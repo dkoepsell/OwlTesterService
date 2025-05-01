@@ -223,6 +223,7 @@ class OwlTester:
         consistency = self.check_consistency()
         inferred_axioms = self.get_inferred_axioms()
         expressivity = self.get_ontology_expressivity()
+        fol_premises = self.generate_fol_premises()
         
         # Ensure axioms and inferred_axioms are lists, not generators
         if not isinstance(axioms, list):
@@ -242,7 +243,8 @@ class OwlTester:
             },
             "axioms": axioms,
             "consistency": consistency,
-            "inferred": inferred_axioms
+            "inferred": inferred_axioms,
+            "fol_premises": fol_premises
         }
         
         # Add additional metrics
@@ -252,6 +254,140 @@ class OwlTester:
         }
         
         return report
+        
+    def generate_fol_premises(self):
+        """
+        Generate First Order Logic (FOL) premises from the ontology axioms.
+        
+        Returns:
+            list: A list of FOL premises as strings
+        """
+        fol_premises = []
+        
+        try:
+            # Convert class hierarchies to FOL
+            # SubClassOf(A, B) -> ∀x: A(x) → B(x)
+            classes_list = list(self.onto.classes())
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    # Process subclasses
+                    is_a_list = list(cls.is_a) if hasattr(cls, 'is_a') else []
+                    for parent in is_a_list:
+                        if hasattr(parent, 'name') and parent.name is not None:
+                            fol_premises.append({
+                                "type": "SubClassOf",
+                                "fol": f"∀x: {cls.name}(x) → {parent.name}(x)",
+                                "description": f"All instances of {cls.name} are also instances of {parent.name}"
+                            })
+                except Exception as e:
+                    print(f"Error processing class {cls.name}: {str(e)}")
+                
+            # Convert object properties to FOL
+            obj_properties = list(self.onto.object_properties())
+            for prop in obj_properties:
+                if prop.name is None:
+                    continue
+                
+                try:
+                    # Handle domain restrictions
+                    # Domain(prop, C) -> ∀x,y: prop(x,y) → C(x)
+                    if hasattr(prop, 'domain') and prop.domain:
+                        domain_list = list(prop.domain) if hasattr(prop.domain, '__iter__') else []
+                        for domain in domain_list:
+                            if hasattr(domain, 'name') and domain.name is not None:
+                                fol_premises.append({
+                                    "type": "PropertyDomain",
+                                    "fol": f"∀x,y: {prop.name}(x,y) → {domain.name}(x)",
+                                    "description": f"If x relates to y via {prop.name}, then x is a {domain.name}"
+                                })
+                    
+                    # Handle range restrictions
+                    # Range(prop, C) -> ∀x,y: prop(x,y) → C(y)
+                    if hasattr(prop, 'range') and prop.range:
+                        range_list = list(prop.range) if hasattr(prop.range, '__iter__') else []
+                        for range_cls in range_list:
+                            if hasattr(range_cls, 'name') and range_cls.name is not None:
+                                fol_premises.append({
+                                    "type": "PropertyRange",
+                                    "fol": f"∀x,y: {prop.name}(x,y) → {range_cls.name}(y)",
+                                    "description": f"If x relates to y via {prop.name}, then y is a {range_cls.name}"
+                                })
+                    
+                    # Handle property characteristics
+                    if hasattr(prop, 'transitive') and prop.transitive:
+                        fol_premises.append({
+                            "type": "Transitive",
+                            "fol": f"∀x,y,z: ({prop.name}(x,y) ∧ {prop.name}(y,z)) → {prop.name}(x,z)",
+                            "description": f"Property {prop.name} is transitive"
+                        })
+                    
+                    if hasattr(prop, 'symmetric') and prop.symmetric:
+                        fol_premises.append({
+                            "type": "Symmetric",
+                            "fol": f"∀x,y: {prop.name}(x,y) → {prop.name}(y,x)",
+                            "description": f"Property {prop.name} is symmetric"
+                        })
+                    
+                    if hasattr(prop, 'functional') and prop.functional:
+                        fol_premises.append({
+                            "type": "Functional",
+                            "fol": f"∀x,y,z: ({prop.name}(x,y) ∧ {prop.name}(x,z)) → y = z",
+                            "description": f"Property {prop.name} is functional"
+                        })
+                except Exception as e:
+                    print(f"Error processing property {prop.name}: {str(e)}")
+            
+            # Add disjoint class axioms
+            # DisjointClasses(A, B) -> ∀x: ¬(A(x) ∧ B(x))
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    if hasattr(cls, 'disjoints'):
+                        disjoints = list(cls.disjoints())
+                        for disjoint in disjoints:
+                            entities = list(disjoint.entities)
+                            for entity in entities:
+                                if entity != cls and hasattr(entity, 'name') and entity.name is not None:
+                                    fol_premises.append({
+                                        "type": "DisjointClasses",
+                                        "fol": f"∀x: ¬({cls.name}(x) ∧ {entity.name}(x))",
+                                        "description": f"No instance can be both a {cls.name} and a {entity.name}"
+                                    })
+                except Exception as e:
+                    print(f"Error processing disjoints for {cls.name}: {str(e)}")
+            
+            # Handle equivalent classes
+            # EquivalentClasses(A, B) -> ∀x: A(x) ↔ B(x)
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
+                        equiv_list = list(cls.equivalent_to)
+                        for equiv in equiv_list:
+                            if hasattr(equiv, 'name') and equiv.name is not None:
+                                fol_premises.append({
+                                    "type": "EquivalentClasses",
+                                    "fol": f"∀x: {cls.name}(x) ↔ {equiv.name}(x)",
+                                    "description": f"A thing is a {cls.name} if and only if it is a {equiv.name}"
+                                })
+                except Exception as e:
+                    print(f"Error processing equivalents for {cls.name}: {str(e)}")
+                
+        except Exception as e:
+            fol_premises.append({
+                "type": "Error",
+                "fol": f"Error generating FOL premises: {str(e)}",
+                "description": "An error occurred during FOL generation"
+            })
+            
+        return fol_premises
     
     def extract_axioms(self):
         """
@@ -541,6 +677,20 @@ class OwlTester:
         }
         
         try:
+            # Check if Java is available
+            import shutil
+            java_path = shutil.which('java')
+            
+            if not java_path:
+                # Java is not available, provide a detailed message
+                consistency_report["consistent"] = None  # None means we can't determine
+                consistency_report["issues"].append(
+                    "Cannot check consistency: Java is not installed. " +
+                    "The Pellet reasoner requires Java to run consistency checks. " +
+                    "This doesn't mean the ontology is inconsistent, just that we can't verify it."
+                )
+                return consistency_report
+                
             # Create a reasoner
             with self.onto:
                 try:
@@ -563,11 +713,19 @@ class OwlTester:
                             consistency_report["issues"].append(str(explanation))
                     except Exception as e:
                         consistency_report["issues"].append(f"Error getting explanations: {str(e)}")
-                        pass
                         
         except Exception as e:
-            consistency_report["consistent"] = False
-            consistency_report["issues"].append(f"Error during consistency check: {str(e)}")
+            # Handle the specific java not found error with a clearer message
+            if "No such file or directory: 'java'" in str(e):
+                consistency_report["consistent"] = None  # None means we can't determine
+                consistency_report["issues"].append(
+                    "Cannot check consistency: Java is not installed. " +
+                    "The Pellet reasoner requires Java to run consistency checks. " +
+                    "This doesn't mean the ontology is inconsistent, just that we can't verify it."
+                )
+            else:
+                consistency_report["consistent"] = False
+                consistency_report["issues"].append(f"Error during consistency check: {str(e)}")
         
         return consistency_report
     
@@ -581,6 +739,20 @@ class OwlTester:
         inferred_axioms = []
         
         try:
+            # Check if Java is available
+            import shutil
+            java_path = shutil.which('java')
+            
+            if not java_path:
+                # Java is not available, provide a detailed message
+                inferred_axioms.append({
+                    "type": "Info",
+                    "description": "Cannot infer axioms: Java is not installed. " +
+                                 "The Pellet reasoner requires Java to run inference. " +
+                                 "Basic axiom extraction will still work."
+                })
+                return inferred_axioms
+            
             # Create a reasoner to infer axioms
             with self.onto:
                 try:
@@ -589,7 +761,8 @@ class OwlTester:
                                         infer_data_property_values=True)
                     
                     # Extract inferred class subsumptions
-                    for cls in self.onto.classes():
+                    classes_list = list(self.onto.classes())
+                    for cls in classes_list:
                         if cls.name is None:
                             continue
                             
@@ -615,15 +788,27 @@ class OwlTester:
                                     "subject": cls.name,
                                     "description": f"Error processing inferred parents: {str(e)}"
                                 })
-                except:
-                    # If reasoning fails, just return empty inferred axioms
-                    pass
+                except Exception as e:
+                    # If reasoning fails, provide more details
+                    inferred_axioms.append({
+                        "type": "Error",
+                        "description": f"Error during reasoning: {str(e)}"
+                    })
         except Exception as e:
-            # Add error information
-            inferred_axioms.append({
-                "type": "Error",
-                "description": f"Error inferring axioms: {str(e)}"
-            })
+            # Handle the specific java not found error with a clearer message
+            if "No such file or directory: 'java'" in str(e):
+                inferred_axioms.append({
+                    "type": "Info",
+                    "description": "Cannot infer axioms: Java is not installed. " +
+                                 "The Pellet reasoner requires Java to run inference. " +
+                                 "Basic axiom extraction will still work."
+                })
+            else:
+                # Add error information
+                inferred_axioms.append({
+                    "type": "Error",
+                    "description": f"Error inferring axioms: {str(e)}"
+                })
         
         return inferred_axioms
     

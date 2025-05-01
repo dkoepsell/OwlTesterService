@@ -214,7 +214,8 @@ def analyze_owl(filename):
                         complexity=analysis.get('complexity', 0),
                         axioms=analysis.get('axioms', []),
                         consistency_issues=analysis.get('consistency_issues', []),
-                        inferred_axioms=analysis.get('inferred_axioms', [])
+                        inferred_axioms=analysis.get('inferred_axioms', []),
+                        fol_premises=analysis.get('fol_premises', [])
                     )
                     db.session.add(ontology_analysis)
                     db.session.commit()
