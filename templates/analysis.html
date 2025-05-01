@@ -1,0 +1,495 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Ontology Analysis Report</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Ontology Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-tag me-2"></i>File: </h6>
+                        <p class="ms-4">{{ original_filename }}</p>
+                        
+                        <h6><i class="fas fa-link me-2"></i>IRI: </h6>
+                        <p class="ms-4">{{ analysis.ontology_iri }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-project-diagram me-2"></i>Expressivity: </h6>
+                        <p class="ms-4">{{ analysis.metrics.expressivity }}</p>
+                        
+                        <h6><i class="fas fa-chart-line me-2"></i>Complexity: </h6>
+                        <p class="ms-4">{{ analysis.metrics.complexity }} axioms</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Ontology Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100 bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="display-4">{{ analysis.stats.class_count }}</h3>
+                                <p class="mb-0">Classes</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100 bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="display-4">{{ analysis.stats.object_property_count }}</h3>
+                                <p class="mb-0">Object Properties</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100 bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="display-4">{{ analysis.stats.data_property_count }}</h3>
+                                <p class="mb-0">Data Properties</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card h-100 bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="display-4">{{ analysis.stats.individual_count }}</h3>
+                                <p class="mb-0">Individuals</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Consistency Check</h5>
+                {% if analysis.consistency.consistent %}
+                <span class="badge bg-success">Consistent</span>
+                {% else %}
+                <span class="badge bg-danger">Inconsistent</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if analysis.consistency.consistent %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    The ontology is logically consistent. No contradictions were found.
+                </div>
+                {% else %}
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>The ontology is inconsistent!</strong> The following issues were detected:
+                </div>
+                <ul class="list-group">
+                    {% for issue in analysis.consistency.issues %}
+                    <li class="list-group-item list-group-item-danger">{{ issue }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-list-ul me-2"></i>Axioms</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="axiomTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="all-axioms-tab" data-bs-toggle="tab" data-bs-target="#all-axioms" type="button" role="tab" aria-controls="all-axioms" aria-selected="true">
+                            All Axioms ({{ analysis.axioms|length }})
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="class-axioms-tab" data-bs-toggle="tab" data-bs-target="#class-axioms" type="button" role="tab" aria-controls="class-axioms" aria-selected="false">
+                            Class Axioms
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="property-axioms-tab" data-bs-toggle="tab" data-bs-target="#property-axioms" type="button" role="tab" aria-controls="property-axioms" aria-selected="false">
+                            Property Axioms
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="individual-axioms-tab" data-bs-toggle="tab" data-bs-target="#individual-axioms" type="button" role="tab" aria-controls="individual-axioms" aria-selected="false">
+                            Individual Axioms
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content pt-3" id="axiomTabsContent">
+                    <div class="tab-pane fade show active" id="all-axioms" role="tabpanel" aria-labelledby="all-axioms-tab">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="searchAllAxioms" placeholder="Search axioms...">
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="allAxiomsTable">
+                                    {% for axiom in analysis.axioms %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ axiom.type }}</span></td>
+                                        <td>{{ axiom.description }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if not analysis.axioms %}
+                        <div class="alert alert-info">No axioms found.</div>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="class-axioms" role="tabpanel" aria-labelledby="class-axioms-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for axiom in analysis.axioms %}
+                                    {% if axiom.type in ['SubClassOf', 'EquivalentClasses', 'DisjointClasses'] %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ axiom.type }}</span></td>
+                                        <td>{{ axiom.description }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="property-axioms" role="tabpanel" aria-labelledby="property-axioms-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for axiom in analysis.axioms %}
+                                    {% if axiom.type in ['ObjectPropertyDomain', 'ObjectPropertyRange', 'DataPropertyDomain', 'DataPropertyRange', 'Transitive', 'Symmetric', 'Asymmetric', 'Functional', 'InverseFunctional', 'Reflexive', 'Irreflexive'] %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ axiom.type }}</span></td>
+                                        <td>{{ axiom.description }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="individual-axioms" role="tabpanel" aria-labelledby="individual-axioms-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for axiom in analysis.axioms %}
+                                    {% if axiom.type in ['ClassAssertion', 'ObjectPropertyAssertion', 'DataPropertyAssertion'] %}
+                                    <tr>
+                                        <td><span class="badge bg-secondary">{{ axiom.type }}</span></td>
+                                        <td>{{ axiom.description }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Inferred Axioms</h5>
+            </div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="searchInferredAxioms" placeholder="Search inferred axioms...">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inferredAxiomsTable">
+                            {% for axiom in analysis.inferred %}
+                            <tr>
+                                <td><span class="badge bg-info">{{ axiom.type }}</span></td>
+                                <td>{{ axiom.description }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if not analysis.inferred %}
+                <div class="alert alert-info">No inferred axioms found.</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Ontology Entities</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="entityTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="classes-tab" data-bs-toggle="tab" data-bs-target="#classes" type="button" role="tab" aria-controls="classes" aria-selected="true">
+                            Classes ({{ classes|length }})
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="object-properties-tab" data-bs-toggle="tab" data-bs-target="#object-properties" type="button" role="tab" aria-controls="object-properties" aria-selected="false">
+                            Object Properties ({{ relations|length }})
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="data-properties-tab" data-bs-toggle="tab" data-bs-target="#data-properties" type="button" role="tab" aria-controls="data-properties" aria-selected="false">
+                            Data Properties ({{ data_properties|length }})
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="individuals-tab" data-bs-toggle="tab" data-bs-target="#individuals" type="button" role="tab" aria-controls="individuals" aria-selected="false">
+                            Individuals ({{ individuals|length }})
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content pt-3" id="entityTabsContent">
+                    <div class="tab-pane fade show active" id="classes" role="tabpanel" aria-labelledby="classes-tab">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="searchClasses" placeholder="Search classes...">
+                        </div>
+                        <ul class="list-group" id="classesList">
+                            {% for class in classes %}
+                            <li class="list-group-item">{{ class }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% if not classes %}
+                        <div class="alert alert-info">No classes found.</div>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="object-properties" role="tabpanel" aria-labelledby="object-properties-tab">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="searchObjectProperties" placeholder="Search object properties...">
+                        </div>
+                        <ul class="list-group" id="objectPropertiesList">
+                            {% for relation in relations %}
+                            <li class="list-group-item">{{ relation }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% if not relations %}
+                        <div class="alert alert-info">No object properties found.</div>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="data-properties" role="tabpanel" aria-labelledby="data-properties-tab">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="searchDataProperties" placeholder="Search data properties...">
+                        </div>
+                        <ul class="list-group" id="dataPropertiesList">
+                            {% for prop in data_properties %}
+                            <li class="list-group-item">{{ prop }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% if not data_properties %}
+                        <div class="alert alert-info">No data properties found.</div>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="individuals" role="tabpanel" aria-labelledby="individuals-tab">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="searchIndividuals" placeholder="Search individuals...">
+                        </div>
+                        <ul class="list-group" id="individualsList">
+                            {% for individual in individuals %}
+                            <li class="list-group-item">{{ individual }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% if not individuals %}
+                        <div class="alert alert-info">No individuals found.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mb-4">
+            <a href="{{ url_for('upload_owl') }}" class="btn btn-primary">
+                <i class="fas fa-upload me-2"></i>Upload Another Ontology
+            </a>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-home me-2"></i>Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality for axioms
+        const searchAllAxioms = document.getElementById('searchAllAxioms');
+        const allAxiomsTable = document.getElementById('allAxiomsTable');
+        
+        if (searchAllAxioms && allAxiomsTable) {
+            searchAllAxioms.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const rows = allAxiomsTable.getElementsByTagName('tr');
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const textContent = rows[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        rows[i].style.display = '';
+                    } else {
+                        rows[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Search functionality for inferred axioms
+        const searchInferredAxioms = document.getElementById('searchInferredAxioms');
+        const inferredAxiomsTable = document.getElementById('inferredAxiomsTable');
+        
+        if (searchInferredAxioms && inferredAxiomsTable) {
+            searchInferredAxioms.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const rows = inferredAxiomsTable.getElementsByTagName('tr');
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const textContent = rows[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        rows[i].style.display = '';
+                    } else {
+                        rows[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Search functionality for classes
+        const searchClasses = document.getElementById('searchClasses');
+        const classesList = document.getElementById('classesList');
+        
+        if (searchClasses && classesList) {
+            searchClasses.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const items = classesList.getElementsByTagName('li');
+                
+                for (let i = 0; i < items.length; i++) {
+                    const textContent = items[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        items[i].style.display = '';
+                    } else {
+                        items[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Search functionality for object properties
+        const searchObjectProperties = document.getElementById('searchObjectProperties');
+        const objectPropertiesList = document.getElementById('objectPropertiesList');
+        
+        if (searchObjectProperties && objectPropertiesList) {
+            searchObjectProperties.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const items = objectPropertiesList.getElementsByTagName('li');
+                
+                for (let i = 0; i < items.length; i++) {
+                    const textContent = items[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        items[i].style.display = '';
+                    } else {
+                        items[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Search functionality for data properties
+        const searchDataProperties = document.getElementById('searchDataProperties');
+        const dataPropertiesList = document.getElementById('dataPropertiesList');
+        
+        if (searchDataProperties && dataPropertiesList) {
+            searchDataProperties.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const items = dataPropertiesList.getElementsByTagName('li');
+                
+                for (let i = 0; i < items.length; i++) {
+                    const textContent = items[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        items[i].style.display = '';
+                    } else {
+                        items[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Search functionality for individuals
+        const searchIndividuals = document.getElementById('searchIndividuals');
+        const individualsList = document.getElementById('individualsList');
+        
+        if (searchIndividuals && individualsList) {
+            searchIndividuals.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const items = individualsList.getElementsByTagName('li');
+                
+                for (let i = 0; i < items.length; i++) {
+                    const textContent = items[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        items[i].style.display = '';
+                    } else {
+                        items[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
