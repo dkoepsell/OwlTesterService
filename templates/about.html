@@ -1,0 +1,193 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">About FOL-BFO-OWL Tester</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Introduction</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    The FOL-BFO-OWL Tester is a web service designed to validate and test First-Order Logic (FOL) 
+                    expressions against the Basic Formal Ontology (BFO) classes and relations.
+                </p>
+                <p>
+                    This tool helps ontology developers, researchers, and students check if their logical expressions 
+                    conform to BFO standards and identify potential issues in their formulations.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>How It Works</h5>
+            </div>
+            <div class="card-body">
+                <ol class="list-group list-group-numbered mb-3">
+                    <li class="list-group-item">
+                        <strong>Enter a FOL Expression</strong>: Type or paste your first-order logic expression in the input field.
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Test the Expression</strong>: Click the "Test Expression" button to analyze your input.
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Review Results</strong>: The system will parse your expression, check it against BFO classes and relations, 
+                        and display detailed results.
+                    </li>
+                    <li class="list-group-item">
+                        <strong>Fix Issues</strong>: If any problems are detected, you can use the provided feedback to refine your expression.
+                    </li>
+                </ol>
+                
+                <h6 class="mt-4">The tester checks for:</h6>
+                <ul class="list-group">
+                    <li class="list-group-item">
+                        <i class="fas fa-check-circle text-success me-2"></i>Syntactic validity of FOL expressions
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-check-circle text-success me-2"></i>Recognition of BFO classes and relations
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-check-circle text-success me-2"></i>Identification of non-BFO terms
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-check-circle text-success me-2"></i>Structural issues like unbalanced parentheses or improper quantifier usage
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-book me-2"></i>About BFO</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    The Basic Formal Ontology (BFO) is a top-level ontology designed to support information integration, 
+                    retrieval, and analysis across diverse scientific domains. BFO serves as a foundation for building 
+                    domain-specific ontologies in a way that supports interoperability.
+                </p>
+                <p>
+                    BFO divides entities into two main categories:
+                </p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                Continuants
+                            </div>
+                            <div class="card-body">
+                                Entities that persist through time while maintaining their identity, even as they undergo 
+                                different sorts of changes. Examples include objects, qualities, and functions.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                Occurrents
+                            </div>
+                            <div class="card-body">
+                                Entities that happen or unfold in time. Examples include processes, events, and temporal regions.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <p>
+                        For more information about BFO, visit the 
+                        <a href="https://basic-formal-ontology.org/" target="_blank">BFO official website</a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-code me-2"></i>FOL Syntax Guide</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    When writing First-Order Logic expressions for the tester, use the following syntax:
+                </p>
+                
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Logical Operator</th>
+                            <th>Symbol</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Universal Quantifier</td>
+                            <td><code>forall</code></td>
+                            <td><code>forall x (Human(x) -> Mortal(x))</code></td>
+                        </tr>
+                        <tr>
+                            <td>Existential Quantifier</td>
+                            <td><code>exists</code></td>
+                            <td><code>exists x (Student(x) & Happy(x))</code></td>
+                        </tr>
+                        <tr>
+                            <td>Conjunction (AND)</td>
+                            <td><code>&</code></td>
+                            <td><code>Tall(john) & Strong(john)</code></td>
+                        </tr>
+                        <tr>
+                            <td>Disjunction (OR)</td>
+                            <td><code>|</code></td>
+                            <td><code>Happy(mary) | Sad(mary)</code></td>
+                        </tr>
+                        <tr>
+                            <td>Negation (NOT)</td>
+                            <td><code>~</code></td>
+                            <td><code>~Raining(today)</code></td>
+                        </tr>
+                        <tr>
+                            <td>Implication</td>
+                            <td><code>-></code></td>
+                            <td><code>Wet(grass) -> Rained(recently)</code></td>
+                        </tr>
+                        <tr>
+                            <td>Biconditional</td>
+                            <td><code><-></code></td>
+                            <td><code>Bachelor(x) <-> (Man(x) & ~Married(x))</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <p class="mt-4">
+                    Variables are typically represented by lowercase letters. Predicates and constants typically start with uppercase letters.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-code-branch me-2"></i>Project Information</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    This web service is based on the 
+                    <a href="https://github.com/dkoepsell/FOL-BFO-OWL-tester" target="_blank">FOL-BFO-OWL-tester</a> 
+                    by dkoepsell. The original Python script has been adapted and extended to provide a web interface
+                    and API for testing FOL expressions against BFO-OWL guidelines.
+                </p>
+                <p>
+                    Technologies used:
+                </p>
+                <ul>
+                    <li>Backend: Flask, Python, NLTK, Owlready2</li>
+                    <li>Frontend: HTML5, Bootstrap 5, JavaScript</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

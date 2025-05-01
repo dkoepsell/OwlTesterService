@@ -1,0 +1,227 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">FOL-BFO-OWL Expression Tester</h1>
+        
+        {% if error %}
+        <div class="alert alert-danger" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i> {{ error }}
+        </div>
+        {% endif %}
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-code me-2"></i>Test Your FOL Expression</h5>
+            </div>
+            <div class="card-body">
+                <form id="expression-form">
+                    <div class="mb-3">
+                        <label for="expression-input" class="form-label">Enter your First-Order Logic expression:</label>
+                        <textarea class="form-control" id="expression-input" rows="3" placeholder="e.g., forall x (Continuant(x) -> exists t (temporal_region(t) & exists_at(x,t)))"
+                                 required></textarea>
+                        <div class="form-text">
+                            Use standard FOL syntax with BFO classes and relations.
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check-circle me-2"></i>Test Expression
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="clear-btn">
+                            <i class="fas fa-eraser me-2"></i>Clear
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div id="results-container" class="card mb-4 d-none">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Test Results</h5>
+            </div>
+            <div class="card-body">
+                <div id="expression-display" class="alert alert-secondary mb-3">
+                    <strong>Expression:</strong> <span id="expression-text"></span>
+                </div>
+                
+                <div id="validity-result" class="mb-3">
+                    <!-- Filled by JavaScript -->
+                </div>
+                
+                <div id="issues-container" class="mb-3 d-none">
+                    <h6><i class="fas fa-exclamation-circle me-2"></i>Issues:</h6>
+                    <ul id="issues-list" class="list-group">
+                        <!-- Filled by JavaScript -->
+                    </ul>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">BFO Classes Used</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul id="classes-used-list" class="list-unstyled">
+                                    <!-- Filled by JavaScript -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">BFO Relations Used</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul id="relations-used-list" class="list-unstyled">
+                                    <!-- Filled by JavaScript -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0">Non-BFO Terms</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul id="non-bfo-terms-list" class="list-unstyled">
+                                    <!-- Filled by JavaScript -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Available BFO Classes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text" id="search-classes-addon">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="search-classes" 
+                                   placeholder="Search classes..." aria-label="Search classes" 
+                                   aria-describedby="search-classes-addon">
+                        </div>
+                        <div class="bfo-list-container">
+                            <ul id="bfo-classes-list" class="list-group">
+                                {% for class in bfo_classes %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    {{ class }}
+                                    <button class="btn btn-sm btn-outline-primary copy-btn" data-term="{{ class }}">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-link me-2"></i>Available BFO Relations</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text" id="search-relations-addon">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="search-relations" 
+                                   placeholder="Search relations..." aria-label="Search relations" 
+                                   aria-describedby="search-relations-addon">
+                        </div>
+                        <div class="bfo-list-container">
+                            <ul id="bfo-relations-list" class="list-group">
+                                {% for relation in bfo_relations %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    {{ relation }}
+                                    <button class="btn btn-sm btn-outline-primary copy-btn" data-term="{{ relation }}">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Example Expressions</h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="exampleAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingOne">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                                Example 1: Continuant exists at some temporal region
+                            </button>
+                        </h2>
+                        <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#exampleAccordion">
+                            <div class="accordion-body">
+                                <code>forall x (Continuant(x) -> exists t (temporal_region(t) & exists_at(x,t)))</code>
+                                <button class="btn btn-sm btn-outline-primary float-end use-example" 
+                                        data-example="forall x (Continuant(x) -> exists t (temporal_region(t) & exists_at(x,t)))">
+                                    Use This Example
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingTwo">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                Example 2: Process occurs in some temporal region
+                            </button>
+                        </h2>
+                        <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#exampleAccordion">
+                            <div class="accordion-body">
+                                <code>forall p (Process(p) -> exists t (temporal_region(t) & occurs_in(p, t)))</code>
+                                <button class="btn btn-sm btn-outline-primary float-end use-example" 
+                                        data-example="forall p (Process(p) -> exists t (temporal_region(t) & occurs_in(p, t)))">
+                                    Use This Example
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingThree">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                Example 3: Material entity is a subclass of independent continuant
+                            </button>
+                        </h2>
+                        <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#exampleAccordion">
+                            <div class="accordion-body">
+                                <code>forall x (material_entity(x) -> IndependentContinuant(x))</code>
+                                <button class="btn btn-sm btn-outline-primary float-end use-example" 
+                                        data-example="forall x (material_entity(x) -> IndependentContinuant(x))">
+                                    Use This Example
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // The main JavaScript functionality is in static/js/script.js
+</script>
+{% endblock %}

@@ -1,0 +1,101 @@
+/* Custom CSS for FOL-BFO-OWL Tester */
+
+/* List containers */
+.bfo-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Code styling */
+code {
+    background-color: rgba(var(--bs-secondary-rgb), 0.2);
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+/* Accordion styling */
+.accordion-button:not(.collapsed) {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    color: var(--bs-primary);
+}
+
+/* Custom card styling */
+.card {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.card-header {
+    border-bottom: 0;
+}
+
+/* Make card headers more vibrant */
+.card .card-header.bg-secondary {
+    background-color: var(--bs-secondary) !important;
+}
+
+/* Styling for list items */
+.bfo-class-item, .bfo-relation-item {
+    transition: background-color 0.2s;
+}
+
+.bfo-class-item:hover, .bfo-relation-item:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+/* Custom button styling */
+.copy-btn {
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.copy-btn:hover {
+    opacity: 1;
+}
+
+/* Expression box styling */
+#expression-input {
+    font-family: monospace;
+    resize: vertical;
+}
+
+/* Form feedback styling */
+.error-feedback {
+    color: var(--bs-danger);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* Results styling */
+#expression-display {
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Custom fade animation for results */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s;
+}
+
+/* Tooltip customization */
+.tooltip-inner {
+    max-width: 300px;
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+    .bfo-list-container {
+        max-height: 200px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
