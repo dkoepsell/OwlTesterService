@@ -268,6 +268,43 @@
             </div>
         </div>
         
+        <!-- First-Order Logic Premises -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-code me-2"></i>First-Order Logic Premises</h5>
+            </div>
+            <div class="card-body">
+                <p class="lead">The following FOL premises have been generated from the ontology axioms:</p>
+                <div class="input-group mb-3">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="searchFOLPremises" placeholder="Search FOL premises...">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>FOL Formula</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="folPremisesTable">
+                            {% for premise in analysis.fol_premises %}
+                            <tr>
+                                <td><span class="badge bg-primary">{{ premise.type }}</span></td>
+                                <td><code>{{ premise.fol }}</code></td>
+                                <td>{{ premise.description }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if not analysis.fol_premises %}
+                <div class="alert alert-info">No FOL premises could be generated from this ontology.</div>
+                {% endif %}
+            </div>
+        </div>
+        
         <div class="card mb-4">
             <div class="card-header bg-secondary text-white">
                 <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Ontology Entities</h5>
@@ -399,6 +436,26 @@
             searchInferredAxioms.addEventListener('input', function() {
                 const searchText = this.value.toLowerCase();
                 const rows = inferredAxiomsTable.getElementsByTagName('tr');
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const textContent = rows[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        rows[i].style.display = '';
+                    } else {
+                        rows[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // Search functionality for FOL premises
+        const searchFOLPremises = document.getElementById('searchFOLPremises');
+        const folPremisesTable = document.getElementById('folPremisesTable');
+        
+        if (searchFOLPremises && folPremisesTable) {
+            searchFOLPremises.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const rows = folPremisesTable.getElementsByTagName('tr');
                 
                 for (let i = 0; i < rows.length; i++) {
                     const textContent = rows[i].textContent.toLowerCase();
