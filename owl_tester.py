@@ -198,6 +198,18 @@ class OwlTester:
         Returns:
             dict: A report containing ontology statistics, axioms, and consistency issues
         """
+        # Extract data first to ensure proper conversion of generators to lists
+        axioms = self.extract_axioms()
+        consistency = self.check_consistency()
+        inferred_axioms = self.get_inferred_axioms()
+        expressivity = self.get_ontology_expressivity()
+        
+        # Ensure axioms and inferred_axioms are lists, not generators
+        if not isinstance(axioms, list):
+            axioms = list(axioms)
+        if not isinstance(inferred_axioms, list):
+            inferred_axioms = list(inferred_axioms)
+            
         report = {
             "ontology_name": self.ontology_source,
             "ontology_iri": str(self.onto.base_iri),
@@ -208,15 +220,15 @@ class OwlTester:
                 "individual_count": len(self.individuals),
                 "annotation_property_count": len(self.annotation_properties)
             },
-            "axioms": self.extract_axioms(),
-            "consistency": self.check_consistency(),
-            "inferred": self.get_inferred_axioms()
+            "axioms": axioms,
+            "consistency": consistency,
+            "inferred": inferred_axioms
         }
         
         # Add additional metrics
         report["metrics"] = {
-            "expressivity": self.get_ontology_expressivity(),
-            "complexity": len(report["axioms"]) + len(report["inferred"])
+            "expressivity": expressivity,
+            "complexity": len(axioms) + len(inferred_axioms)
         }
         
         return report
@@ -257,16 +269,26 @@ class OwlTester:
                         })
             
             # Get disjoint classes
-            if hasattr(cls, 'disjoints') and cls.disjoints():
-                for disjoint in cls.disjoints():
-                    for entity in disjoint.entities:
-                        if entity != cls and hasattr(entity, 'name') and entity.name is not None:
-                            axioms.append({
-                                "type": "DisjointClasses",
-                                "subject": cls.name,
-                                "object": entity.name,
-                                "description": f"{cls.name} is disjoint with {entity.name}"
-                            })
+            if hasattr(cls, 'disjoints'):
+                try:
+                    # Convert to list in case disjoints() returns a generator
+                    disjoints = list(cls.disjoints())
+                    for disjoint in disjoints:
+                        for entity in disjoint.entities:
+                            if entity != cls and hasattr(entity, 'name') and entity.name is not None:
+                                axioms.append({
+                                    "type": "DisjointClasses",
+                                    "subject": cls.name,
+                                    "object": entity.name,
+                                    "description": f"{cls.name} is disjoint with {entity.name}"
+                                })
+                except Exception as e:
+                    # In case of error, add information about what failed
+                    axioms.append({
+                        "type": "Error",
+                        "subject": cls.name if hasattr(cls, 'name') else "Unknown",
+                        "description": f"Error processing disjoints: {str(e)}"
+                    })
         
         # Extract property axioms
         for prop in self.onto.object_properties():
@@ -427,9 +449,12 @@ class OwlTester:
                     
                     # Try to extract more detailed inconsistency info
                     try:
-                        for explanation in self.onto.inconsistency_explanations():
+                        # Convert to list in case inconsistency_explanations() returns a generator
+                        explanations = list(self.onto.inconsistency_explanations())
+                        for explanation in explanations:
                             consistency_report["issues"].append(str(explanation))
-                    except:
+                    except Exception as e:
+                        consistency_report["issues"].append(f"Error getting explanations: {str(e)}")
                         pass
                         
         except Exception as e:
@@ -461,16 +486,26 @@ class OwlTester:
                             continue
                             
                         # Get inferred subclass relationships
-                        for inf_parent in cls.INDIRECT_is_a:
-                            if (hasattr(inf_parent, 'name') and 
-                                inf_parent.name is not None and 
-                                inf_parent not in cls.is_a):
-                                
+                        if hasattr(cls, 'INDIRECT_is_a'):
+                            try:
+                                # Convert to list in case INDIRECT_is_a is a generator
+                                indirect_parents = list(cls.INDIRECT_is_a)
+                                for inf_parent in indirect_parents:
+                                    if (hasattr(inf_parent, 'name') and 
+                                        inf_parent.name is not None and 
+                                        inf_parent not in cls.is_a):
+                                        
+                                        inferred_axioms.append({
+                                            "type": "InferredSubClassOf",
+                                            "subject": cls.name,
+                                            "object": inf_parent.name,
+                                            "description": f"Inferred: {cls.name} is a subclass of {inf_parent.name}"
+                                        })
+                            except Exception as e:
                                 inferred_axioms.append({
-                                    "type": "InferredSubClassOf",
+                                    "type": "Error",
                                     "subject": cls.name,
-                                    "object": inf_parent.name,
-                                    "description": f"Inferred: {cls.name} is a subclass of {inf_parent.name}"
+                                    "description": f"Error processing inferred parents: {str(e)}"
                                 })
                 except:
                     # If reasoning fails, just return empty inferred axioms
