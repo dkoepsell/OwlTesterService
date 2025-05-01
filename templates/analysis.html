@@ -84,19 +84,21 @@
         <div class="card mb-4">
             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Consistency Check</h5>
-                {% if analysis.consistency.consistent %}
+                {% if analysis.consistency.consistent == True %}
                 <span class="badge bg-success">Consistent</span>
-                {% else %}
+                {% elif analysis.consistency.consistent == False %}
                 <span class="badge bg-danger">Inconsistent</span>
+                {% else %}
+                <span class="badge bg-warning">Unknown</span>
                 {% endif %}
             </div>
             <div class="card-body">
-                {% if analysis.consistency.consistent %}
+                {% if analysis.consistency.consistent == True %}
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle me-2"></i>
                     The ontology is logically consistent. No contradictions were found.
                 </div>
-                {% else %}
+                {% elif analysis.consistency.consistent == False %}
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-triangle me-2"></i>
                     <strong>The ontology is inconsistent!</strong> The following issues were detected:
@@ -104,6 +106,16 @@
                 <ul class="list-group">
                     {% for issue in analysis.consistency.issues %}
                     <li class="list-group-item list-group-item-danger">{{ issue }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Consistency Unknown</strong>
+                </div>
+                <ul class="list-group">
+                    {% for issue in analysis.consistency.issues %}
+                    <li class="list-group-item list-group-item-warning">{{ issue }}</li>
                     {% endfor %}
                 </ul>
                 {% endif %}
