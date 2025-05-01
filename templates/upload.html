@@ -1,0 +1,109 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">OWL File Upload and Analysis</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload OWL File</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="upload-form">
+                    <div class="mb-3">
+                        <label for="owl-file" class="form-label">Select an OWL/RDF file to analyze:</label>
+                        <input class="form-control" type="file" id="owl-file" name="owl_file" accept=".owl,.rdf,.xml,.ttl,.n3,.nt" required>
+                        <div class="form-text">
+                            Supported file formats: .owl, .rdf, .xml, .ttl, .n3, .nt (max 16MB)
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-cloud-upload-alt me-2"></i>Upload & Analyze
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>About OWL Analysis</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    Upload an OWL (Web Ontology Language) file to analyze its structure, axioms, and check for consistency and contradictions.
+                </p>
+                
+                <h6 class="mt-3">The analysis includes:</h6>
+                <ul class="list-group mb-3">
+                    <li class="list-group-item">
+                        <i class="fas fa-project-diagram text-primary me-2"></i>Complete list of all axioms in the ontology
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-check-circle text-success me-2"></i>Consistency checking to identify contradictions
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-lightbulb text-warning me-2"></i>Inference of implicit axioms through reasoning
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-chart-pie text-info me-2"></i>Ontology metrics including expressivity and complexity
+                    </li>
+                </ul>
+                
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-clock me-2"></i>
+                    <strong>Note:</strong> Analysis may take a few moments depending on the size and complexity of your ontology.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Optional file upload feedback when a file is selected
+        const fileInput = document.getElementById('owl-file');
+        const form = document.getElementById('upload-form');
+        
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                const fileName = this.files[0].name;
+                const fileSize = (this.files[0].size / 1024 / 1024).toFixed(2);
+                const feedback = document.createElement('div');
+                feedback.className = 'alert alert-info mt-2';
+                feedback.innerHTML = `<i class="fas fa-file me-2"></i><strong>${fileName}</strong> (${fileSize} MB) selected`;
+                
+                // Remove any existing feedback
+                const existingFeedback = document.querySelector('.alert-info');
+                if (existingFeedback) {
+                    existingFeedback.remove();
+                }
+                
+                // Add new feedback
+                this.parentNode.appendChild(feedback);
+            }
+        });
+        
+        form.addEventListener('submit', function() {
+            // Show loading message
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Uploading & Analyzing...';
+        });
+    });
+</script>
+{% endblock %}

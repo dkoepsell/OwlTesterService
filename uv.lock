@@ -83,6 +83,15 @@ wheels = [
 ]
 
 [[package]]
+name = "flask-uploads"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flask" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c9/a8/2c8e9ec04267d94b7852a374cebeb9a32d60f8cba83818af960e64fafbec/Flask-Uploads-0.2.1.tar.gz", hash = "sha256:53ecbd6033667d50ae02b63adebbaa33c7fc56c09e5293025810cf9d841ecb02", size = 7625 }
+
+[[package]]
 name = "greenlet"
 version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -358,6 +367,7 @@ dependencies = [
     { name = "email-validator" },
     { name = "flask" },
     { name = "flask-sqlalchemy" },
+    { name = "flask-uploads" },
     { name = "gunicorn" },
     { name = "nltk" },
     { name = "owlready2" },
@@ -369,6 +379,7 @@ requires-dist = [
     { name = "email-validator", specifier = ">=2.2.0" },
     { name = "flask", specifier = ">=3.1.0" },
     { name = "flask-sqlalchemy", specifier = ">=3.1.1" },
+    { name = "flask-uploads", specifier = ">=0.2.1" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "nltk", specifier = ">=3.9.1" },
     { name = "owlready2", specifier = ">=0.47" },
