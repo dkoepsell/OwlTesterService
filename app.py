@@ -203,7 +203,7 @@ def analyze_owl(filename):
                         ontology_file_id=ontology_file.id,
                         ontology_name=analysis.get('ontology_name', 'Unknown'),
                         ontology_iri=analysis.get('ontology_iri', ''),
-                        is_consistent=analysis.get('is_consistent', True),
+                        is_consistent=analysis.get('consistency', {}).get('consistent', True),
                         class_count=analysis.get('class_count', 0),
                         object_property_count=analysis.get('object_property_count', 0),
                         data_property_count=analysis.get('data_property_count', 0),
@@ -213,8 +213,8 @@ def analyze_owl(filename):
                         expressivity=analysis.get('expressivity', ''),
                         complexity=analysis.get('complexity', 0),
                         axioms=analysis.get('axioms', []),
-                        consistency_issues=analysis.get('consistency_issues', []),
-                        inferred_axioms=analysis.get('inferred_axioms', []),
+                        consistency_issues=analysis.get('consistency', {}).get('issues', []),
+                        inferred_axioms=analysis.get('inferred', []),
                         fol_premises=analysis.get('fol_premises', [])
                     )
                     db.session.add(ontology_analysis)

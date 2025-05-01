@@ -31,7 +31,7 @@ class OntologyAnalysis(db.Model):
     # Basic ontology information
     ontology_name = db.Column(db.String(255), nullable=True)
     ontology_iri = db.Column(db.String(500), nullable=True)
-    is_consistent = db.Column(db.Boolean, default=True)
+    is_consistent = db.Column(db.Boolean, nullable=True, default=True)
     
     # Statistics
     class_count = db.Column(db.Integer, default=0)
