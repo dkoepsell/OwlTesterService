@@ -49,35 +49,55 @@ class OwlTester:
         self.individuals = []
         self.annotation_properties = []
         
-        # Collect classes
-        for c in self.onto.classes():
-            classname = c.name
-            if classname is not None:
-                self.bfo_classes.append(classname)
+        try:
+            # Collect classes - convert generator to list first
+            ontology_classes = list(self.onto.classes())
+            for c in ontology_classes:
+                classname = c.name
+                if classname is not None:
+                    self.bfo_classes.append(classname)
+        except Exception as e:
+            print(f"Error collecting classes: {str(e)}")
         
-        # Collect object properties (relations)
-        for op in self.onto.object_properties():
-            propname = op.name
-            if propname is not None:
-                self.bfo_relations.append(propname)
+        try:
+            # Collect object properties (relations) - convert generator to list first
+            obj_properties = list(self.onto.object_properties())
+            for op in obj_properties:
+                propname = op.name
+                if propname is not None:
+                    self.bfo_relations.append(propname)
+        except Exception as e:
+            print(f"Error collecting object properties: {str(e)}")
         
-        # Collect data properties
-        for dp in self.onto.data_properties():
-            propname = dp.name
-            if propname is not None:
-                self.data_properties.append(propname)
+        try:
+            # Collect data properties - convert generator to list first
+            data_properties = list(self.onto.data_properties())
+            for dp in data_properties:
+                propname = dp.name
+                if propname is not None:
+                    self.data_properties.append(propname)
+        except Exception as e:
+            print(f"Error collecting data properties: {str(e)}")
         
-        # Collect individuals
-        for i in self.onto.individuals():
-            indname = i.name
-            if indname is not None:
-                self.individuals.append(indname)
+        try:
+            # Collect individuals - convert generator to list first
+            indiv_list = list(self.onto.individuals())
+            for i in indiv_list:
+                indname = i.name
+                if indname is not None:
+                    self.individuals.append(indname)
+        except Exception as e:
+            print(f"Error collecting individuals: {str(e)}")
                 
-        # Collect annotation properties
-        for ap in self.onto.annotation_properties():
-            propname = ap.name
-            if propname is not None:
-                self.annotation_properties.append(propname)
+        try:
+            # Collect annotation properties - convert generator to list first
+            annot_properties = list(self.onto.annotation_properties())
+            for ap in annot_properties:
+                propname = ap.name
+                if propname is not None:
+                    self.annotation_properties.append(propname)
+        except Exception as e:
+            print(f"Error collecting annotation properties: {str(e)}")
     
     def test_expression(self, input_expr):
         """
@@ -242,181 +262,269 @@ class OwlTester:
         """
         axioms = []
         
-        # Extract class axioms
-        for cls in self.onto.classes():
-            if cls.name is None:
-                continue
-                
-            # Get subclass relationships
-            for parent in cls.is_a:
-                if hasattr(parent, 'name') and parent.name is not None:
-                    axioms.append({
-                        "type": "SubClassOf",
-                        "subject": cls.name,
-                        "object": parent.name,
-                        "description": f"{cls.name} is a subclass of {parent.name}"
-                    })
-            
-            # Get equivalent classes
-            if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
-                for equiv in cls.equivalent_to:
-                    if hasattr(equiv, 'name') and equiv.name is not None:
-                        axioms.append({
-                            "type": "EquivalentClasses",
-                            "subject": cls.name,
-                            "object": equiv.name,
-                            "description": f"{cls.name} is equivalent to {equiv.name}"
-                        })
-            
-            # Get disjoint classes
-            if hasattr(cls, 'disjoints'):
-                try:
-                    # Convert to list in case disjoints() returns a generator
-                    disjoints = list(cls.disjoints())
-                    for disjoint in disjoints:
-                        for entity in disjoint.entities:
-                            if entity != cls and hasattr(entity, 'name') and entity.name is not None:
-                                axioms.append({
-                                    "type": "DisjointClasses",
-                                    "subject": cls.name,
-                                    "object": entity.name,
-                                    "description": f"{cls.name} is disjoint with {entity.name}"
-                                })
+        try:
+            # Extract class axioms - convert to list first
+            classes_list = list(self.onto.classes())
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                    
+                try:    
+                    # Get subclass relationships
+                    # Convert is_a to list in case it's a generator
+                    is_a_list = list(cls.is_a) if hasattr(cls, 'is_a') else []
+                    for parent in is_a_list:
+                        if hasattr(parent, 'name') and parent.name is not None:
+                            axioms.append({
+                                "type": "SubClassOf",
+                                "subject": cls.name,
+                                "object": parent.name,
+                                "description": f"{cls.name} is a subclass of {parent.name}"
+                            })
                 except Exception as e:
-                    # In case of error, add information about what failed
                     axioms.append({
                         "type": "Error",
-                        "subject": cls.name if hasattr(cls, 'name') else "Unknown",
-                        "description": f"Error processing disjoints: {str(e)}"
+                        "subject": cls.name,
+                        "description": f"Error processing subclass relationships: {str(e)}"
                     })
-        
-        # Extract property axioms
-        for prop in self.onto.object_properties():
-            if prop.name is None:
-                continue
                 
-            # Domain and range
-            if hasattr(prop, 'domain') and prop.domain:
-                for domain in prop.domain:
-                    if hasattr(domain, 'name') and domain.name is not None:
-                        axioms.append({
-                            "type": "ObjectPropertyDomain",
-                            "subject": prop.name,
-                            "object": domain.name,
-                            "description": f"{prop.name} has domain {domain.name}"
-                        })
-            
-            if hasattr(prop, 'range') and prop.range:
-                for range_cls in prop.range:
-                    if hasattr(range_cls, 'name') and range_cls.name is not None:
-                        axioms.append({
-                            "type": "ObjectPropertyRange",
-                            "subject": prop.name,
-                            "object": range_cls.name,
-                            "description": f"{prop.name} has range {range_cls.name}"
-                        })
-            
-            # Property characteristics
-            characteristics = []
-            if hasattr(prop, 'transitive') and prop.transitive:
-                characteristics.append("Transitive")
-            if hasattr(prop, 'symmetric') and prop.symmetric:
-                characteristics.append("Symmetric")
-            if hasattr(prop, 'asymmetric') and prop.asymmetric:
-                characteristics.append("Asymmetric")
-            if hasattr(prop, 'functional') and prop.functional:
-                characteristics.append("Functional")
-            if hasattr(prop, 'inverse_functional') and prop.inverse_functional:
-                characteristics.append("InverseFunctional")
-            if hasattr(prop, 'reflexive') and prop.reflexive:
-                characteristics.append("Reflexive")
-            if hasattr(prop, 'irreflexive') and prop.irreflexive:
-                characteristics.append("Irreflexive")
-                
-            for characteristic in characteristics:
-                axioms.append({
-                    "type": characteristic,
-                    "subject": prop.name,
-                    "object": None,
-                    "description": f"{prop.name} is {characteristic.lower()}"
-                })
-        
-        # Extract data property axioms
-        for prop in self.onto.data_properties():
-            if prop.name is None:
-                continue
-            
-            # Domain
-            if hasattr(prop, 'domain') and prop.domain:
-                for domain in prop.domain:
-                    if hasattr(domain, 'name') and domain.name is not None:
-                        axioms.append({
-                            "type": "DataPropertyDomain",
-                            "subject": prop.name,
-                            "object": domain.name,
-                            "description": f"{prop.name} has domain {domain.name}"
-                        })
-            
-            # Range (data property ranges are different)
-            if hasattr(prop, 'range') and prop.range:
-                for range_item in prop.range:
-                    range_name = str(range_item)
-                    axioms.append({
-                        "type": "DataPropertyRange",
-                        "subject": prop.name,
-                        "object": range_name,
-                        "description": f"{prop.name} has range {range_name}"
-                    })
-        
-        # Extract individual axioms
-        for ind in self.onto.individuals():
-            if ind.name is None:
-                continue
-                
-            # Class assertions
-            for cls in ind.is_a:
-                if hasattr(cls, 'name') and cls.name is not None:
-                    axioms.append({
-                        "type": "ClassAssertion",
-                        "subject": ind.name,
-                        "object": cls.name,
-                        "description": f"{ind.name} is an instance of {cls.name}"
-                    })
-            
-            # Object property assertions
-            for prop in self.onto.object_properties():
-                if prop.name is None:
-                    continue
-                    
-                if hasattr(ind, prop.name):
-                    values = getattr(ind, prop.name)
-                    if values:
-                        for val in values:
-                            if hasattr(val, 'name') and val.name is not None:
+                try:
+                    # Get equivalent classes
+                    if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
+                        # Convert equivalent_to to list in case it's a generator
+                        equiv_list = list(cls.equivalent_to)
+                        for equiv in equiv_list:
+                            if hasattr(equiv, 'name') and equiv.name is not None:
                                 axioms.append({
-                                    "type": "ObjectPropertyAssertion",
-                                    "subject": ind.name,
-                                    "property": prop.name,
-                                    "object": val.name,
-                                    "description": f"{ind.name} {prop.name} {val.name}"
+                                    "type": "EquivalentClasses",
+                                    "subject": cls.name,
+                                    "object": equiv.name,
+                                    "description": f"{cls.name} is equivalent to {equiv.name}"
                                 })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": cls.name,
+                        "description": f"Error processing equivalent classes: {str(e)}"
+                    })
+                    
+                # Get disjoint classes
+                if hasattr(cls, 'disjoints'):
+                    try:
+                        # Convert to list in case disjoints() returns a generator
+                        disjoints = list(cls.disjoints())
+                        for disjoint in disjoints:
+                            for entity in disjoint.entities:
+                                if entity != cls and hasattr(entity, 'name') and entity.name is not None:
+                                    axioms.append({
+                                        "type": "DisjointClasses",
+                                        "subject": cls.name,
+                                        "object": entity.name,
+                                        "description": f"{cls.name} is disjoint with {entity.name}"
+                                    })
+                    except Exception as e:
+                        # In case of error, add information about what failed
+                        axioms.append({
+                            "type": "Error",
+                            "subject": cls.name if hasattr(cls, 'name') else "Unknown",
+                            "description": f"Error processing disjoints: {str(e)}"
+                        })
+                    
+        except Exception as e:
+            # Add error information for entire classes extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing classes: {str(e)}"
+            })
             
-            # Data property assertions
-            for prop in self.onto.data_properties():
+        try:
+            # Extract property axioms - convert to list first
+            object_properties = list(self.onto.object_properties())
+            for prop in object_properties:
                 if prop.name is None:
                     continue
                     
-                if hasattr(ind, prop.name):
-                    values = getattr(ind, prop.name)
-                    if values:
-                        for val in values:
+                try:
+                    # Domain and range
+                    if hasattr(prop, 'domain') and prop.domain:
+                        # Convert domain to list in case it's a generator
+                        domain_list = list(prop.domain) if hasattr(prop.domain, '__iter__') else []
+                        for domain in domain_list:
+                            if hasattr(domain, 'name') and domain.name is not None:
+                                axioms.append({
+                                    "type": "ObjectPropertyDomain",
+                                    "subject": prop.name,
+                                    "object": domain.name,
+                                    "description": f"{prop.name} has domain {domain.name}"
+                                })
+                
+                    if hasattr(prop, 'range') and prop.range:
+                        # Convert range to list in case it's a generator
+                        range_list = list(prop.range) if hasattr(prop.range, '__iter__') else []
+                        for range_cls in range_list:
+                            if hasattr(range_cls, 'name') and range_cls.name is not None:
+                                axioms.append({
+                                    "type": "ObjectPropertyRange",
+                                    "subject": prop.name,
+                                    "object": range_cls.name,
+                                    "description": f"{prop.name} has range {range_cls.name}"
+                                })
+                
+                    # Property characteristics
+                    characteristics = []
+                    if hasattr(prop, 'transitive') and prop.transitive:
+                        characteristics.append("Transitive")
+                    if hasattr(prop, 'symmetric') and prop.symmetric:
+                        characteristics.append("Symmetric")
+                    if hasattr(prop, 'asymmetric') and prop.asymmetric:
+                        characteristics.append("Asymmetric")
+                    if hasattr(prop, 'functional') and prop.functional:
+                        characteristics.append("Functional")
+                    if hasattr(prop, 'inverse_functional') and prop.inverse_functional:
+                        characteristics.append("InverseFunctional")
+                    if hasattr(prop, 'reflexive') and prop.reflexive:
+                        characteristics.append("Reflexive")
+                    if hasattr(prop, 'irreflexive') and prop.irreflexive:
+                        characteristics.append("Irreflexive")
+                        
+                    for characteristic in characteristics:
+                        axioms.append({
+                            "type": characteristic,
+                            "subject": prop.name,
+                            "object": None,
+                            "description": f"{prop.name} is {characteristic.lower()}"
+                        })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": prop.name if hasattr(prop, 'name') else "Unknown property",
+                        "description": f"Error processing property: {str(e)}"
+                    })
+                    
+        except Exception as e:
+            # Add error information for property extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing object properties: {str(e)}"
+            })
+            
+        try:
+            # Extract data property axioms - convert to list first
+            data_properties = list(self.onto.data_properties())
+            for prop in data_properties:
+                if prop.name is None:
+                    continue
+                
+                try:
+                    # Domain
+                    if hasattr(prop, 'domain') and prop.domain:
+                        # Convert domain to list in case it's a generator
+                        domain_list = list(prop.domain) if hasattr(prop.domain, '__iter__') else []
+                        for domain in domain_list:
+                            if hasattr(domain, 'name') and domain.name is not None:
+                                axioms.append({
+                                    "type": "DataPropertyDomain",
+                                    "subject": prop.name,
+                                    "object": domain.name,
+                                    "description": f"{prop.name} has domain {domain.name}"
+                                })
+                
+                    # Range (data property ranges are different)
+                    if hasattr(prop, 'range') and prop.range:
+                        # Convert range to list in case it's a generator
+                        range_list = list(prop.range) if hasattr(prop.range, '__iter__') else []
+                        for range_item in range_list:
+                            range_name = str(range_item)
                             axioms.append({
-                                "type": "DataPropertyAssertion",
-                                "subject": ind.name,
-                                "property": prop.name,
-                                "object": str(val),
-                                "description": f"{ind.name} {prop.name} {val}"
+                                "type": "DataPropertyRange",
+                                "subject": prop.name,
+                                "object": range_name,
+                                "description": f"{prop.name} has range {range_name}"
                             })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": prop.name if hasattr(prop, 'name') else "Unknown data property",
+                        "description": f"Error processing data property: {str(e)}"
+                    })
+        except Exception as e:
+            # Add error information for data property extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing data properties: {str(e)}"
+            })
+        
+        try:
+            # Extract individual axioms - convert to list first
+            individuals = list(self.onto.individuals())
+            for ind in individuals:
+                if ind.name is None:
+                    continue
+                    
+                try:
+                    # Class assertions
+                    is_a_list = list(ind.is_a) if hasattr(ind.is_a, '__iter__') else []
+                    for cls in is_a_list:
+                        if hasattr(cls, 'name') and cls.name is not None:
+                            axioms.append({
+                                "type": "ClassAssertion",
+                                "subject": ind.name,
+                                "object": cls.name,
+                                "description": f"{ind.name} is an instance of {cls.name}"
+                            })
+                
+                    # Object property assertions
+                    obj_props = list(self.onto.object_properties())
+                    for prop in obj_props:
+                        if prop.name is None:
+                            continue
+                            
+                        if hasattr(ind, prop.name):
+                            values = getattr(ind, prop.name)
+                            if values:
+                                # Convert values to list in case it's a generator
+                                values_list = list(values) if hasattr(values, '__iter__') else [values]
+                                for val in values_list:
+                                    if hasattr(val, 'name') and val.name is not None:
+                                        axioms.append({
+                                            "type": "ObjectPropertyAssertion",
+                                            "subject": ind.name,
+                                            "property": prop.name,
+                                            "object": val.name,
+                                            "description": f"{ind.name} {prop.name} {val.name}"
+                                        })
+                
+                    # Data property assertions
+                    data_props = list(self.onto.data_properties())
+                    for prop in data_props:
+                        if prop.name is None:
+                            continue
+                            
+                        if hasattr(ind, prop.name):
+                            values = getattr(ind, prop.name)
+                            if values:
+                                # Convert values to list in case it's a generator
+                                values_list = list(values) if hasattr(values, '__iter__') else [values]
+                                for val in values_list:
+                                    axioms.append({
+                                        "type": "DataPropertyAssertion",
+                                        "subject": ind.name,
+                                        "property": prop.name,
+                                        "object": str(val),
+                                        "description": f"{ind.name} {prop.name} {val}"
+                                    })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": ind.name if hasattr(ind, 'name') else "Unknown individual",
+                        "description": f"Error processing individual: {str(e)}"
+                    })
+        except Exception as e:
+            # Add error information for individual extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing individuals: {str(e)}"
+            })
         
         return axioms
     
@@ -564,8 +672,14 @@ class OwlTester:
                 break
         
         # Check for nominals (enumerated classes or hasValue restrictions)
-        if len(self.onto.individuals()) > 0:
-            has_nominals = True
+        try:
+            # Convert individuals to list first
+            individuals = list(self.onto.individuals())
+            if len(individuals) > 0:
+                has_nominals = True
+        except Exception:
+            # Safely handle generator issues
+            pass
         
         # Check for transitive properties
         for prop in self.onto.object_properties():
@@ -574,8 +688,14 @@ class OwlTester:
                 break
         
         # Check for data properties
-        if len(self.onto.data_properties()) > 0:
-            has_datatype = True
+        try:
+            # Convert data_properties to list first
+            data_props = list(self.onto.data_properties())
+            if len(data_props) > 0:
+                has_datatype = True
+        except Exception:
+            # Safely handle generator issues
+            pass
         
         # Build expressivity string
         if has_complement or has_union:
