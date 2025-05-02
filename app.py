@@ -204,12 +204,12 @@ def analyze_owl(filename):
         # Generate analysis report
         analysis = custom_tester.analyze_ontology()
         
-        # Generate PlantUML diagram code
+        # Generate PlantUML diagram code with increased max_classes
         diagram_result = custom_tester.generate_uml_diagram(
             include_individuals=False,
             include_data_properties=True,
             include_annotation_properties=False,
-            max_classes=100
+            max_classes=1000  # Increased to show more classes
         )
         
         # Get the PlantUML code if successful
@@ -407,12 +407,12 @@ def generate_diagram(filename):
         # Create an OwlTester instance with the file
         tester = OwlTester(file_record.file_path)
         
-        # Generate PlantUML code directly
+        # Generate PlantUML code directly with increased max_classes
         result = tester.generate_uml_diagram(
             include_individuals=include_individuals,
             include_data_properties=include_data_properties,
             include_annotation_properties=include_annotation_properties,
-            max_classes=max_classes
+            max_classes=1000  # Increased to show more classes
         )
         
         if not result["success"]:
@@ -446,12 +446,12 @@ def api_generate_diagram(filename):
         # Create an OwlTester instance with the file
         tester = OwlTester(file_record.file_path)
         
-        # Generate diagram using the updated method
+        # Generate diagram using the updated method with increased max_classes
         result = tester.generate_uml_diagram(
             include_individuals=include_individuals,
             include_data_properties=include_data_properties,
             include_annotation_properties=include_annotation_properties,
-            max_classes=max_classes
+            max_classes=1000  # Increased to show more classes
         )
         
         if result["success"]:

@@ -996,7 +996,7 @@ class OwlTester:
             
     def generate_uml_diagram(self, include_individuals=False, 
                            include_data_properties=True, include_annotation_properties=False,
-                           max_classes=100):
+                           max_classes=1000):
         """
         Generate PlantUML code for the loaded ontology.
         
@@ -1004,7 +1004,7 @@ class OwlTester:
             include_individuals (bool): Whether to include individuals in the diagram
             include_data_properties (bool): Whether to include data properties
             include_annotation_properties (bool): Whether to include annotation properties
-            max_classes (int): Maximum number of classes to include in the diagram
+            max_classes (int): Maximum number of classes to include in the diagram (default: 1000)
             
         Returns:
             dict: PlantUML code generation result
