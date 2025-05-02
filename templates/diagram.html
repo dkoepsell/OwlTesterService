@@ -2,6 +2,10 @@
 
 {% block title %}UML Diagram - {{ file.original_filename }}{% endblock %}
 
+{% block extra_head %}
+<script src="{{ url_for('static', filename='js/diagram.js') }}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <nav aria-label="breadcrumb">
@@ -43,8 +47,7 @@
                         <div class="card-body">
                             <div class="position-relative">
                                 <button class="btn btn-outline-primary position-absolute top-0 end-0 m-2" 
-                                        id="copy-button"
-                                        onclick="copyCode()" 
+                                        onclick="copyToClipboard(document.getElementById('plantuml-code').textContent)" 
                                         title="Copy PlantUML code">
                                     <i class="fas fa-clipboard"></i> Copy
                                 </button>
@@ -65,31 +68,29 @@
                     
                     <div class="collapse mt-3" id="diagramOptions">
                         <div class="card card-body">
-                            <form id="diagram-options-form" method="get">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="include-individuals" name="individuals">
-                                            <label class="form-check-label" for="include-individuals">Include individuals</label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="include-data-properties" name="data_properties" checked>
-                                            <label class="form-check-label" for="include-data-properties">Include data properties</label>
-                                        </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="include-individuals" name="individuals">
+                                        <label class="form-check-label" for="include-individuals">Include individuals</label>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="include-annotation-properties" name="annotation_properties">
-                                            <label class="form-check-label" for="include-annotation-properties">Include annotation properties</label>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="max-classes" class="form-label">Max classes to display:</label>
-                                            <input type="number" class="form-control" id="max-classes" name="max_classes" value="100" min="10" max="500">
-                                        </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="include-data-properties" name="data_properties" checked>
+                                        <label class="form-check-label" for="include-data-properties">Include data properties</label>
                                     </div>
                                 </div>
-                                <button type="button" onclick="regenerateDiagram()" class="btn btn-primary mt-2">Regenerate Diagram</button>
-                            </form>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="include-annotation-properties" name="annotation_properties">
+                                        <label class="form-check-label" for="include-annotation-properties">Include annotation properties</label>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="max-classes" class="form-label">Max classes to display:</label>
+                                        <input type="number" class="form-control" id="max-classes" name="max_classes" value="100" min="10" max="500">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" onclick="regenerateDiagram()" class="btn btn-primary mt-2">Regenerate Diagram</button>
                         </div>
                     </div>
                 </div>
@@ -97,103 +98,4 @@
         </div>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize any necessary components
-});
-
-function copyCode() {
-    var codeElement = document.getElementById('plantuml-code');
-    if (!codeElement) return;
-    
-    try {
-        navigator.clipboard.writeText(codeElement.textContent).then(function() {
-            showToast('PlantUML code copied to clipboard!', 'success');
-        }).catch(function() {
-            // Fallback for older browsers
-            fallbackCopyTextToClipboard(codeElement.textContent);
-        });
-    } catch (e) {
-        console.error("Error copying PlantUML code: ", e);
-        fallbackCopyTextToClipboard(codeElement.textContent);
-    }
-}
-
-function fallbackCopyTextToClipboard(text) {
-    var textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.top = '0';
-    textArea.style.left = '0';
-    textArea.style.width = '2em';
-    textArea.style.height = '2em';
-    textArea.style.padding = '0';
-    textArea.style.border = 'none';
-    textArea.style.outline = 'none';
-    textArea.style.boxShadow = 'none';
-    textArea.style.background = 'transparent';
-    document.body.appendChild(textArea);
-    textArea.select();
-    
-    try {
-        var successful = document.execCommand('copy');
-        if (successful) {
-            showToast('PlantUML code copied to clipboard!', 'success');
-        } else {
-            showToast('Please select and copy the code manually', 'warning');
-        }
-    } catch (err) {
-        showToast('Please select and copy the code manually', 'warning');
-    }
-    
-    document.body.removeChild(textArea);
-}
-
-function showToast(message, type) {
-    var toast = document.createElement('div');
-    toast.className = 'position-fixed bottom-0 end-0 p-3';
-    toast.style.zIndex = '1050';
-    
-    var toastContent = document.createElement('div');
-    toastContent.className = 'toast show';
-    toastContent.setAttribute('role', 'alert');
-    toastContent.setAttribute('aria-live', 'assertive');
-    toastContent.setAttribute('aria-atomic', 'true');
-    
-    var headerClass = type === 'success' ? 'bg-success' : 'bg-warning';
-    
-    toastContent.innerHTML = `
-        <div class="toast-header ${headerClass} text-white">
-            <strong class="me-auto">${type === 'success' ? 'Success' : 'Notice'}</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
-        </div>
-        <div class="toast-body">
-            ${message}
-        </div>
-    `;
-    
-    toast.appendChild(toastContent);
-    document.body.appendChild(toast);
-    
-    setTimeout(function() {
-        toast.remove();
-    }, 3000);
-}
-
-function regenerateDiagram() {
-    var individuals = document.getElementById('include-individuals').checked;
-    var dataProps = document.getElementById('include-data-properties').checked;
-    var annotationProps = document.getElementById('include-annotation-properties').checked;
-    var maxClasses = document.getElementById('max-classes').value;
-    
-    var queryParams = new URLSearchParams();
-    queryParams.append('individuals', individuals ? 'true' : 'false');
-    queryParams.append('data_properties', dataProps ? 'true' : 'false');
-    queryParams.append('annotation_properties', annotationProps ? 'true' : 'false');
-    queryParams.append('max_classes', maxClasses);
-    
-    window.location.href = '{{ url_for("generate_diagram", filename=file.filename) }}?' + queryParams.toString();
-}
-</script>
 {% endblock %}
