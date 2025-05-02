@@ -11,12 +11,14 @@
             </div>
             <div class="card-body">
                 <p>
-                    The FOL-BFO-OWL Tester is a web service designed to validate and test First-Order Logic (FOL) 
-                    expressions against the Basic Formal Ontology (BFO) classes and relations.
+                    The FOL-BFO-OWL Tester is a comprehensive web service designed to validate and test First-Order Logic (FOL) 
+                    expressions against the Basic Formal Ontology (BFO) classes and relations, as well as analyze complete OWL ontologies
+                    for consistency, structure, and real-world implications.
                 </p>
                 <p>
                     This tool helps ontology developers, researchers, and students check if their logical expressions 
-                    conform to BFO standards and identify potential issues in their formulations.
+                    conform to BFO standards, identify potential issues in their formulations, and understand the practical
+                    implications of their ontological structures in real-world scenarios.
                 </p>
             </div>
         </div>
@@ -26,37 +28,80 @@
                 <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>How It Works</h5>
             </div>
             <div class="card-body">
-                <ol class="list-group list-group-numbered mb-3">
-                    <li class="list-group-item">
-                        <strong>Enter a FOL Expression</strong>: Type or paste your first-order logic expression in the input field.
-                    </li>
-                    <li class="list-group-item">
-                        <strong>Test the Expression</strong>: Click the "Test Expression" button to analyze your input.
-                    </li>
-                    <li class="list-group-item">
-                        <strong>Review Results</strong>: The system will parse your expression, check it against BFO classes and relations, 
-                        and display detailed results.
-                    </li>
-                    <li class="list-group-item">
-                        <strong>Fix Issues</strong>: If any problems are detected, you can use the provided feedback to refine your expression.
-                    </li>
-                </ol>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5 class="mb-3"><i class="fas fa-flask me-2"></i>FOL Expression Testing</h5>
+                        <ol class="list-group list-group-numbered mb-3">
+                            <li class="list-group-item">
+                                <strong>Enter a FOL Expression</strong>: Type or paste your first-order logic expression in the input field.
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Test the Expression</strong>: Click the "Test Expression" button to analyze your input.
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Review Results</strong>: The system will parse your expression, check it against BFO classes and relations, 
+                                and display detailed results.
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Fix Issues</strong>: If any problems are detected, you can use the provided feedback to refine your expression.
+                            </li>
+                        </ol>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h5 class="mb-3"><i class="fas fa-upload me-2"></i>Ontology Analysis</h5>
+                        <ol class="list-group list-group-numbered mb-3">
+                            <li class="list-group-item">
+                                <strong>Upload OWL File</strong>: Select and upload your OWL ontology file.
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Review Analysis</strong>: The system automatically analyzes the ontology structure, consistency, and logical relationships.
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Explore FOL Premises</strong>: View the First-Order Logic premises extracted from your ontology.
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Generate Implications</strong>: Generate real-world implications based on your ontology's logical structure.
+                            </li>
+                        </ol>
+                    </div>
+                </div>
                 
-                <h6 class="mt-4">The tester checks for:</h6>
-                <ul class="list-group">
-                    <li class="list-group-item">
-                        <i class="fas fa-check-circle text-success me-2"></i>Syntactic validity of FOL expressions
-                    </li>
-                    <li class="list-group-item">
-                        <i class="fas fa-check-circle text-success me-2"></i>Recognition of BFO classes and relations
-                    </li>
-                    <li class="list-group-item">
-                        <i class="fas fa-check-circle text-success me-2"></i>Identification of non-BFO terms
-                    </li>
-                    <li class="list-group-item">
-                        <i class="fas fa-check-circle text-success me-2"></i>Structural issues like unbalanced parentheses or improper quantifier usage
-                    </li>
-                </ul>
+                <h6 class="mt-4">The system checks for:</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Syntactic validity of FOL expressions
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Recognition of BFO classes and relations
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Identification of non-BFO terms
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Structural issues in expressions
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-group">
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Ontology consistency and contradictions
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Class hierarchies and relationships
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Axiom validity and completeness
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check-circle text-success me-2"></i>Logical implications and entailments
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -102,6 +147,91 @@
                         For more information about BFO, visit the 
                         <a href="https://basic-formal-ontology.org/" target="_blank">BFO official website</a>.
                     </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Ontology Analysis Features</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    Our system provides comprehensive ontology analysis capabilities, allowing you to:
+                </p>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-primary">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Upload and Analyze OWL Files</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Upload your OWL (Web Ontology Language) ontology files for comprehensive analysis, including:</p>
+                                <ul>
+                                    <li>Class hierarchy extraction</li>
+                                    <li>Relationship mapping</li>
+                                    <li>Axiom identification</li>
+                                    <li>Statistical analysis of ontology structure</li>
+                                    <li>Consistency checking using reasoners</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-success">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">FOL Premises Extraction</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>The system extracts First-Order Logic (FOL) premises from your ontology, providing:</p>
+                                <ul>
+                                    <li>Translation of OWL axioms to FOL statements</li>
+                                    <li>Logical interpretation of ontology relations</li>
+                                    <li>Human-readable descriptions of logical structures</li>
+                                    <li>Identification of logical patterns and rules</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-info">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">Real-World Implications Generation</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Using advanced AI technology, the system generates practical real-world implications from your ontology:</p>
+                                <ul>
+                                    <li>AI-powered interpretation of logical structures</li>
+                                    <li>Generation of concrete scenarios demonstrating logical rules</li>
+                                    <li>Domain-specific examples of how ontology principles apply</li>
+                                    <li>Explanations connecting scenarios to specific premises</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0">History and Analysis Tracking</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>The system maintains a comprehensive history of your ontology analyses:</p>
+                                <ul>
+                                    <li>Track all uploaded ontologies</li>
+                                    <li>Review previous analysis results</li>
+                                    <li>Compare different versions of ontologies</li>
+                                    <li>Access previously generated implications</li>
+                                    <li>Build a knowledge base of ontology insights</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -183,8 +313,10 @@
                     Technologies used:
                 </p>
                 <ul>
-                    <li>Backend: Flask, Python, NLTK, Owlready2</li>
+                    <li>Backend: Flask, Python, NLTK, Owlready2, PostgreSQL Database</li>
                     <li>Frontend: HTML5, Bootstrap 5, JavaScript</li>
+                    <li>AI Integration: OpenAI API for generating real-world implications</li>
+                    <li>Reasoners: HermiT and Pellet for ontology consistency checking</li>
                 </ul>
             </div>
         </div>
