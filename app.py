@@ -3,10 +3,16 @@ import logging
 import uuid
 import datetime
 import base64
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session
 from werkzeug.utils import secure_filename
+# We'll use urllib for URL parsing instead of werkzeug
+from urllib.parse import urlparse
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, BooleanField, EmailField, SubmitField
+from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from owl_tester import OwlTester
-from models import db, OntologyFile, OntologyAnalysis, FOLExpression
+from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression
 from openai_utils import generate_real_world_implications
 
 # Set up logging
@@ -36,6 +42,17 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 # Initialize database
 db.init_app(app)
 
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'info'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 # Configure file uploads
 app.config['UPLOADED_OWLS_DEST'] = os.path.join(app.root_path, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
@@ -53,6 +70,30 @@ def allowed_file(filename):
 with app.app_context():
     db.create_all()
     logger.info("Database tables created")
+
+# Create Authentication Forms
+class LoginForm(FlaskForm):
+    email = EmailField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    remember_me = BooleanField('Remember Me')
+    submit = SubmitField('Log In')
+    
+class RegistrationForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=64)])
+    email = EmailField('Email', validators=[DataRequired(), Email(), Length(max=120)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
+    password2 = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Register')
+    
+    def validate_username(self, username):
+        user = User.query.filter_by(username=username.data).first()
+        if user is not None:
+            raise ValidationError('Please use a different username.')
+    
+    def validate_email(self, email):
+        user = User.query.filter_by(email=email.data).first()
+        if user is not None:
+            raise ValidationError('Please use a different email address.')
 
 # Load the default OwlTester
 logger.info("Initializing OwlTester...")
@@ -95,6 +136,9 @@ def test_expression():
         result = owl_tester.test_expression(expression)
         
         # Save the test result to the database
+        # Associate expression with current user if logged in
+        user_id = current_user.id if current_user.is_authenticated else None
+        
         fol_expression = FOLExpression(
             expression=expression,
             is_valid=result.get('valid', False),
@@ -102,7 +146,8 @@ def test_expression():
             issues=result.get('issues', []),
             bfo_classes_used=result.get('bfo_classes_used', []),
             bfo_relations_used=result.get('bfo_relations_used', []),
-            non_bfo_terms=result.get('non_bfo_terms', [])
+            non_bfo_terms=result.get('non_bfo_terms', []),
+            user_id=user_id
         )
         db.session.add(fol_expression)
         db.session.commit()
@@ -158,12 +203,16 @@ def upload_owl():
             file_size = os.path.getsize(file_path)
             mime_type = file.content_type if hasattr(file, 'content_type') else 'application/rdf+xml'
             
+            # Associate file with current user if logged in
+            user_id = current_user.id if current_user.is_authenticated else None
+            
             ontology_file = OntologyFile(
                 filename=unique_filename,
                 original_filename=original_filename,
                 file_path=file_path,
                 file_size=file_size,
-                mime_type=mime_type
+                mime_type=mime_type,
+                user_id=user_id
             )
             db.session.add(ontology_file)
             db.session.commit()
@@ -525,6 +574,97 @@ def page_not_found(e):
 @app.errorhandler(500)
 def server_error(e):
     return render_template('index.html', error=f"Server error: {str(e)}"), 500
+
+# Authentication Routes
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login page"""
+    # Check if the user is already authenticated
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
+    form = LoginForm()
+    if form.validate_on_submit():
+        # Find the user by email
+        user = User.query.filter_by(email=form.email.data).first()
+        
+        # Check if user exists and password is correct
+        if user is None or not user.check_password(form.password.data):
+            flash('Invalid email or password', 'danger')
+            return redirect(url_for('login'))
+        
+        # Login the user
+        login_user(user, remember=form.remember_me.data)
+        
+        # Update last login time
+        user.last_login = datetime.datetime.utcnow()
+        db.session.commit()
+        
+        # Redirect to the page the user was trying to access
+        next_page = request.args.get('next')
+        if not next_page or urlparse(next_page).netloc != '':
+            next_page = url_for('dashboard')
+            
+        flash(f'Welcome back, {user.username}!', 'success')
+        return redirect(next_page)
+    
+    return render_template('login.html', title='Login', form=form)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration page"""
+    # Check if the user is already authenticated
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        # Create a new user
+        user = User(username=form.username.data, email=form.email.data)
+        user.set_password(form.password.data)
+        
+        # Save the user to the database
+        db.session.add(user)
+        db.session.commit()
+        
+        flash('Registration successful! You can now log in with your credentials.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html', title='Register', form=form)
+
+@app.route('/logout')
+@login_required
+def logout():
+    """User logout"""
+    logout_user()
+    flash('You have been logged out successfully.', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """User dashboard with personalized analysis history"""
+    # Get user's ontology files with analyses, ordered by upload date (newest first)
+    user_ontologies = OntologyFile.query.filter_by(user_id=current_user.id)\
+                                   .order_by(OntologyFile.upload_date.desc()).all()
+    
+    # Get user's FOL expressions, ordered by test date (newest first)
+    user_expressions = FOLExpression.query.filter_by(user_id=current_user.id)\
+                                    .order_by(FOLExpression.test_date.desc()).limit(10).all()
+    
+    # Get statistics
+    stats = {
+        'ontology_count': len(user_ontologies),
+        'expression_count': FOLExpression.query.filter_by(user_id=current_user.id).count(),
+        'analysis_count': sum(len(ontology.analyses) for ontology in user_ontologies),
+        'latest_activity': user_ontologies[0].upload_date if user_ontologies else None
+    }
+    
+    return render_template('dashboard.html', 
+                         title=f"{current_user.username}'s Dashboard",
+                         ontologies=user_ontologies,
+                         expressions=user_expressions,
+                         stats=stats)
 
 if __name__ == '__main__':
     # Run the app on host 0.0.0.0 to make it accessible externally
