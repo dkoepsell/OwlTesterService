@@ -246,11 +246,17 @@ def analyze_owl(filename):
                 logger.error(f"Error saving analysis to database: {str(e)}")
                 # Continue with the analysis even if saving to DB fails
         
+        # Debug log to see what fields are in the analysis
+        logger.info(f"Analysis keys: {list(analysis.keys())}")
+        if 'stats' in analysis:
+            logger.info(f"Stats: {analysis['stats']}")
+        
         # Move stats to the top level for easier access in the template
         if 'stats' in analysis:
             # Move stats fields to the top level of the analysis object
-            analysis.update(analysis['stats'])
-        
+            for key, value in analysis['stats'].items():
+                analysis[key] = value
+            
         # Add expressivity from metrics if available
         if 'metrics' in analysis and 'expressivity' in analysis['metrics']:
             analysis['expressivity'] = analysis['metrics']['expressivity']
@@ -258,6 +264,9 @@ def analyze_owl(filename):
         # Add complexity from metrics if available
         if 'metrics' in analysis and 'complexity' in analysis['metrics']:
             analysis['complexity'] = analysis['metrics']['complexity']
+            
+        # Debug log to show what fields are now in the analysis
+        logger.info(f"Updated analysis keys: {list(analysis.keys())}")
         
         # Render analysis template with results
         return render_template('analysis_new.html', 
@@ -290,7 +299,10 @@ def api_analyze_owl(filename):
         
         # Move stats to top level for API consistency
         if 'stats' in analysis:
-            analysis.update(analysis['stats'])
+            for key, value in analysis['stats'].items():
+                analysis[key] = value
+            # Log the update for debugging
+            logger.info(f"API endpoint updated keys: {list(analysis.keys())}")
             
         # Add expressivity and complexity from metrics if available
         if 'metrics' in analysis:
