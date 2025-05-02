@@ -205,14 +205,59 @@ class PlantUMLGenerator:
             
             # Add data properties if requested
             if include_data_properties:
+                # Get both data properties and annotation properties
+                all_properties = []
+                
+                # Try to get all data properties from the ontology first
+                try:
+                    data_properties = list(ontology.data_properties())
+                    for prop in data_properties:
+                        if hasattr(prop, 'domain') and cls in prop.domain:
+                            all_properties.append(prop)
+                except:
+                    # If data_properties() method fails, continue with other methods
+                    pass
+                    
+                # Try to get annotation properties if requested
+                if include_annotation_properties:
+                    try:
+                        annotation_properties = list(ontology.annotation_properties())
+                        for prop in annotation_properties:
+                            if hasattr(prop, 'domain') and cls in prop.domain:
+                                all_properties.append(prop)
+                    except:
+                        # If annotation_properties() method fails, continue with other methods
+                        pass
+                
+                # Get all properties directly associated with the class
                 for prop in cls.get_class_properties():
-                    # Skip object properties, handle later
-                    if hasattr(prop, 'range') and prop.range and len(prop.range) > 0 and prop.range[0] in classes:
-                        continue
-                        
+                    if hasattr(prop, 'name') and prop.name:
+                        all_properties.append(prop)
+                
+                # Add properties from the ontology that have this class in their domain
+                for prop in ontology.properties():
+                    if hasattr(prop, 'domain') and cls in prop.domain:
+                        all_properties.append(prop)
+                
+                # Add the properties to the class, checking if they're data properties
+                for prop in all_properties:
                     if hasattr(prop, 'name') and prop.name:
                         prop_name = self._sanitize_name(prop.name)
-                        uml_code.append(f"\"{class_name}\" : +{prop_name}")
+                        
+                        # Skip properties that are clearly object properties
+                        is_object_prop = False
+                        if hasattr(prop, 'range') and prop.range and len(prop.range) > 0:
+                            for range_cls in prop.range:
+                                if range_cls in classes:
+                                    is_object_prop = True
+                                    break
+                        
+                        if not is_object_prop:
+                            # It's likely a data property or annotation property
+                            range_type = "string"
+                            if hasattr(prop, 'range') and prop.range and len(prop.range) > 0:
+                                range_type = str(prop.range[0])
+                            uml_code.append(f"\"{class_name}\" : +{prop_name} : {range_type}")
             
             # Add parents
             for parent in cls.is_a:
@@ -220,14 +265,42 @@ class PlantUMLGenerator:
                     parent_name = self._sanitize_name(parent.name)
                     uml_code.append(f"\"{parent_name}\" <|-- \"{class_name}\"")
         
-        # Process object properties
+        # Process object properties with more details
         uml_code.append("\n' Object properties")
         relations = set()
         
+        # Get all object properties from the ontology
+        try:
+            all_object_properties = list(ontology.object_properties())
+        except:
+            # If object_properties() method fails, try to get them a different way
+            all_object_properties = [p for p in ontology.properties() 
+                               if hasattr(p, 'range') and p.range and 
+                               len(p.range) > 0 and 
+                               any(r in classes for r in p.range)]
+        
+        for prop in all_object_properties:
+            if hasattr(prop, 'name') and prop.name:
+                rel_name = self._sanitize_name(prop.name)
+                
+                # Handle the case where domain and range are explicitly defined
+                if hasattr(prop, 'domain') and prop.domain and hasattr(prop, 'range') and prop.range:
+                    for domain_cls in prop.domain:
+                        for range_cls in prop.range:
+                            if domain_cls in classes and range_cls in classes:
+                                source = self._sanitize_name(domain_cls.name)
+                                target = self._sanitize_name(range_cls.name)
+                                
+                                relation = f"\"{source}\" --> \"{target}\" : {rel_name}"
+                                if relation not in relations:
+                                    relations.add(relation)
+                                    uml_code.append(relation)
+                                    
+        # Also check properties that might be found through class_properties
         for cls in classes:
             for prop in cls.get_class_properties():
                 # Check if this is an object property
-                if hasattr(prop, 'range') and prop.range and len(prop.range) > 0 and prop.range[0] in classes:
+                if hasattr(prop, 'range') and prop.range and len(prop.range) > 0:
                     for range_cls in prop.range:
                         if range_cls in classes:
                             source = self._sanitize_name(cls.name)
