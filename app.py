@@ -391,28 +391,22 @@ def generate_diagram(filename):
         tester = OwlTester(file_record.file_path)
         
         # Generate PlantUML code directly
-        try:
-            # Create an instance of the PlantUMLGenerator
-            from plantuml_generator import PlantUMLGenerator
-            generator = PlantUMLGenerator()
-            
-            # Generate the UML code directly
-            plantuml_code = generator._generate_plantuml_code(
-                tester.onto,
-                include_individuals=include_individuals,
-                include_data_properties=include_data_properties,
-                include_annotation_properties=include_annotation_properties,
-                max_classes=max_classes
-            )
-            
-            # Render the diagram page with the PlantUML code
-            return render_template('diagram.html', 
-                                 file=file_record,
-                                 plantuml_code=plantuml_code)
-        except Exception as diagram_error:
-            logger.error(f"Error generating diagram code: {str(diagram_error)}")
-            flash(f"Error generating diagram code: {str(diagram_error)}", 'error')
+        result = tester.generate_uml_diagram(
+            include_individuals=include_individuals,
+            include_data_properties=include_data_properties,
+            include_annotation_properties=include_annotation_properties,
+            max_classes=max_classes
+        )
+        
+        if not result["success"]:
+            logger.error(f"Error generating diagram code: {result.get('error', 'Unknown error')}")
+            flash(f"Error generating diagram code: {result.get('error', 'Unknown error')}", 'error')
             return redirect(url_for('analyze_owl', filename=filename))
+        
+        # Render the diagram page with the PlantUML code
+        return render_template('diagram.html', 
+                             file=file_record,
+                             plantuml_code=result["plantuml_code"])
             
     except Exception as e:
         logger.error(f"Error generating diagram: {str(e)}")
@@ -435,30 +429,24 @@ def api_generate_diagram(filename):
         # Create an OwlTester instance with the file
         tester = OwlTester(file_record.file_path)
         
-        # Generate PlantUML code directly
-        try:
-            # Create an instance of the PlantUMLGenerator
-            from plantuml_generator import PlantUMLGenerator
-            generator = PlantUMLGenerator()
-            
-            # Generate the UML code directly
-            plantuml_code = generator._generate_plantuml_code(
-                tester.onto,
-                include_individuals=include_individuals,
-                include_data_properties=include_data_properties,
-                include_annotation_properties=include_annotation_properties,
-                max_classes=max_classes
-            )
-            
+        # Generate diagram using the updated method
+        result = tester.generate_uml_diagram(
+            include_individuals=include_individuals,
+            include_data_properties=include_data_properties,
+            include_annotation_properties=include_annotation_properties,
+            max_classes=max_classes
+        )
+        
+        if result["success"]:
             return jsonify({
                 "success": True,
-                "plantuml_code": plantuml_code,
+                "plantuml_code": result["plantuml_code"],
                 "filename": file_record.original_filename,
                 "file_id": file_record.id
             })
-        except Exception as diagram_error:
-            logger.error(f"Error generating diagram code: {str(diagram_error)}")
-            return jsonify({"success": False, "error": str(diagram_error)}), 500
+        else:
+            logger.error(f"Error generating diagram code: {result.get('error', 'Unknown error')}")
+            return jsonify({"success": False, "error": result.get('error', 'Unknown error')}), 500
     except Exception as e:
         logger.error(f"API error generating diagram: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
