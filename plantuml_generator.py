@@ -28,7 +28,10 @@ class PlantUMLGenerator:
             plantuml_server (str): URL of the PlantUML server
         """
         self.plantuml = plantuml.PlantUML(url=plantuml_server)
-        self.static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+        # Use absolute path to the static folder
+        self.static_folder = os.path.abspath('static')
+        logger.info(f"Static folder path: {self.static_folder}")
+        # Create diagrams directory if it doesn't exist
         os.makedirs(os.path.join(self.static_folder, 'diagrams'), exist_ok=True)
         
     def generate_class_diagram(self, ontology, filename_base, include_individuals=False, 
