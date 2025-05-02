@@ -12,4 +12,5 @@ dependencies = [
     "nltk>=3.9.1",
     "owlready2>=0.47",
     "psycopg2-binary>=2.9.10",
+    "openai>=1.76.2",
 ]
