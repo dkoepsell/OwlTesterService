@@ -28,14 +28,12 @@
                         </p>
                     </div>
 
-                    <div class="text-center mb-4">
-                        {% if svg_path %}
-                        <img src="{{ url_for('static', filename=svg_path.replace('static/', '')) }}" class="img-fluid uml-diagram" alt="UML Class Diagram" style="max-width: 100%;">
-                        {% elif diagram_path %}
-                        <img src="{{ url_for('static', filename=diagram_path.replace('static/', '')) }}" class="img-fluid uml-diagram" alt="UML Class Diagram" style="max-width: 100%;">
-                        {% else %}
-                        <div class="alert alert-warning">Diagram image could not be generated.</div>
-                        {% endif %}
+                    <div class="alert alert-info mb-4">
+                        <h4><i class="fas fa-info-circle"></i> Diagram Visualization</h4>
+                        <p>To visualize this diagram, copy the PlantUML code below and paste it into the 
+                        <a href="https://www.plantuml.com/plantuml/uml/" target="_blank" class="alert-link">
+                            PlantUML Web Server <i class="fas fa-external-link-alt"></i>
+                        </a>.</p>
                     </div>
 
                     <div class="card mb-3">
@@ -106,51 +104,67 @@
 <script>
 function copyPlantUMLCode() {
     var codeElement = document.getElementById('plantuml-code');
-    var textArea = document.createElement('textarea');
-    textArea.value = codeElement.textContent;
-    document.body.appendChild(textArea);
-    textArea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textArea);
+    if (!codeElement) return;
     
-    // Show a copied notification
-    var notification = document.createElement('div');
-    notification.className = 'position-fixed bottom-0 end-0 p-3';
-    notification.style.zIndex = '5';
-    notification.innerHTML = `
-        <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header bg-success text-white">
-                <strong class="me-auto">Success</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
+    try {
+        var textArea = document.createElement('textarea');
+        textArea.value = codeElement.textContent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        // Show a copied notification
+        var notification = document.createElement('div');
+        notification.className = 'position-fixed bottom-0 end-0 p-3';
+        notification.style.zIndex = '5';
+        notification.innerHTML = `
+            <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header bg-success text-white">
+                    <strong class="me-auto">Success</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
+                </div>
+                <div class="toast-body">
+                    PlantUML code copied to clipboard!
+                </div>
             </div>
-            <div class="toast-body">
-                PlantUML code copied to clipboard!
-            </div>
-        </div>
-    `;
-    document.body.appendChild(notification);
-    
-    // Remove the notification after 3 seconds
-    setTimeout(function() {
-        notification.remove();
-    }, 3000);
+        `;
+        document.body.appendChild(notification);
+        
+        // Remove the notification after 3 seconds
+        setTimeout(function() {
+            notification.remove();
+        }, 3000);
+    } catch (e) {
+        console.error("Error copying PlantUML code: ", e);
+        alert("Failed to copy code. Please select and copy manually.");
+    }
 }
 
-// Handle form submission via AJAX
-document.getElementById('diagramOptionsForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    var formData = new FormData(this);
-    var queryParams = new URLSearchParams();
-    
-    // Add checkbox values as true/false strings
-    queryParams.append('individuals', document.getElementById('include_individuals').checked ? 'true' : 'false');
-    queryParams.append('data_properties', document.getElementById('include_data_properties').checked ? 'true' : 'false');
-    queryParams.append('annotation_properties', document.getElementById('include_annotation_properties').checked ? 'true' : 'false');
-    queryParams.append('max_classes', document.getElementById('max_classes').value);
-    
-    // Redirect to the same page with query parameters
-    window.location.href = '{{ url_for("generate_diagram", filename=file.filename) }}?' + queryParams.toString();
+// Handle form submission
+window.addEventListener('DOMContentLoaded', function() {
+    var form = document.getElementById('diagramOptionsForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            var queryParams = new URLSearchParams();
+            
+            // Add checkbox values as true/false strings
+            var individualCheckbox = document.getElementById('include_individuals');
+            var dataPropsCheckbox = document.getElementById('include_data_properties');
+            var annotationPropsCheckbox = document.getElementById('include_annotation_properties');
+            var maxClassesInput = document.getElementById('max_classes');
+            
+            if (individualCheckbox) queryParams.append('individuals', individualCheckbox.checked ? 'true' : 'false');
+            if (dataPropsCheckbox) queryParams.append('data_properties', dataPropsCheckbox.checked ? 'true' : 'false');
+            if (annotationPropsCheckbox) queryParams.append('annotation_properties', annotationPropsCheckbox.checked ? 'true' : 'false');
+            if (maxClassesInput) queryParams.append('max_classes', maxClassesInput.value);
+            
+            // Redirect to the same page with query parameters
+            window.location.href = '{{ url_for("generate_diagram", filename=file.filename) }}?' + queryParams.toString();
+        });
+    }
 });
 </script>
 {% endblock %}
