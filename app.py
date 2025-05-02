@@ -1,10 +1,12 @@
 import os
 import logging
 import uuid
+import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from owl_tester import OwlTester
 from models import db, OntologyFile, OntologyAnalysis, FOLExpression
+from openai_utils import generate_real_world_implications
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -260,6 +262,97 @@ def api_analyze_owl(filename):
     except Exception as e:
         logger.error(f"Error in API analyzing OWL file: {str(e)}")
         return jsonify({"error": f"Error analyzing OWL file: {str(e)}"}), 500
+
+@app.route('/api/implications/<int:analysis_id>', methods=['GET', 'POST'])
+def generate_implications(analysis_id):
+    """
+    Generate or retrieve real-world implications for an ontology analysis.
+    
+    GET: Retrieve previously generated implications
+    POST: Generate new implications
+    """
+    try:
+        # Find the analysis
+        analysis = OntologyAnalysis.query.get(analysis_id)
+        if not analysis:
+            return jsonify({"error": "Analysis not found"}), 404
+            
+        # Check if implications already exist and this is a GET request
+        if request.method == 'GET' and analysis.implications_generated and analysis.real_world_implications:
+            return jsonify({"implications": analysis.real_world_implications})
+        
+        # For POST requests, generate new implications
+        if request.method == 'POST':
+            # Get the ontology file
+            ontology_file = OntologyFile.query.get(analysis.ontology_file_id)
+            if not ontology_file:
+                return jsonify({"error": "Ontology file not found"}), 404
+                
+            # Create a custom tester for this ontology
+            custom_tester = OwlTester(ontology_path=ontology_file.file_path)
+            
+            # Generate the implications (default 5)
+            num_implications = request.args.get('count', 5, type=int)
+            implications = custom_tester.generate_real_world_implications(num_implications)
+            
+            # Save the implications to the database
+            analysis.real_world_implications = implications
+            analysis.implications_generated = True
+            analysis.implications_generation_date = datetime.datetime.utcnow()
+            db.session.commit()
+            
+            logger.info(f"Generated {len(implications)} real-world implications for analysis ID {analysis_id}")
+            
+            return jsonify({"implications": implications})
+        
+        # GET request but no implications yet
+        return jsonify({"implications": [], "message": "No implications generated yet. Use POST to generate."}), 200
+        
+    except Exception as e:
+        logger.error(f"Error generating implications: {str(e)}")
+        return jsonify({"error": f"Error generating implications: {str(e)}"}), 500
+        
+@app.route('/analyze/<filename>/implications')
+def show_implications(filename):
+    """Show real-world implications for an ontology file."""
+    try:
+        # Get the file ID from query parameters
+        file_id = request.args.get('file_id')
+        analysis_id = request.args.get('analysis_id')
+        
+        if not file_id and not analysis_id:
+            flash('Missing file or analysis ID', 'error')
+            return redirect(url_for('view_history'))
+            
+        # Try to get the analysis
+        analysis = None
+        if analysis_id:
+            analysis = OntologyAnalysis.query.get(int(analysis_id))
+        elif file_id:
+            # Find the most recent analysis for this file
+            analysis = OntologyAnalysis.query.filter_by(
+                ontology_file_id=int(file_id)
+            ).order_by(OntologyAnalysis.analysis_date.desc()).first()
+            
+        if not analysis:
+            flash('Analysis not found', 'error')
+            return redirect(url_for('view_history'))
+            
+        ontology_file = OntologyFile.query.get(analysis.ontology_file_id)
+        if not ontology_file:
+            flash('Ontology file not found', 'error')
+            return redirect(url_for('view_history'))
+            
+        # Render the implications template
+        return render_template('implications.html',
+                              analysis=analysis,
+                              ontology_file=ontology_file,
+                              original_filename=ontology_file.original_filename)
+                              
+    except Exception as e:
+        logger.error(f"Error showing implications: {str(e)}")
+        flash(f"Error showing implications: {str(e)}", 'error')
+        return redirect(url_for('view_history'))
 
 @app.route('/history')
 def view_history():

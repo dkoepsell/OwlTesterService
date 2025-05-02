@@ -1,0 +1,274 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Real-World Implications</h1>
+        <h4 class="text-secondary">
+            <i class="fas fa-file-alt me-2"></i>{{ original_filename }}
+        </h4>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i> {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Real-World Applications and Implications</h5>
+                <span id="implicationsStatusBadge" class="badge bg-primary">
+                    {% if analysis.implications_generated %}
+                        Generated {{ analysis.implications_generation_date.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}
+                        Not Generated
+                    {% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="lead">
+                    Using AI to generate real-world implications from the ontology's logical structures.
+                    These examples illustrate how the logical rules in your ontology would manifest in concrete situations.
+                </p>
+                
+                <div id="implicationsControls" class="mb-4">
+                    {% if not analysis.implications_generated %}
+                        <button id="generateImplicationsBtn" class="btn btn-primary" 
+                                data-analysis-id="{{ analysis.id }}">
+                            <i class="fas fa-cogs me-2"></i>Generate Implications
+                        </button>
+                        <span id="generationStatus" class="ms-3 text-secondary fst-italic d-none">
+                            <i class="fas fa-circle-notch fa-spin me-2"></i>Generating implications...
+                        </span>
+                    {% else %}
+                        <button id="regenerateImplicationsBtn" class="btn btn-outline-primary" 
+                                data-analysis-id="{{ analysis.id }}">
+                            <i class="fas fa-sync-alt me-2"></i>Regenerate Implications
+                        </button>
+                        <span id="regenerationStatus" class="ms-3 text-secondary fst-italic d-none">
+                            <i class="fas fa-circle-notch fa-spin me-2"></i>Regenerating implications...
+                        </span>
+                    {% endif %}
+                </div>
+                
+                <div id="implicationsContainer">
+                    {% if analysis.implications_generated and analysis.real_world_implications %}
+                        <div class="row" id="implicationsCardRow">
+                            {% for implication in analysis.real_world_implications %}
+                                <div class="col-md-6 mb-4">
+                                    <div class="card h-100 border-primary">
+                                        <div class="card-header bg-primary text-white">
+                                            <h5 class="mb-0">{{ implication.title }}</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <h6 class="card-subtitle mb-2 text-primary">Scenario:</h6>
+                                            <p class="card-text">{{ implication.scenario }}</p>
+                                            
+                                            <h6 class="card-subtitle mb-2 text-primary">Explanation:</h6>
+                                            <p class="card-text">{{ implication.explanation }}</p>
+                                            
+                                            {% if implication.premises_used %}
+                                                <div class="mt-3">
+                                                    <h6 class="card-subtitle mb-2 text-primary">Premises Used:</h6>
+                                                    <ul class="list-group">
+                                                        {% for premise in implication.premises_used %}
+                                                            <li class="list-group-item">{{ premise }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div id="noImplicationsMessage" class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No real-world implications have been generated yet. 
+                            Click the "Generate Implications" button to analyze the ontology and create examples.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('analyze_owl', filename=ontology_file.filename, original_name=ontology_file.original_filename, file_id=ontology_file.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Analysis
+            </a>
+            <a href="{{ url_for('view_history') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-history me-2"></i>View History
+            </a>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Generate implications button
+        const generateBtn = document.getElementById('generateImplicationsBtn');
+        if (generateBtn) {
+            generateBtn.addEventListener('click', function() {
+                generateImplications(this.dataset.analysisId);
+            });
+        }
+        
+        // Regenerate implications button
+        const regenerateBtn = document.getElementById('regenerateImplicationsBtn');
+        if (regenerateBtn) {
+            regenerateBtn.addEventListener('click', function() {
+                generateImplications(this.dataset.analysisId);
+            });
+        }
+        
+        // Function to generate implications
+        function generateImplications(analysisId) {
+            // Show loading state
+            const generationStatus = document.getElementById('generationStatus') || 
+                                    document.getElementById('regenerationStatus');
+            const implicationsContainer = document.getElementById('implicationsContainer');
+            const statusBadge = document.getElementById('implicationsStatusBadge');
+            
+            if (generationStatus) {
+                generationStatus.classList.remove('d-none');
+            }
+            
+            if (regenerateBtn) {
+                regenerateBtn.disabled = true;
+            }
+            if (generateBtn) {
+                generateBtn.disabled = true;
+            }
+            
+            // Make the API call
+            fetch(`/api/implications/${analysisId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    // Show error
+                    implicationsContainer.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Error generating implications: ${data.error}
+                        </div>
+                    `;
+                } else if (data.implications && data.implications.length > 0) {
+                    // Update status badge
+                    statusBadge.className = 'badge bg-success';
+                    statusBadge.textContent = 'Generated ' + new Date().toLocaleString();
+                    
+                    // Create cards for implications
+                    let cardsHtml = '<div class="row" id="implicationsCardRow">';
+                    data.implications.forEach(implication => {
+                        cardsHtml += `
+                            <div class="col-md-6 mb-4">
+                                <div class="card h-100 border-primary">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0">${implication.title}</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6 class="card-subtitle mb-2 text-primary">Scenario:</h6>
+                                        <p class="card-text">${implication.scenario}</p>
+                                        
+                                        <h6 class="card-subtitle mb-2 text-primary">Explanation:</h6>
+                                        <p class="card-text">${implication.explanation}</p>
+                                        
+                                        ${renderPremises(implication.premises_used)}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    cardsHtml += '</div>';
+                    
+                    // Update the container
+                    implicationsContainer.innerHTML = cardsHtml;
+                    
+                    // Update controls
+                    const controlsDiv = document.getElementById('implicationsControls');
+                    controlsDiv.innerHTML = `
+                        <button id="regenerateImplicationsBtn" class="btn btn-outline-primary" 
+                                data-analysis-id="${analysisId}">
+                            <i class="fas fa-sync-alt me-2"></i>Regenerate Implications
+                        </button>
+                        <span id="regenerationStatus" class="ms-3 text-secondary fst-italic d-none">
+                            <i class="fas fa-circle-notch fa-spin me-2"></i>Regenerating implications...
+                        </span>
+                    `;
+                    
+                    // Re-attach event listener
+                    document.getElementById('regenerateImplicationsBtn').addEventListener('click', function() {
+                        generateImplications(this.dataset.analysisId);
+                    });
+                } else {
+                    // Show empty state
+                    implicationsContainer.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            No implications were generated. Please try again.
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                // Show error
+                implicationsContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Error: ${error.message}
+                    </div>
+                `;
+            })
+            .finally(() => {
+                // Hide loading state
+                if (generationStatus) {
+                    generationStatus.classList.add('d-none');
+                }
+                
+                if (regenerateBtn) {
+                    regenerateBtn.disabled = false;
+                }
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                }
+            });
+        }
+        
+        // Helper function to render premises
+        function renderPremises(premises) {
+            if (!premises || premises.length === 0) {
+                return '';
+            }
+            
+            let html = `
+                <div class="mt-3">
+                    <h6 class="card-subtitle mb-2 text-primary">Premises Used:</h6>
+                    <ul class="list-group">
+            `;
+            
+            premises.forEach(premise => {
+                html += `<li class="list-group-item">${premise}</li>`;
+            });
+            
+            html += `
+                    </ul>
+                </div>
+            `;
+            
+            return html;
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

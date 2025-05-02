@@ -50,6 +50,9 @@ class OntologyAnalysis(db.Model):
     consistency_issues = db.Column(db.JSON, nullable=True)
     inferred_axioms = db.Column(db.JSON, nullable=True)
     fol_premises = db.Column(db.JSON, nullable=True)
+    real_world_implications = db.Column(db.JSON, nullable=True)
+    implications_generated = db.Column(db.Boolean, default=False)
+    implications_generation_date = db.Column(db.DateTime, nullable=True)
     
     def __repr__(self):
         return f"<OntologyAnalysis {self.id} for {self.ontology_file_id}>"

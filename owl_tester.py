@@ -2,9 +2,11 @@ import re
 import os
 import nltk
 import owlready2
+import logging
 from owlready2 import *
 from nltk.sem.logic import LogicalExpressionException
 from nltk.sem import Expression
+from openai_utils import generate_real_world_implications
 
 # Load required NLTK resources if needed
 try:
@@ -244,7 +246,8 @@ class OwlTester:
             "axioms": axioms,
             "consistency": consistency,
             "inferred": inferred_axioms,
-            "fol_premises": fol_premises
+            "fol_premises": fol_premises,
+            "real_world_implications": []
         }
         
         # Add additional metrics
@@ -812,6 +815,67 @@ class OwlTester:
         
         return inferred_axioms
     
+    def generate_real_world_implications(self, num_implications=5):
+        """
+        Generate real-world implications based on the ontology's FOL premises.
+        
+        Args:
+            num_implications (int): Number of implications to generate
+            
+        Returns:
+            list: A list of dictionaries containing the generated implications
+        """
+        try:
+            logging.info(f"Generating real-world implications for {self.ontology_source}")
+            
+            # Get FOL premises
+            fol_premises = self.generate_fol_premises()
+            
+            # Extract domain classes (non-BFO classes) with their descriptions
+            domain_classes = []
+            
+            try:
+                # Get all classes
+                classes_list = list(self.onto.classes())
+                for cls in classes_list:
+                    if cls.name is None:
+                        continue
+                        
+                    # Skip BFO classes (typically have URIs with purl.obolibrary.org/obo/BFO)
+                    if 'obo/BFO' in str(cls.iri):
+                        continue
+                    
+                    # Get class description from comments/annotations if available
+                    description = ""
+                    if hasattr(cls, 'comment') and cls.comment:
+                        try:
+                            comment_list = list(cls.comment)
+                            if comment_list:
+                                description = comment_list[0]
+                        except Exception:
+                            pass
+                    
+                    domain_classes.append({
+                        "name": cls.name,
+                        "description": description or f"A type of {cls.name}"
+                    })
+            except Exception as e:
+                logging.error(f"Error extracting domain classes: {str(e)}")
+            
+            # Generate implications using OpenAI
+            implications = generate_real_world_implications(
+                self.ontology_source, 
+                domain_classes, 
+                fol_premises,
+                num_implications
+            )
+            
+            return implications
+            
+        except Exception as e:
+            logging.error(f"Error generating real-world implications: {str(e)}")
+            return [{"error": str(e), "title": "Error generating implications"}]
+            
     def get_ontology_expressivity(self):
         """
         Determine the ontology expressivity (ALC, SHOIN, etc.).
