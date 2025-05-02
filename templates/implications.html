@@ -110,29 +110,32 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Safely add event listener function
-        function addSafeEventListener(id, event, handler) {
-            const element = document.getElementById(id);
-            if (element) {
-                element.addEventListener(event, handler);
-            } else {
-                console.log(`Element with ID ${id} not found, skipping event listener`);
-            }
+    // Wait for DOM to be fully loaded before attaching event listeners
+    window.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM fully loaded");
+        
+        // Find buttons safely
+        const generateBtn = document.getElementById('generateImplicationsBtn');
+        const regenerateBtn = document.getElementById('regenerateImplicationsBtn');
+        
+        console.log("Generate button exists:", !!generateBtn);
+        console.log("Regenerate button exists:", !!regenerateBtn);
+        
+        // Attach event listeners if buttons exist
+        if (generateBtn) {
+            console.log("Attaching event listener to generate button");
+            generateBtn.onclick = function() {
+                const analysisId = this.getAttribute('data-analysis-id');
+                generateImplications(analysisId);
+            };
         }
         
-        // Generate implications button
-        if (document.getElementById('generateImplicationsBtn')) {
-            document.getElementById('generateImplicationsBtn').addEventListener('click', function() {
-                generateImplications(this.dataset.analysisId);
-            });
-        }
-        
-        // Regenerate implications button
-        if (document.getElementById('regenerateImplicationsBtn')) {
-            document.getElementById('regenerateImplicationsBtn').addEventListener('click', function() {
-                generateImplications(this.dataset.analysisId);
-            });
+        if (regenerateBtn) {
+            console.log("Attaching event listener to regenerate button");
+            regenerateBtn.onclick = function() {
+                const analysisId = this.getAttribute('data-analysis-id');
+                generateImplications(analysisId);
+            };
         }
         
         // Function to generate implications
@@ -218,10 +221,15 @@
                         </span>
                     `;
                     
-                    // Re-attach event listener - using the safe function
-                    addSafeEventListener('regenerateImplicationsBtn', 'click', function() {
-                        generateImplications(this.dataset.analysisId);
-                    });
+                    // Re-attach event listener to the newly created button
+                    const newRegenerateBtn = document.getElementById('regenerateImplicationsBtn');
+                    if (newRegenerateBtn) {
+                        console.log("Re-attaching event listener to regenerate button");
+                        newRegenerateBtn.onclick = function() {
+                            const newAnalysisId = this.getAttribute('data-analysis-id');
+                            generateImplications(newAnalysisId);
+                        };
+                    }
                 } else {
                     // Show empty state
                     implicationsContainer.innerHTML = `
