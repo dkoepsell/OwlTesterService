@@ -111,21 +111,23 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Generate implications button
-        const generateBtn = document.getElementById('generateImplicationsBtn');
-        if (generateBtn) {
-            generateBtn.addEventListener('click', function() {
-                generateImplications(this.dataset.analysisId);
-            });
+        // Safely add event listener function
+        function addSafeEventListener(id, event, handler) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener(event, handler);
+            }
         }
         
+        // Generate implications button
+        addSafeEventListener('generateImplicationsBtn', 'click', function() {
+            generateImplications(this.dataset.analysisId);
+        });
+        
         // Regenerate implications button
-        const regenerateBtn = document.getElementById('regenerateImplicationsBtn');
-        if (regenerateBtn) {
-            regenerateBtn.addEventListener('click', function() {
-                generateImplications(this.dataset.analysisId);
-            });
-        }
+        addSafeEventListener('regenerateImplicationsBtn', 'click', function() {
+            generateImplications(this.dataset.analysisId);
+        });
         
         // Function to generate implications
         function generateImplications(analysisId) {
@@ -138,6 +140,9 @@
             if (generationStatus) {
                 generationStatus.classList.remove('d-none');
             }
+            
+            const regenerateBtn = document.getElementById('regenerateImplicationsBtn');
+            const generateBtn = document.getElementById('generateImplicationsBtn');
             
             if (regenerateBtn) {
                 regenerateBtn.disabled = true;
