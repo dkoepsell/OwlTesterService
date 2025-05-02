@@ -204,6 +204,17 @@ def analyze_owl(filename):
         # Generate analysis report
         analysis = custom_tester.analyze_ontology()
         
+        # Generate PlantUML diagram code
+        diagram_result = custom_tester.generate_uml_diagram(
+            include_individuals=False,
+            include_data_properties=True,
+            include_annotation_properties=False,
+            max_classes=100
+        )
+        
+        # Get the PlantUML code if successful
+        plantuml_code = diagram_result.get("plantuml_code", "") if diagram_result.get("success", False) else ""
+        
         # Save analysis to database if we have a file_id
         if file_id:
             try:
@@ -236,15 +247,12 @@ def analyze_owl(filename):
                 # Continue with the analysis even if saving to DB fails
         
         # Render analysis template with results
-        return render_template('analysis.html', 
+        return render_template('analysis_new.html', 
                               original_filename=original_name,
+                              filename=filename,
                               file_id=file_id,  # Add file_id to be available in the template
                               analysis=analysis,
-                              classes=custom_tester.get_bfo_classes(),
-                              relations=custom_tester.get_bfo_relations(),
-                              data_properties=custom_tester.get_data_properties(),
-                              individuals=custom_tester.get_individuals(),
-                              annotation_properties=custom_tester.get_annotation_properties())
+                              plantuml_code=plantuml_code)
                               
     except Exception as e:
         logger.error(f"Error analyzing OWL file: {str(e)}")

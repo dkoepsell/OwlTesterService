@@ -1,0 +1,330 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row my-4">
+        <div class="col-12">
+            <h1 class="mb-4"><i class="fas fa-microscope me-2"></i>Ontology Analysis Report</h1>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('upload_owl') }}">Upload</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Analyze: {{ original_filename }}</li>
+                </ol>
+            </nav>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category if category != 'error' else 'danger' }}">
+                            <i class="fas fa-exclamation-triangle me-2"></i> {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-file-alt me-2"></i>Ontology Overview</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Basic Information</h5>
+                            <table class="table table-bordered">
+                                <tr>
+                                    <th>File Name</th>
+                                    <td>{{ original_filename }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Ontology Name</th>
+                                    <td>{{ analysis.ontology_name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Ontology IRI</th>
+                                    <td>{{ analysis.ontology_iri }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Consistency</th>
+                                    <td>
+                                        {% if analysis.consistency.consistent %}
+                                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Consistent</span>
+                                        {% else %}
+                                        <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Inconsistent</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Expressivity</th>
+                                    <td><span class="badge bg-info">{{ analysis.expressivity }}</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Metrics</h5>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <tr>
+                                        <th>Classes</th>
+                                        <td><span class="badge bg-primary">{{ analysis.class_count }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Object Properties</th>
+                                        <td><span class="badge bg-secondary">{{ analysis.object_property_count }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Data Properties</th>
+                                        <td><span class="badge bg-secondary">{{ analysis.data_property_count }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Individuals</th>
+                                        <td><span class="badge bg-info">{{ analysis.individual_count }}</span></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Total Axioms</th>
+                                        <td><span class="badge bg-dark">{{ analysis.axiom_count }}</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-center gap-3">
+                            <button id="showDiagramBtn" class="btn btn-outline-primary">
+                                <i class="fas fa-sitemap me-2"></i>Show UML Diagram
+                            </button>
+                            {% if file_id %}
+                            <a href="{{ url_for('show_implications', filename=filename) }}" class="btn btn-outline-success">
+                                <i class="fas fa-lightbulb me-2"></i>Generate Real-World Implications
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- UML Diagram Section (initially hidden) -->
+            <div id="umlDiagramSection" class="card mb-4" style="display: none;">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-sitemap me-2"></i>UML Diagram</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <p><i class="fas fa-info-circle me-2"></i>To view this diagram in PlantUML:</p>
+                        <ol>
+                            <li>Copy the code below</li>
+                            <li>Visit <a href="https://www.plantuml.com/plantuml/uml/" target="_blank">PlantUML Web Server</a></li>
+                            <li>Paste the code in the editor</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">PlantUML Code</h5>
+                                <button id="copyDiagramBtn" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-clipboard me-1"></i>Copy Code
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <pre id="plantUmlCode" class="bg-dark text-light p-3" style="max-height: 400px; overflow-y: auto;">{{ plantuml_code }}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main content tabs -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-list-alt me-2"></i>Analysis Details</h4>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="analysisTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="axioms-tab" data-bs-toggle="tab" data-bs-target="#axioms" type="button" role="tab" aria-controls="axioms" aria-selected="true">
+                                Axioms ({{ analysis.axioms|length }})
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="inferred-tab" data-bs-toggle="tab" data-bs-target="#inferred" type="button" role="tab" aria-controls="inferred" aria-selected="false">
+                                Inferred Axioms ({{ analysis.inferred|length }})
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="fol-tab" data-bs-toggle="tab" data-bs-target="#fol" type="button" role="tab" aria-controls="fol" aria-selected="false">
+                                FOL Premises ({{ analysis.fol_premises|length }})
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="analysisTabsContent">
+                        <!-- Axioms Tab -->
+                        <div class="tab-pane fade show active" id="axioms" role="tabpanel" aria-labelledby="axioms-tab">
+                            <div class="input-group mt-3 mb-3">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="searchAxioms" placeholder="Search axioms...">
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="axiomsTable">
+                                        {% for axiom in analysis.axioms %}
+                                        <tr>
+                                            <td><span class="badge bg-secondary">{{ axiom.type }}</span></td>
+                                            <td>{{ axiom.description }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Inferred Axioms Tab -->
+                        <div class="tab-pane fade" id="inferred" role="tabpanel" aria-labelledby="inferred-tab">
+                            <div class="input-group mt-3 mb-3">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="searchInferred" placeholder="Search inferred axioms...">
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inferredTable">
+                                        {% for axiom in analysis.inferred %}
+                                        <tr>
+                                            <td><span class="badge bg-info">{{ axiom.type }}</span></td>
+                                            <td>{{ axiom.description }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- FOL Premises Tab -->
+                        <div class="tab-pane fade" id="fol" role="tabpanel" aria-labelledby="fol-tab">
+                            <div class="input-group mt-3 mb-3">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="searchFOL" placeholder="Search FOL premises...">
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Expression</th>
+                                            <th>Description</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="folTable">
+                                        {% for premise in analysis.fol_premises %}
+                                        <tr>
+                                            <td><span class="badge bg-primary">{{ premise.type }}</span></td>
+                                            <td><code>{{ premise.fol }}</code></td>
+                                            <td>{{ premise.description }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // UML Diagram toggle
+    const showDiagramBtn = document.getElementById('showDiagramBtn');
+    const umlDiagramSection = document.getElementById('umlDiagramSection');
+    
+    if (showDiagramBtn && umlDiagramSection) {
+        showDiagramBtn.addEventListener('click', function() {
+            if (umlDiagramSection.style.display === 'none') {
+                umlDiagramSection.style.display = 'block';
+                showDiagramBtn.innerHTML = '<i class="fas fa-times me-2"></i>Hide UML Diagram';
+                showDiagramBtn.classList.remove('btn-outline-primary');
+                showDiagramBtn.classList.add('btn-outline-secondary');
+            } else {
+                umlDiagramSection.style.display = 'none';
+                showDiagramBtn.innerHTML = '<i class="fas fa-sitemap me-2"></i>Show UML Diagram';
+                showDiagramBtn.classList.remove('btn-outline-secondary');
+                showDiagramBtn.classList.add('btn-outline-primary');
+            }
+        });
+    }
+    
+    // Copy diagram code button
+    const copyDiagramBtn = document.getElementById('copyDiagramBtn');
+    const plantUmlCode = document.getElementById('plantUmlCode');
+    
+    if (copyDiagramBtn && plantUmlCode) {
+        copyDiagramBtn.addEventListener('click', function() {
+            const textArea = document.createElement('textarea');
+            textArea.value = plantUmlCode.textContent;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            // Change button text temporarily
+            const originalText = copyDiagramBtn.innerHTML;
+            copyDiagramBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+            copyDiagramBtn.classList.remove('btn-outline-secondary');
+            copyDiagramBtn.classList.add('btn-success');
+            
+            setTimeout(function() {
+                copyDiagramBtn.innerHTML = originalText;
+                copyDiagramBtn.classList.remove('btn-success');
+                copyDiagramBtn.classList.add('btn-outline-secondary');
+            }, 2000);
+        });
+    }
+    
+    // Search functions for tables
+    function setupTableSearch(searchId, tableId) {
+        const searchInput = document.getElementById(searchId);
+        const table = document.getElementById(tableId);
+        
+        if (searchInput && table) {
+            searchInput.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                const rows = table.getElementsByTagName('tr');
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const textContent = rows[i].textContent.toLowerCase();
+                    if (textContent.includes(searchText)) {
+                        rows[i].style.display = '';
+                    } else {
+                        rows[i].style.display = 'none';
+                    }
+                }
+            });
+        }
+    }
+    
+    // Set up search for all tables
+    setupTableSearch('searchAxioms', 'axiomsTable');
+    setupTableSearch('searchInferred', 'inferredTable');
+    setupTableSearch('searchFOL', 'folTable');
+});
+</script>
+{% endblock %}
