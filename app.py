@@ -246,6 +246,19 @@ def analyze_owl(filename):
                 logger.error(f"Error saving analysis to database: {str(e)}")
                 # Continue with the analysis even if saving to DB fails
         
+        # Move stats to the top level for easier access in the template
+        if 'stats' in analysis:
+            # Move stats fields to the top level of the analysis object
+            analysis.update(analysis['stats'])
+        
+        # Add expressivity from metrics if available
+        if 'metrics' in analysis and 'expressivity' in analysis['metrics']:
+            analysis['expressivity'] = analysis['metrics']['expressivity']
+            
+        # Add complexity from metrics if available
+        if 'metrics' in analysis and 'complexity' in analysis['metrics']:
+            analysis['complexity'] = analysis['metrics']['complexity']
+        
         # Render analysis template with results
         return render_template('analysis_new.html', 
                               original_filename=original_name,
@@ -274,6 +287,17 @@ def api_analyze_owl(filename):
         
         # Generate analysis report
         analysis = custom_tester.analyze_ontology()
+        
+        # Move stats to top level for API consistency
+        if 'stats' in analysis:
+            analysis.update(analysis['stats'])
+            
+        # Add expressivity and complexity from metrics if available
+        if 'metrics' in analysis:
+            if 'expressivity' in analysis['metrics']:
+                analysis['expressivity'] = analysis['metrics']['expressivity']
+            if 'complexity' in analysis['metrics']:
+                analysis['complexity'] = analysis['metrics']['complexity']
         
         return jsonify(analysis)
         
