@@ -1,0 +1,140 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-5"><i class="fas fa-tachometer-alt me-2"></i>{{ title }}</h1>
+        <p class="lead">Welcome to your personalized dashboard, {{ current_user.username }}!</p>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="fas fa-file me-2"></i>Ontologies</h5>
+                <p class="display-4">{{ stats.ontology_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="fas fa-microscope me-2"></i>Analyses</h5>
+                <p class="display-4">{{ stats.analysis_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="fas fa-code me-2"></i>Expressions</h5>
+                <p class="display-4">{{ stats.expression_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-secondary mb-3">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="fas fa-calendar-alt me-2"></i>Last Activity</h5>
+                <p class="h5">{{ stats.latest_activity.strftime('%Y-%m-%d') if stats.latest_activity else 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User's Ontologies -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-dark">
+                <h4 class="mb-0"><i class="fas fa-file-alt me-2"></i>Your Ontologies</h4>
+            </div>
+            <div class="card-body">
+                {% if ontologies %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>File Name</th>
+                                <th>Upload Date</th>
+                                <th>Analyses</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ontology in ontologies %}
+                            <tr>
+                                <td>{{ ontology.original_filename }}</td>
+                                <td>{{ ontology.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ ontology.analyses|length }}</td>
+                                <td>
+                                    <a href="{{ url_for('analyze_owl', filename=ontology.filename, original_name=ontology.original_filename, file_id=ontology.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-microscope me-1"></i> Analyze
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> You haven't uploaded any ontologies yet.
+                    <a href="{{ url_for('upload_owl') }}" class="alert-link">Upload your first ontology now!</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User's FOL Expressions -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-dark">
+                <h4 class="mb-0"><i class="fas fa-code me-2"></i>Recent FOL Expressions</h4>
+            </div>
+            <div class="card-body">
+                {% if expressions %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Expression</th>
+                                <th>Test Date</th>
+                                <th>Valid</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for expression in expressions %}
+                            <tr>
+                                <td><code>{{ expression.expression }}</code></td>
+                                <td>{{ expression.test_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    {% if expression.is_valid %}
+                                    <span class="badge bg-success"><i class="fas fa-check me-1"></i>Valid</span>
+                                    {% else %}
+                                    <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Invalid</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i> You haven't tested any FOL expressions yet.
+                    <a href="{{ url_for('index') }}" class="alert-link">Go to the home page to test your first expression!</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
