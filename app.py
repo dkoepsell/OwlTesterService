@@ -256,6 +256,10 @@ def analyze_owl(filename):
             # Move stats fields to the top level of the analysis object
             for key, value in analysis['stats'].items():
                 analysis[key] = value
+        
+        # Add total axiom count if not present
+        if 'axioms' in analysis and isinstance(analysis['axioms'], list):
+            analysis['axiom_count'] = len(analysis['axioms'])
             
         # Add expressivity from metrics if available
         if 'metrics' in analysis and 'expressivity' in analysis['metrics']:
@@ -267,6 +271,11 @@ def analyze_owl(filename):
             
         # Debug log to show what fields are now in the analysis
         logger.info(f"Updated analysis keys: {list(analysis.keys())}")
+        logger.info(f"Class count: {analysis.get('class_count')}")
+        logger.info(f"Object property count: {analysis.get('object_property_count')}")
+        logger.info(f"Data property count: {analysis.get('data_property_count')}")
+        logger.info(f"Individual count: {analysis.get('individual_count')}")
+        logger.info(f"Axiom count: {analysis.get('axiom_count')}")
         
         # Render analysis template with results
         return render_template('analysis_new.html', 
@@ -304,6 +313,10 @@ def api_analyze_owl(filename):
             # Log the update for debugging
             logger.info(f"API endpoint updated keys: {list(analysis.keys())}")
             
+        # Add total axiom count if not present
+        if 'axioms' in analysis and isinstance(analysis['axioms'], list):
+            analysis['axiom_count'] = len(analysis['axioms'])
+        
         # Add expressivity and complexity from metrics if available
         if 'metrics' in analysis:
             if 'expressivity' in analysis['metrics']:
