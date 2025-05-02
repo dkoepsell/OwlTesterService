@@ -229,6 +229,7 @@ def analyze_owl(filename):
         # Render analysis template with results
         return render_template('analysis.html', 
                               original_filename=original_name,
+                              file_id=file_id,  # Add file_id to be available in the template
                               analysis=analysis,
                               classes=custom_tester.get_bfo_classes(),
                               relations=custom_tester.get_bfo_relations(),
