@@ -397,16 +397,22 @@ def generate_diagram(filename):
             flash(f"Error generating diagram: {diagram_result.get('error', 'Unknown error')}", 'error')
             return redirect(url_for('analyze_owl', filename=filename))
         
-        # Save diagram paths for rendering
+        # Extract results from the diagram generation
         plantuml_code = diagram_result["plantuml_code"]
         diagram_path = diagram_result["diagram_path"]
-        svg_path = diagram_result["svg_path"]
         
+        # If the diagram_path starts with /static/, it's a direct reference to an HTML file
+        # we can just redirect to it
+        if diagram_path and diagram_path.startswith('/static/'):
+            # This is our new HTML representation - redirect to it directly
+            return redirect(diagram_path)
+        
+        # Otherwise use the original template with the PlantUML code
         return render_template('diagram.html', 
                               file=file_record,
                               plantuml_code=plantuml_code,
                               diagram_path=diagram_path,
-                              svg_path=svg_path)
+                              svg_path=diagram_result.get("svg_path"))
     except Exception as e:
         logger.error(f"Error generating diagram: {str(e)}")
         flash(f"Error generating diagram: {str(e)}", 'error')
