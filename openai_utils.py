@@ -96,14 +96,44 @@ Ensure your examples are domain-appropriate, concrete, and clearly connected to 
         
         # Parse the response
         result_text = response.choices[0].message.content
-        result = json.loads(result_text)
+        logger.info(f"Raw OpenAI response: {result_text}")
         
-        # Ensure we have a list of implications
-        implications = result.get("implications", [])
-        if not implications and isinstance(result, list):
-            implications = result
+        # Handle different JSON formats that might be returned
+        implications = []
+        
+        try:
+            result = json.loads(result_text)
             
+            # Case 1: Response is a list of implications
+            if isinstance(result, list):
+                implications = result
+            # Case 2: Response has an 'implications' key
+            elif result.get("implications") and isinstance(result.get("implications"), list):
+                implications = result.get("implications")
+            # Case 3: Response is a flat object with the expected fields
+            elif "title" in result and "scenario" in result:
+                implications = [result]  # Wrap single item in a list
+            # Case 4: Response has numbered keys as strings (e.g., "1", "2", etc.)
+            else:
+                for key, value in result.items():
+                    if isinstance(value, dict) and "title" in value:
+                        implications.append(value)
+        except Exception as e:
+            logger.error(f"Error parsing OpenAI response: {str(e)}")
+            implications = []
+        
         logger.info(f"Successfully generated {len(implications)} real-world implications")
+        
+        # If we still have no implications, create a default one for debugging
+        if not implications:
+            implications = [{
+                "title": "Example Implication",
+                "scenario": "This is an example implication generated as a fallback.",
+                "premises_used": ["Example premise"],
+                "explanation": "The OpenAI response didn't contain properly formatted implications."
+            }]
+            logger.warning("Using fallback implications because none were parsed from the response")
+            
         return implications
         
     except Exception as e:
