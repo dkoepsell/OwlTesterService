@@ -1032,12 +1032,16 @@ class OwlTester:
                 max_classes=max_classes
             )
             
+            # Since we're now using an HTML representation, we check if diagram_path is not None
+            # but we don't check svg_path since we may not be generating SVGs anymore
+            success = diagram_path is not None
+            
             return {
                 "plantuml_code": plantuml_code,
                 "diagram_path": diagram_path,
                 "svg_path": svg_path,
                 "filename_base": filename_base,
-                "success": diagram_path is not None and svg_path is not None
+                "success": success
             }
         except Exception as e:
             return {
