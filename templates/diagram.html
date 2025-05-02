@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
 
 {% block title %}UML Diagram - {{ file.original_filename }}{% endblock %}
 
@@ -48,7 +48,7 @@
                                 <button class="btn btn-sm btn-outline-primary position-absolute top-0 end-0 m-2" 
                                         onclick="copyPlantUMLCode()" 
                                         title="Copy PlantUML code">
-                                    <i class="bi bi-clipboard"></i> Copy
+                                    <i class="fas fa-clipboard"></i> Copy
                                 </button>
                                 <pre class="bg-dark text-light p-3" id="plantuml-code" style="max-height: 400px; overflow-y: scroll;">{{ plantuml_code }}</pre>
                             </div>
@@ -58,13 +58,13 @@
                 <div class="card-footer">
                     <div class="btn-group">
                         <a href="{{ url_for('analyze_owl', filename=file.filename) }}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Back to Analysis
+                            <i class="fas fa-arrow-left"></i> Back to Analysis
                         </a>
                         <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#diagramOptions" aria-expanded="false">
-                            <i class="bi bi-gear"></i> Diagram Options
+                            <i class="fas fa-cog"></i> Diagram Options
                         </button>
                         <a href="{{ url_for('api_generate_diagram', filename=file.filename) }}" class="btn btn-outline-secondary" target="_blank">
-                            <i class="bi bi-code-slash"></i> API Response
+                            <i class="fas fa-code"></i> API Response
                         </a>
                     </div>
                     
