@@ -405,6 +405,33 @@
             </div>
         </div>
         
+        <!-- Real-World Implications CTA Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Discover Real-World Implications</h5>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <p class="lead mb-0">
+                            Generate concrete real-world examples that demonstrate how your ontology's 
+                            logical rules apply in practical situations.
+                        </p>
+                        <p class="text-muted mt-2">
+                            Using AI, we'll analyze your ontology's First-Order Logic premises and create
+                            meaningful scenarios that illustrate the implications of your ontological structures.
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <a href="{{ url_for('show_implications', filename=original_filename, file_id=request.args.get('file_id')) }}" 
+                           class="btn btn-lg btn-primary">
+                            <i class="fas fa-brain me-2"></i>Generate Implications
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div class="mb-4">
             <a href="{{ url_for('upload_owl') }}" class="btn btn-primary">
                 <i class="fas fa-upload me-2"></i>Upload Another Ontology
