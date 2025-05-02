@@ -212,8 +212,8 @@
                         </span>
                     `;
                     
-                    // Re-attach event listener
-                    document.getElementById('regenerateImplicationsBtn').addEventListener('click', function() {
+                    // Re-attach event listener - using the safe function
+                    addSafeEventListener('regenerateImplicationsBtn', 'click', function() {
                         generateImplications(this.dataset.analysisId);
                     });
                 } else {
