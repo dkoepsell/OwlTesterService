@@ -378,41 +378,42 @@ def view_history():
 def generate_diagram(filename):
     """Generate a UML diagram for an ontology file."""
     try:
+        # Get query parameters
+        include_individuals = request.args.get('individuals', 'false').lower() == 'true'
+        include_data_properties = request.args.get('data_properties', 'true').lower() == 'true'
+        include_annotation_properties = request.args.get('annotation_properties', 'false').lower() == 'true'
+        max_classes = int(request.args.get('max_classes', 100))
+        
         # Find the file in the database
         file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
         
         # Create an OwlTester instance with the file
         tester = OwlTester(file_record.file_path)
         
-        # Generate the UML diagram
-        diagram_result = tester.generate_uml_diagram(
-            filename_base=f"diagram_{filename.split('.')[0]}",
-            include_individuals=False,
-            include_data_properties=True,
-            include_annotation_properties=False,
-            max_classes=100
-        )
-        
-        if not diagram_result["success"]:
-            flash(f"Error generating diagram: {diagram_result.get('error', 'Unknown error')}", 'error')
+        # Generate PlantUML code directly
+        try:
+            # Create an instance of the PlantUMLGenerator
+            from plantuml_generator import PlantUMLGenerator
+            generator = PlantUMLGenerator()
+            
+            # Generate the UML code directly
+            plantuml_code = generator._generate_plantuml_code(
+                tester.onto,
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+            
+            # Render the diagram page with the PlantUML code
+            return render_template('diagram.html', 
+                                 file=file_record,
+                                 plantuml_code=plantuml_code)
+        except Exception as diagram_error:
+            logger.error(f"Error generating diagram code: {str(diagram_error)}")
+            flash(f"Error generating diagram code: {str(diagram_error)}", 'error')
             return redirect(url_for('analyze_owl', filename=filename))
-        
-        # Extract results from the diagram generation
-        plantuml_code = diagram_result["plantuml_code"]
-        diagram_path = diagram_result["diagram_path"]
-        
-        # If the diagram_path starts with /static/, it's a direct reference to an HTML file
-        # we can just redirect to it
-        if diagram_path and diagram_path.startswith('/static/'):
-            # This is our new HTML representation - redirect to it directly
-            return redirect(diagram_path)
-        
-        # Otherwise use the original template with the PlantUML code
-        return render_template('diagram.html', 
-                              file=file_record,
-                              plantuml_code=plantuml_code,
-                              diagram_path=diagram_path,
-                              svg_path=diagram_result.get("svg_path"))
+            
     except Exception as e:
         logger.error(f"Error generating diagram: {str(e)}")
         flash(f"Error generating diagram: {str(e)}", 'error')
@@ -434,16 +435,30 @@ def api_generate_diagram(filename):
         # Create an OwlTester instance with the file
         tester = OwlTester(file_record.file_path)
         
-        # Generate the UML diagram
-        diagram_result = tester.generate_uml_diagram(
-            filename_base=f"diagram_{filename.split('.')[0]}",
-            include_individuals=include_individuals,
-            include_data_properties=include_data_properties,
-            include_annotation_properties=include_annotation_properties,
-            max_classes=max_classes
-        )
-        
-        return jsonify(diagram_result)
+        # Generate PlantUML code directly
+        try:
+            # Create an instance of the PlantUMLGenerator
+            from plantuml_generator import PlantUMLGenerator
+            generator = PlantUMLGenerator()
+            
+            # Generate the UML code directly
+            plantuml_code = generator._generate_plantuml_code(
+                tester.onto,
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+            
+            return jsonify({
+                "success": True,
+                "plantuml_code": plantuml_code,
+                "filename": file_record.original_filename,
+                "file_id": file_record.id
+            })
+        except Exception as diagram_error:
+            logger.error(f"Error generating diagram code: {str(diagram_error)}")
+            return jsonify({"success": False, "error": str(diagram_error)}), 500
     except Exception as e:
         logger.error(f"API error generating diagram: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
