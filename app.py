@@ -2,6 +2,7 @@ import os
 import logging
 import uuid
 import datetime
+import base64
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from owl_tester import OwlTester
@@ -15,6 +16,14 @@ logger = logging.getLogger(__name__)
 # Initialize the app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "default-secret-key-for-development")
+
+# Add custom Jinja filters
+@app.template_filter('b64encode')
+def b64encode_filter(s):
+    """Filter to base64 encode a string for PlantUML URLs"""
+    if isinstance(s, str):
+        return base64.b64encode(s.encode('utf-8')).decode('utf-8')
+    return s
 
 # Configure database
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///owl_tester.db")

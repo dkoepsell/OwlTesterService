@@ -2,10 +2,6 @@
 
 {% block title %}UML Diagram - {{ file.original_filename }}{% endblock %}
 
-{% block extra_head %}
-<script src="{{ url_for('static', filename='js/diagram.js') }}"></script>
-{% endblock %}
-
 {% block content %}
 <div class="container mt-4">
     <nav aria-label="breadcrumb">
@@ -32,70 +28,67 @@
                         </p>
                     </div>
 
-                    <div class="alert alert-info mb-4">
+                    <div class="alert alert-success mb-4">
                         <h4><i class="fas fa-info-circle"></i> Diagram Visualization</h4>
-                        <p>To visualize this diagram, copy the PlantUML code below and paste it into the 
-                        <a href="https://www.plantuml.com/plantuml/uml/" target="_blank" class="alert-link">
-                            PlantUML Web Server <i class="fas fa-external-link-alt"></i>
-                        </a>.</p>
+                        <p>Click the button below to view your UML diagram in the PlantUML web server:</p>
+                        <div class="text-center mt-3">
+                            <a href="https://www.plantuml.com/plantuml/uml/" 
+                               target="_blank" 
+                               class="btn btn-lg btn-primary">
+                                <i class="fas fa-external-link-alt me-2"></i> Open PlantUML Web Server
+                            </a>
+                            <p class="text-muted mt-2">Copy the code below and paste it into the PlantUML editor</p>
+                        </div>
                     </div>
-
+                    
                     <div class="card mb-3">
                         <div class="card-header">
                             <h4>PlantUML Source Code</h4>
                         </div>
                         <div class="card-body">
-                            <div class="position-relative">
-                                <button class="btn btn-outline-primary position-absolute top-0 end-0 m-2" 
-                                        onclick="copyToClipboard(document.getElementById('plantuml-code').textContent)" 
-                                        title="Copy PlantUML code">
-                                    <i class="fas fa-clipboard"></i> Copy
+                            <pre class="bg-dark text-light p-3" style="max-height: 400px; overflow-y: auto;">{{ plantuml_code }}</pre>
+                            <div class="text-center mt-3">
+                                <button class="btn btn-outline-primary" 
+                                   onclick="copyCode()" 
+                                   id="copy-button">
+                                    <i class="fas fa-clipboard me-2"></i> Copy Code
                                 </button>
-                                <pre class="bg-dark text-light p-3" id="plantuml-code" style="max-height: 400px; overflow-y: auto; margin-top: 40px;">{{ plantuml_code }}</pre>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="btn-group">
-                        <a href="{{ url_for('analyze_owl', filename=file.filename) }}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left"></i> Back to Analysis
+                    <div class="text-end">
+                        <a href="{{ url_for('analyze_owl', filename=file.filename) }}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left me-2"></i> Back to Analysis
                         </a>
-                        <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#diagramOptions" aria-expanded="false">
-                            <i class="fas fa-cog"></i> Diagram Options
-                        </button>
-                    </div>
-                    
-                    <div class="collapse mt-3" id="diagramOptions">
-                        <div class="card card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="include-individuals" name="individuals">
-                                        <label class="form-check-label" for="include-individuals">Include individuals</label>
-                                    </div>
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="include-data-properties" name="data_properties" checked>
-                                        <label class="form-check-label" for="include-data-properties">Include data properties</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="include-annotation-properties" name="annotation_properties">
-                                        <label class="form-check-label" for="include-annotation-properties">Include annotation properties</label>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="max-classes" class="form-label">Max classes to display:</label>
-                                        <input type="number" class="form-control" id="max-classes" name="max_classes" value="100" min="10" max="500">
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="button" onclick="regenerateDiagram()" class="btn btn-primary mt-2">Regenerate Diagram</button>
-                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    function copyCode() {
+        const textArea = document.createElement('textarea');
+        textArea.value = `{{ plantuml_code|replace('\n', '\\n')|replace("'", "\\'") }}`;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        const button = document.getElementById('copy-button');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check me-2"></i> Copied!';
+        button.classList.remove('btn-outline-primary');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-primary');
+        }, 2000);
+    }
+</script>
 {% endblock %}
