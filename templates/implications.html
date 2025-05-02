@@ -116,18 +116,24 @@
             const element = document.getElementById(id);
             if (element) {
                 element.addEventListener(event, handler);
+            } else {
+                console.log(`Element with ID ${id} not found, skipping event listener`);
             }
         }
         
         // Generate implications button
-        addSafeEventListener('generateImplicationsBtn', 'click', function() {
-            generateImplications(this.dataset.analysisId);
-        });
+        if (document.getElementById('generateImplicationsBtn')) {
+            document.getElementById('generateImplicationsBtn').addEventListener('click', function() {
+                generateImplications(this.dataset.analysisId);
+            });
+        }
         
         // Regenerate implications button
-        addSafeEventListener('regenerateImplicationsBtn', 'click', function() {
-            generateImplications(this.dataset.analysisId);
-        });
+        if (document.getElementById('regenerateImplicationsBtn')) {
+            document.getElementById('regenerateImplicationsBtn').addEventListener('click', function() {
+                generateImplications(this.dataset.analysisId);
+            });
+        }
         
         // Function to generate implications
         function generateImplications(analysisId) {

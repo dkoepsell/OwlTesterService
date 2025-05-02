@@ -110,14 +110,19 @@ Ensure your examples are domain-appropriate, concrete, and clearly connected to 
             # Case 2: Response has an 'implications' key
             elif result.get("implications") and isinstance(result.get("implications"), list):
                 implications = result.get("implications")
-            # Case 3: Response is a flat object with the expected fields
+            # Case 3: Response has an 'examples' key (like in our current response)
+            elif result.get("examples") and isinstance(result.get("examples"), list):
+                implications = result.get("examples")
+            # Case 4: Response is a flat object with the expected fields
             elif "title" in result and "scenario" in result:
                 implications = [result]  # Wrap single item in a list
-            # Case 4: Response has numbered keys as strings (e.g., "1", "2", etc.)
+            # Case 5: Response has numbered keys as strings (e.g., "1", "2", etc.)
             else:
                 for key, value in result.items():
                     if isinstance(value, dict) and "title" in value:
                         implications.append(value)
+                        
+            logger.info(f"Parsed implications from response: {implications}")
         except Exception as e:
             logger.error(f"Error parsing OpenAI response: {str(e)}")
             implications = []
