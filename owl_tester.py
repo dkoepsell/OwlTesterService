@@ -1,12 +1,14 @@
 import re
 import os
 import nltk
+import uuid
 import owlready2
 import logging
 from owlready2 import *
 from nltk.sem.logic import LogicalExpressionException
 from nltk.sem import Expression
 from openai_utils import generate_real_world_implications
+from plantuml_generator import PlantUMLGenerator
 
 # Load required NLTK resources if needed
 try:
@@ -991,3 +993,58 @@ class OwlTester:
             return True
         except Exception as e:
             return False, str(e)
+            
+    def generate_uml_diagram(self, filename_base=None, include_individuals=False, 
+                           include_data_properties=True, include_annotation_properties=False,
+                           max_classes=100):
+        """
+        Generate a PlantUML diagram for the loaded ontology.
+        
+        Args:
+            filename_base (str, optional): Base filename for the diagram. If None, uses ontology name.
+            include_individuals (bool): Whether to include individuals in the diagram
+            include_data_properties (bool): Whether to include data properties
+            include_annotation_properties (bool): Whether to include annotation properties
+            max_classes (int): Maximum number of classes to include in the diagram
+            
+        Returns:
+            dict: Diagram generation results including PlantUML code and image paths
+        """
+        try:
+            # Generate a default filename if not provided
+            if filename_base is None:
+                # Use the ontology name or a UUID if name is not available
+                if hasattr(self.onto, 'name') and self.onto.name:
+                    filename_base = f"ontology_{self.onto.name.replace(' ', '_').lower()}"
+                else:
+                    filename_base = f"ontology_{str(uuid.uuid4())[:8]}"
+            
+            # Initialize the PlantUML generator
+            generator = PlantUMLGenerator()
+            
+            # Generate the diagram
+            plantuml_code, diagram_path, svg_path = generator.generate_class_diagram(
+                self.onto,
+                filename_base,
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+            
+            return {
+                "plantuml_code": plantuml_code,
+                "diagram_path": diagram_path,
+                "svg_path": svg_path,
+                "filename_base": filename_base,
+                "success": diagram_path is not None and svg_path is not None
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "plantuml_code": None,
+                "diagram_path": None,
+                "svg_path": None,
+                "filename_base": filename_base
+            }

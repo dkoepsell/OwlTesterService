@@ -13,4 +13,6 @@ dependencies = [
     "owlready2>=0.47",
     "psycopg2-binary>=2.9.10",
     "openai>=1.76.2",
+    "plantuml>=0.3.0",
+    "six>=1.17.0",
 ]

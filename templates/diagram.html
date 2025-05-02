@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}UML Diagram - {{ file.original_filename }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('view_history') }}">History</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('analyze_owl', filename=file.filename) }}">{{ file.original_filename }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">UML Diagram</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3>UML Class Diagram for {{ file.original_filename }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <p>This UML diagram represents the class hierarchy and relationships in your ontology.</p>
+                        <p><strong>Color Key:</strong>
+                            <span class="badge bg-light text-dark" style="background-color: LightBlue !important;">Blue classes</span> are from BFO/IAO,
+                            <span class="badge bg-light text-dark" style="background-color: LightGreen !important;">Green classes</span> are domain-specific.
+                        </p>
+                    </div>
+
+                    <div class="text-center mb-4">
+                        {% if svg_path %}
+                        <img src="{{ url_for('static', filename=svg_path.replace('static/', '')) }}" class="img-fluid uml-diagram" alt="UML Class Diagram" style="max-width: 100%;">
+                        {% elif diagram_path %}
+                        <img src="{{ url_for('static', filename=diagram_path.replace('static/', '')) }}" class="img-fluid uml-diagram" alt="UML Class Diagram" style="max-width: 100%;">
+                        {% else %}
+                        <div class="alert alert-warning">Diagram image could not be generated.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h4>PlantUML Source Code</h4>
+                        </div>
+                        <div class="card-body">
+                            <p>You can use this PlantUML code to regenerate or modify the diagram.</p>
+                            <div class="plantuml-code-container" style="position: relative;">
+                                <button class="btn btn-sm btn-outline-primary position-absolute top-0 end-0 m-2" 
+                                        onclick="copyPlantUMLCode()" 
+                                        title="Copy PlantUML code">
+                                    <i class="bi bi-clipboard"></i> Copy
+                                </button>
+                                <pre class="bg-dark text-light p-3" id="plantuml-code" style="max-height: 400px; overflow-y: scroll;">{{ plantuml_code }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="btn-group">
+                        <a href="{{ url_for('analyze_owl', filename=file.filename) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Analysis
+                        </a>
+                        <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#diagramOptions" aria-expanded="false">
+                            <i class="bi bi-gear"></i> Diagram Options
+                        </button>
+                        <a href="{{ url_for('api_generate_diagram', filename=file.filename) }}" class="btn btn-outline-secondary" target="_blank">
+                            <i class="bi bi-code-slash"></i> API Response
+                        </a>
+                    </div>
+                    
+                    <div class="collapse mt-3" id="diagramOptions">
+                        <div class="card card-body">
+                            <form id="diagramOptionsForm" action="{{ url_for('generate_diagram', filename=file.filename) }}" method="get">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="include_individuals" name="individuals">
+                                            <label class="form-check-label" for="include_individuals">Include individuals</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="include_data_properties" name="data_properties" checked>
+                                            <label class="form-check-label" for="include_data_properties">Include data properties</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="include_annotation_properties" name="annotation_properties">
+                                            <label class="form-check-label" for="include_annotation_properties">Include annotation properties</label>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="max_classes" class="form-label">Max classes to display:</label>
+                                            <input type="number" class="form-control" id="max_classes" name="max_classes" value="100" min="10" max="500">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary mt-2">Regenerate Diagram</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyPlantUMLCode() {
+    var codeElement = document.getElementById('plantuml-code');
+    var textArea = document.createElement('textarea');
+    textArea.value = codeElement.textContent;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    
+    // Show a copied notification
+    var notification = document.createElement('div');
+    notification.className = 'position-fixed bottom-0 end-0 p-3';
+    notification.style.zIndex = '5';
+    notification.innerHTML = `
+        <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-success text-white">
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
+            </div>
+            <div class="toast-body">
+                PlantUML code copied to clipboard!
+            </div>
+        </div>
+    `;
+    document.body.appendChild(notification);
+    
+    // Remove the notification after 3 seconds
+    setTimeout(function() {
+        notification.remove();
+    }, 3000);
+}
+
+// Handle form submission via AJAX
+document.getElementById('diagramOptionsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    var formData = new FormData(this);
+    var queryParams = new URLSearchParams();
+    
+    // Add checkbox values as true/false strings
+    queryParams.append('individuals', document.getElementById('include_individuals').checked ? 'true' : 'false');
+    queryParams.append('data_properties', document.getElementById('include_data_properties').checked ? 'true' : 'false');
+    queryParams.append('annotation_properties', document.getElementById('include_annotation_properties').checked ? 'true' : 'false');
+    queryParams.append('max_classes', document.getElementById('max_classes').value);
+    
+    // Redirect to the same page with query parameters
+    window.location.href = '{{ url_for("generate_diagram", filename=file.filename) }}?' + queryParams.toString();
+});
+</script>
+{% endblock %}

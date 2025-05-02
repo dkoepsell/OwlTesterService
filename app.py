@@ -373,6 +373,75 @@ def view_history():
         flash(f"Error viewing history: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+# UML Diagram generation
+@app.route('/analyze/<filename>/diagram')
+def generate_diagram(filename):
+    """Generate a UML diagram for an ontology file."""
+    try:
+        # Find the file in the database
+        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        
+        # Create an OwlTester instance with the file
+        tester = OwlTester(file_record.file_path)
+        
+        # Generate the UML diagram
+        diagram_result = tester.generate_uml_diagram(
+            filename_base=f"diagram_{filename.split('.')[0]}",
+            include_individuals=False,
+            include_data_properties=True,
+            include_annotation_properties=False,
+            max_classes=100
+        )
+        
+        if not diagram_result["success"]:
+            flash(f"Error generating diagram: {diagram_result.get('error', 'Unknown error')}", 'error')
+            return redirect(url_for('analyze_owl', filename=filename))
+        
+        # Save diagram paths for rendering
+        plantuml_code = diagram_result["plantuml_code"]
+        diagram_path = diagram_result["diagram_path"]
+        svg_path = diagram_result["svg_path"]
+        
+        return render_template('diagram.html', 
+                              file=file_record,
+                              plantuml_code=plantuml_code,
+                              diagram_path=diagram_path,
+                              svg_path=svg_path)
+    except Exception as e:
+        logger.error(f"Error generating diagram: {str(e)}")
+        flash(f"Error generating diagram: {str(e)}", 'error')
+        return redirect(url_for('analyze_owl', filename=filename))
+
+@app.route('/api/diagram/<filename>', methods=['GET'])
+def api_generate_diagram(filename):
+    """API endpoint to generate a UML diagram for an ontology."""
+    try:
+        # Find the file in the database
+        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        
+        # Parse request parameters
+        include_individuals = request.args.get('individuals', 'false').lower() == 'true'
+        include_data_properties = request.args.get('data_properties', 'true').lower() == 'true'
+        include_annotation_properties = request.args.get('annotation_properties', 'false').lower() == 'true'
+        max_classes = int(request.args.get('max_classes', 100))
+        
+        # Create an OwlTester instance with the file
+        tester = OwlTester(file_record.file_path)
+        
+        # Generate the UML diagram
+        diagram_result = tester.generate_uml_diagram(
+            filename_base=f"diagram_{filename.split('.')[0]}",
+            include_individuals=include_individuals,
+            include_data_properties=include_data_properties,
+            include_annotation_properties=include_annotation_properties,
+            max_classes=max_classes
+        )
+        
+        return jsonify(diagram_result)
+    except Exception as e:
+        logger.error(f"API error generating diagram: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # Error handlers
 @app.errorhandler(404)
 def page_not_found(e):
