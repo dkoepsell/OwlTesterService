@@ -25,14 +25,10 @@ class OwlTester:
         Args:
             ontology_path (str, optional): Path to custom OWL file. If None, uses BFO ontology.
         """
-        # Load default BFO ontology if no custom path provided
-        if ontology_path is None:
-            self.onto = get_ontology("http://purl.obolibrary.org/obo/bfo.owl").load()
-            self.ontology_source = "BFO (default)"
-        else:
-            # Load custom ontology from file
-            self.onto = get_ontology(ontology_path).load()
-            self.ontology_source = os.path.basename(ontology_path)
+        # Initialize flags for tracking the loading method
+        self.is_rdflib_model = False
+        self.rdflib_graph = None
+        self.ontology_iri = None
         
         # Initialize logical expressions reader
         self.read_expr = Expression.fromstring
@@ -42,8 +38,32 @@ class OwlTester:
         self.inconsistencies = []
         self.inferred_axioms = []
         
-        # Prepare ontology for testing
-        self.prepare_ontology()
+        # Load default BFO ontology if no custom path provided
+        if ontology_path is None:
+            try:
+                self.onto = get_ontology("http://purl.obolibrary.org/obo/bfo.owl").load()
+                self.ontology_source = "BFO (default)"
+                # Prepare ontology for testing
+                self.prepare_ontology()
+            except Exception as e:
+                print(f"Failed to load default BFO ontology: {str(e)}")
+                # Fallback to empty ontology
+                self.onto = None
+                self.ontology_source = "Empty (failed to load BFO)"
+                self.bfo_classes = []
+                self.bfo_relations = []
+        else:
+            # Try to load the custom ontology using our robust method
+            result = self.load_ontology_from_file(ontology_path)
+            
+            # Handle result
+            if result is not True:
+                # If loading failed and returned an error message
+                if isinstance(result, tuple) and len(result) == 2 and not result[0]:
+                    raise Exception(f"Failed to load ontology: {result[1]}")
+                # If loading failed with an unknown result format
+                elif result is not True:
+                    raise Exception("Failed to load ontology for unknown reason")
     
     def prepare_ontology(self):
         """Prepare the ontology for testing by collecting classes and relations."""
@@ -238,6 +258,81 @@ class OwlTester:
         Returns:
             dict: A report containing ontology statistics, axioms, and consistency issues
         """
+        # Handle differently based on if we're using RDFLib or Owlready2
+        if self.is_rdflib_model:
+            return self._analyze_ontology_rdflib()
+        else:
+            return self._analyze_ontology_owlready()
+    
+    def _analyze_ontology_rdflib(self):
+        """
+        Analyze the loaded ontology using RDFLib's limited capabilities.
+        
+        Returns:
+            dict: A simplified report for RDFLib-parsed ontologies
+        """
+        # We can only do limited analysis with RDFLib
+        # Create a simplified report based on the extracted information
+        
+        # For ontology IRI, use the one extracted during loading or a placeholder
+        ontology_iri = self.ontology_iri or "Unknown (RDFLib parsing)"
+        
+        # Generate basic FOL premises from class and property info
+        fol_premises = []
+        
+        # Generate premises for class hierarchy
+        try:
+            if self.rdflib_graph:
+                # Extract subclass relationships if possible
+                from rdflib import RDFS
+                
+                # Find subclass relationships
+                for s, p, o in self.rdflib_graph.triples((None, RDFS.subClassOf, None)):
+                    subclass = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                    superclass = str(o).split('#')[-1] if '#' in str(o) else str(o).split('/')[-1]
+                    
+                    # Add a simple FOL premise for subclass
+                    fol_premises.append({
+                        "type": "subclass",
+                        "fol": f"forall x ({subclass}(x) -> {superclass}(x))",
+                        "description": f"{subclass} is a subclass of {superclass}"
+                    })
+        except Exception as e:
+            print(f"Error generating FOL premises for RDFLib model: {str(e)}")
+        
+        # Create report
+        report = {
+            "ontology_name": self.ontology_source,
+            "ontology_iri": ontology_iri,
+            "stats": {
+                "class_count": len(self.bfo_classes),
+                "object_property_count": len(self.bfo_relations),
+                "data_property_count": 0,  # We don't extract these separately in RDFLib mode
+                "individual_count": 0,     # We don't extract individuals in RDFLib mode
+                "annotation_property_count": 0  # We don't extract annotation properties in RDFLib mode
+            },
+            "axioms": [],  # No detailed axioms available in RDFLib mode
+            "consistency": {"consistent": True, "issues": ["Limited consistency checking in RDFLib mode"]},
+            "inferred": [],  # No inference in RDFLib mode
+            "fol_premises": fol_premises,
+            "real_world_implications": []
+        }
+        
+        # Add metrics
+        report["metrics"] = {
+            "expressivity": "Unknown (RDFLib parsing)",
+            "complexity": len(self.bfo_classes) + len(self.bfo_relations)
+        }
+        
+        return report
+    
+    def _analyze_ontology_owlready(self):
+        """
+        Analyze the loaded ontology using full Owlready2 capabilities.
+        
+        Returns:
+            dict: A complete report for Owlready2-parsed ontologies
+        """
         # Extract data first to ensure proper conversion of generators to lists
         axioms = self.extract_axioms()
         consistency = self.check_consistency()
@@ -250,10 +345,16 @@ class OwlTester:
             axioms = list(axioms)
         if not isinstance(inferred_axioms, list):
             inferred_axioms = list(inferred_axioms)
+        
+        # Get the ontology IRI safely
+        try:
+            ontology_iri = str(self.onto.base_iri) if hasattr(self.onto, 'base_iri') else "Unknown"
+        except:
+            ontology_iri = "Unknown"
             
         report = {
             "ontology_name": self.ontology_source,
-            "ontology_iri": str(self.onto.base_iri),
+            "ontology_iri": ontology_iri,
             "stats": {
                 "class_count": len(self.bfo_classes),
                 "object_property_count": len(self.bfo_relations),
@@ -992,14 +1093,18 @@ class OwlTester:
             file_path (str): Path to the OWL file
             
         Returns:
-            bool: True if loaded successfully, False otherwise
+            bool or tuple: True if loaded successfully, or (False, error_message) if failed
         """
+        # Store the file extension for reference throughout the method
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        # Track errors for better debugging
+        all_errors = []
+        
+        # Method 1: Try loading with owlready2's standard mechanism
         try:
             # Determine file format based on extension
-            file_ext = os.path.splitext(file_path)[1].lower()
-            
-            # Handle various file formats explicitly
-            if file_ext in ['.owx', '.own', '.ofn']:
+            if file_ext in ['.owx', '.own', '.ofn', '.ttl', '.rdf', '.xml']:
                 # Special handling for OWL XML and other formats
                 from owlready2 import World, onto_path
                 
@@ -1009,24 +1114,36 @@ class OwlTester:
                 # Set the file path in the ontology search path
                 onto_path.append(os.path.dirname(file_path))
                 
-                # Try to load with explicit format
-                if file_ext == '.owx':
-                    format_name = 'owlxml'
-                elif file_ext == '.own':
-                    format_name = 'ntriples'
-                else:  # .ofn
-                    format_name = 'functional'
-                    
-                # Load the ontology with explicit format
-                try:
-                    self.onto = world.get_ontology(file_path).load(format=format_name)
-                except Exception as format_error:
-                    # If explicit format fails, try without specifying format
-                    print(f"Error loading with format {format_name}: {str(format_error)}")
+                # Map extensions to format names
+                format_map = {
+                    '.owx': 'owlxml',
+                    '.own': 'ntriples',
+                    '.ofn': 'functional',
+                    '.ttl': 'turtle',
+                    '.rdf': 'rdfxml',
+                    '.xml': 'rdfxml'
+                }
+                
+                format_name = format_map.get(file_ext, None)
+                
+                # Try with explicit format if we have a mapping
+                if format_name:
+                    try:
+                        self.onto = world.get_ontology(file_path).load(format=format_name)
+                        print(f"Successfully loaded with format {format_name}")
+                    except Exception as format_error:
+                        all_errors.append(f"Error loading with format {format_name}: {str(format_error)}")
+                        # If explicit format fails, try without specifying format
+                        self.onto = world.get_ontology(file_path).load()
+                        print("Successfully loaded without specifying format")
+                else:
+                    # Standard loading without format specification
                     self.onto = world.get_ontology(file_path).load()
+                    print("Successfully loaded without format specification")
             else:
                 # Standard loading for common formats
                 self.onto = get_ontology(file_path).load()
+                print("Successfully loaded with standard mechanism")
                 
             self.ontology_source = os.path.basename(file_path)
             
@@ -1038,47 +1155,90 @@ class OwlTester:
             # Re-prepare the ontology
             self.prepare_ontology()
             return True
-        except Exception as e:
-            print(f"Error loading ontology: {str(e)}")
-            # Try an alternative approach for problematic files
-            try:
-                # For .owx files that have issues with ontologyIRI
-                if file_ext == '.owx':
-                    # Try using rdflib as an alternative
-                    import rdflib
-                    g = rdflib.Graph()
-                    g.parse(file_path, format="xml")
-                    
-                    # Extract basic ontology information
-                    self.ontology_source = os.path.basename(file_path)
-                    self.bfo_classes = []
-                    self.bfo_relations = []
-                    
-                    # Extract classes
-                    for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.Class)):
-                        class_name = s.split('#')[-1] if '#' in s else s.split('/')[-1]
-                        self.bfo_classes.append(str(class_name))
-                    
-                    # Extract object properties
-                    for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.ObjectProperty)):
-                        prop_name = s.split('#')[-1] if '#' in s else s.split('/')[-1]
-                        self.bfo_relations.append(str(prop_name))
-                    
-                    # Reset report data
-                    self.axioms = []
-                    self.inconsistencies = []
-                    self.inferred_axioms = []
-                    
-                    # Indicate special handling was used
-                    print(f"Used alternative RDFLib parsing for {file_path}")
-                    return True
-                    
-            except ImportError:
-                print("RDFLib not available for alternative parsing")
-            except Exception as alt_e:
-                print(f"Alternative parsing also failed: {str(alt_e)}")
             
-            return False, str(e)
+        except Exception as e:
+            error_msg = f"Method 1 (owlready2) failed: {str(e)}"
+            print(error_msg)
+            all_errors.append(error_msg)
+        
+        # Method 2: Try using rdflib as an alternative for all file types
+        try:
+            import rdflib
+            g = rdflib.Graph()
+            
+            # Determine the parser format based on extension
+            rdflib_format_map = {
+                '.owx': 'xml',
+                '.own': 'nt',
+                '.ofn': 'xml',  # Functional syntax might need special handling
+                '.ttl': 'turtle',
+                '.rdf': 'xml',
+                '.xml': 'xml',
+                '.owl': 'xml'
+            }
+            
+            rdf_format = rdflib_format_map.get(file_ext, 'xml')
+            
+            # Try to parse the file
+            print(f"Attempting RDFLib parsing with format: {rdf_format}")
+            g.parse(file_path, format=rdf_format)
+            
+            # Extract basic ontology information
+            self.ontology_source = os.path.basename(file_path)
+            self.bfo_classes = []
+            self.bfo_relations = []
+            
+            # Extract classes
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.Class)):
+                class_name = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                self.bfo_classes.append(str(class_name))
+            
+            # Extract object properties
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.ObjectProperty)):
+                prop_name = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                self.bfo_relations.append(str(prop_name))
+            
+            # Extract data properties
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.DatatypeProperty)):
+                prop_name = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                # Store in relations for simplicity
+                self.bfo_relations.append(str(prop_name))
+                
+            # Get ontology IRI if possible
+            ontology_iri = None
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.Ontology)):
+                ontology_iri = str(s)
+                break
+                
+            # Reset report data
+            self.axioms = []
+            self.inconsistencies = []
+            self.inferred_axioms = []
+            
+            print(f"Successfully used RDFLib parsing for {file_path}")
+            print(f"Loaded {len(self.bfo_classes)} classes and {len(self.bfo_relations)} relations")
+            
+            # Store special flag to indicate this is a limited RDFLib-based model
+            self.is_rdflib_model = True
+            self.rdflib_graph = g
+            self.ontology_iri = ontology_iri
+            
+            return True
+                
+        except ImportError as ie:
+            error_msg = f"Method 2 (RDFLib) failed - not available: {str(ie)}"
+            print(error_msg)
+            all_errors.append(error_msg)
+        except Exception as alt_e:
+            error_msg = f"Method 2 (RDFLib) failed: {str(alt_e)}"
+            print(error_msg)
+            all_errors.append(error_msg)
+        
+        # Method 3: Try other custom methods for specific formats (if needed)
+        # Additional parsing strategies could be added here
+        
+        # If all methods failed, return False with error details
+        return False, f"Failed to load ontology. Errors: {'; '.join(all_errors)}"
             
     def generate_uml_diagram(self, include_individuals=False, 
                            include_data_properties=True, include_annotation_properties=False,
@@ -1092,6 +1252,32 @@ class OwlTester:
             include_annotation_properties (bool): Whether to include annotation properties
             max_classes (int): Maximum number of classes to include in the diagram (default: 1000)
             
+        Returns:
+            dict: PlantUML code generation result
+        """
+        # Handle differently based on if we're using RDFLib or Owlready2
+        if self.is_rdflib_model:
+            return self._generate_uml_diagram_rdflib(
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+        else:
+            return self._generate_uml_diagram_owlready(
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+            
+    def _generate_uml_diagram_owlready(self, include_individuals=False,
+                                      include_data_properties=True, 
+                                      include_annotation_properties=False,
+                                      max_classes=1000):
+        """
+        Generate PlantUML code for an Owlready2-loaded ontology.
+        
         Returns:
             dict: PlantUML code generation result
         """
@@ -1117,5 +1303,115 @@ class OwlTester:
             return {
                 "success": False,
                 "error": str(e),
+                "plantuml_code": None
+            }
+            
+    def _generate_uml_diagram_rdflib(self, include_individuals=False,
+                                    include_data_properties=True, 
+                                    include_annotation_properties=False,
+                                    max_classes=1000):
+        """
+        Generate a simple PlantUML diagram for an RDFLib-parsed ontology.
+        
+        Returns:
+            dict: PlantUML code generation result
+        """
+        try:
+            # We'll generate a simple PlantUML diagram directly from the extracted RDFLib data
+            from rdflib import RDFS, RDF, OWL
+            
+            # Start the PlantUML code
+            plantuml_code = "@startuml\n\n"
+            plantuml_code += "' PlantUML diagram generated from RDFLib parsing\n"
+            plantuml_code += "' Limited representation based on extracted classes and properties\n\n"
+            plantuml_code += "skinparam class {\n"
+            plantuml_code += "    BackgroundColor white\n"
+            plantuml_code += "    ArrowColor black\n"
+            plantuml_code += "    BorderColor black\n"
+            plantuml_code += "}\n\n"
+            
+            # Add classes
+            class_count = 0
+            added_classes = set()
+            for cls_name in self.bfo_classes:
+                if class_count >= max_classes:
+                    break
+                
+                # Clean the class name for PlantUML
+                clean_name = cls_name.replace(' ', '_').replace('-', '_')
+                if clean_name in added_classes:
+                    continue
+                    
+                plantuml_code += f"class \"{cls_name}\" as {clean_name}\n"
+                added_classes.add(clean_name)
+                class_count += 1
+            
+            # Add class hierarchy
+            if self.rdflib_graph:
+                for s, p, o in self.rdflib_graph.triples((None, RDFS.subClassOf, None)):
+                    if isinstance(o, str) or not o.startswith(str(OWL.NS)):  # Skip OWL built-ins
+                        subclass = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                        superclass = str(o).split('#')[-1] if '#' in str(o) else str(o).split('/')[-1]
+                        
+                        # Clean names for PlantUML
+                        clean_subclass = subclass.replace(' ', '_').replace('-', '_')
+                        clean_superclass = superclass.replace(' ', '_').replace('-', '_')
+                        
+                        if clean_subclass in added_classes and clean_superclass in added_classes:
+                            plantuml_code += f"{clean_subclass} --|> {clean_superclass}\n"
+            
+            # Add object properties as associations
+            for prop_name in self.bfo_relations:
+                # Clean the property name for PlantUML
+                clean_name = prop_name.replace(' ', '_').replace('-', '_')
+                
+                # Try to find domain and range if available
+                found_domain_range = False
+                if self.rdflib_graph:
+                    for s, p, o in self.rdflib_graph.triples((None, RDF.type, OWL.ObjectProperty)):
+                        prop_uri = str(s)
+                        prop_local = prop_uri.split('#')[-1] if '#' in prop_uri else prop_uri.split('/')[-1]
+                        
+                        if prop_local == prop_name:
+                            # Find domain
+                            domain_class = None
+                            for _, _, d in self.rdflib_graph.triples((s, RDFS.domain, None)):
+                                domain_uri = str(d)
+                                domain_local = domain_uri.split('#')[-1] if '#' in domain_uri else domain_uri.split('/')[-1]
+                                domain_class = domain_local.replace(' ', '_').replace('-', '_')
+                                if domain_class not in added_classes:
+                                    domain_class = None
+                                break
+                            
+                            # Find range
+                            range_class = None
+                            for _, _, r in self.rdflib_graph.triples((s, RDFS.range, None)):
+                                range_uri = str(r)
+                                range_local = range_uri.split('#')[-1] if '#' in range_uri else range_uri.split('/')[-1]
+                                range_class = range_local.replace(' ', '_').replace('-', '_')
+                                if range_class not in added_classes:
+                                    range_class = None
+                                break
+                            
+                            # Add the relationship if domain and range were found
+                            if domain_class and range_class:
+                                plantuml_code += f"{domain_class} --> {range_class} : {prop_name}\n"
+                                found_domain_range = True
+                
+                # If we couldn't find domain/range, just list the property
+                if not found_domain_range:
+                    plantuml_code += f"note \"Object Property: {prop_name}\" as note_{clean_name}\n"
+            
+            # Close the diagram
+            plantuml_code += "\n@enduml"
+            
+            return {
+                "plantuml_code": plantuml_code,
+                "success": True
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error generating RDFLib diagram: {str(e)}",
                 "plantuml_code": None
             }

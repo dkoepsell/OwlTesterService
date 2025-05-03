@@ -541,7 +541,15 @@ def generate_diagram(filename):
         file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
         
         # Create an OwlTester instance with the file
-        tester = OwlTester(file_record.file_path)
+        try:
+            tester = OwlTester(file_record.file_path)
+        except Exception as e:
+            logger.error(f"Error creating OwlTester for diagram: {str(e)}")
+            # Try alternative loading method
+            tester = OwlTester()
+            result = tester.load_ontology_from_file(file_record.file_path)
+            if isinstance(result, tuple) and not result[0]:
+                raise Exception(f"Failed to load ontology for diagram: {result[1]}")
         
         # Generate PlantUML code directly with increased max_classes
         result = tester.generate_uml_diagram(
@@ -580,7 +588,15 @@ def api_generate_diagram(filename):
         max_classes = int(request.args.get('max_classes', 100))
         
         # Create an OwlTester instance with the file
-        tester = OwlTester(file_record.file_path)
+        try:
+            tester = OwlTester(file_record.file_path)
+        except Exception as e:
+            logger.error(f"Error creating OwlTester for API diagram: {str(e)}")
+            # Try alternative loading method
+            tester = OwlTester()
+            result = tester.load_ontology_from_file(file_record.file_path)
+            if isinstance(result, tuple) and not result[0]:
+                raise Exception(f"Failed to load ontology for API diagram: {result[1]}")
         
         # Generate diagram using the updated method with increased max_classes
         result = tester.generate_uml_diagram(
