@@ -17,4 +17,5 @@ dependencies = [
     "six>=1.17.0",
     "flask-login>=0.6.3",
     "flask-wtf>=1.2.2",
+    "rdflib>=7.1.4",
 ]

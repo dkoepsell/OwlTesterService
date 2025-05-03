@@ -995,8 +995,39 @@ class OwlTester:
             bool: True if loaded successfully, False otherwise
         """
         try:
-            # Load the ontology
-            self.onto = get_ontology(file_path).load()
+            # Determine file format based on extension
+            file_ext = os.path.splitext(file_path)[1].lower()
+            
+            # Handle various file formats explicitly
+            if file_ext in ['.owx', '.own', '.ofn']:
+                # Special handling for OWL XML and other formats
+                from owlready2 import World, onto_path
+                
+                # Create a new world for this ontology
+                world = World()
+                
+                # Set the file path in the ontology search path
+                onto_path.append(os.path.dirname(file_path))
+                
+                # Try to load with explicit format
+                if file_ext == '.owx':
+                    format_name = 'owlxml'
+                elif file_ext == '.own':
+                    format_name = 'ntriples'
+                else:  # .ofn
+                    format_name = 'functional'
+                    
+                # Load the ontology with explicit format
+                try:
+                    self.onto = world.get_ontology(file_path).load(format=format_name)
+                except Exception as format_error:
+                    # If explicit format fails, try without specifying format
+                    print(f"Error loading with format {format_name}: {str(format_error)}")
+                    self.onto = world.get_ontology(file_path).load()
+            else:
+                # Standard loading for common formats
+                self.onto = get_ontology(file_path).load()
+                
             self.ontology_source = os.path.basename(file_path)
             
             # Reset report data
@@ -1008,6 +1039,45 @@ class OwlTester:
             self.prepare_ontology()
             return True
         except Exception as e:
+            print(f"Error loading ontology: {str(e)}")
+            # Try an alternative approach for problematic files
+            try:
+                # For .owx files that have issues with ontologyIRI
+                if file_ext == '.owx':
+                    # Try using rdflib as an alternative
+                    import rdflib
+                    g = rdflib.Graph()
+                    g.parse(file_path, format="xml")
+                    
+                    # Extract basic ontology information
+                    self.ontology_source = os.path.basename(file_path)
+                    self.bfo_classes = []
+                    self.bfo_relations = []
+                    
+                    # Extract classes
+                    for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.Class)):
+                        class_name = s.split('#')[-1] if '#' in s else s.split('/')[-1]
+                        self.bfo_classes.append(str(class_name))
+                    
+                    # Extract object properties
+                    for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.ObjectProperty)):
+                        prop_name = s.split('#')[-1] if '#' in s else s.split('/')[-1]
+                        self.bfo_relations.append(str(prop_name))
+                    
+                    # Reset report data
+                    self.axioms = []
+                    self.inconsistencies = []
+                    self.inferred_axioms = []
+                    
+                    # Indicate special handling was used
+                    print(f"Used alternative RDFLib parsing for {file_path}")
+                    return True
+                    
+            except ImportError:
+                print("RDFLib not available for alternative parsing")
+            except Exception as alt_e:
+                print(f"Alternative parsing also failed: {str(alt_e)}")
+            
             return False, str(e)
             
     def generate_uml_diagram(self, include_individuals=False, 
