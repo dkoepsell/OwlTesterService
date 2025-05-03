@@ -56,7 +56,7 @@ def load_user(user_id):
 # Configure file uploads
 app.config['UPLOADED_OWLS_DEST'] = os.path.join(app.root_path, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
-app.config['ALLOWED_EXTENSIONS'] = {'owl', 'rdf', 'xml', 'ttl', 'n3', 'nt'}
+app.config['ALLOWED_EXTENSIONS'] = {'owl', 'rdf', 'xml', 'ttl', 'n3', 'nt', 'ofn', 'own', 'owx'}
 
 # Create uploads directory if it doesn't exist
 if not os.path.exists(app.config['UPLOADED_OWLS_DEST']):
@@ -186,7 +186,7 @@ def upload_owl():
             return redirect(request.url)
         
         if not allowed_file(file.filename):
-            flash('Invalid file type. Please upload an OWL/RDF file (.owl, .rdf, .xml, .ttl, .n3, .nt)', 'error')
+            flash('Invalid file type. Please upload an OWL/RDF file (.owl, .rdf, .xml, .ttl, .n3, .nt, .ofn, .own, .owx)', 'error')
             return redirect(request.url)
         
         try:
