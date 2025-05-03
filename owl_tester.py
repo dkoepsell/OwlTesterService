@@ -27,6 +27,7 @@ class OwlTester:
         """
         # Initialize flags for tracking the loading method
         self.is_rdflib_model = False
+        self.is_xml_fallback = False
         self.rdflib_graph = None
         self.ontology_iri = None
         
@@ -1234,8 +1235,135 @@ class OwlTester:
             print(error_msg)
             all_errors.append(error_msg)
         
-        # Method 3: Try other custom methods for specific formats (if needed)
-        # Additional parsing strategies could be added here
+        # Method 3: Try basic XML parsing as a last resort for XML-based formats
+        if file_ext in ['.owx', '.rdf', '.xml', '.owl']:
+            try:
+                import xml.etree.ElementTree as ET
+                
+                print(f"Attempting basic XML parsing as last resort for {file_path}")
+                
+                # Initialize empty lists for storing extracted data
+                self.ontology_source = os.path.basename(file_path)
+                self.bfo_classes = []
+                self.bfo_relations = []
+                self.data_properties = []
+                self.individuals = []
+                self.annotation_properties = []
+                
+                # Parse the XML
+                tree = ET.parse(file_path)
+                root = tree.getroot()
+                
+                # Extract namespace for OWL
+                namespaces = {'owl': 'http://www.w3.org/2002/07/owl#'}
+                
+                # Helper function to handle namespaces in tags
+                def find_elements_with_namespace(element, tag_name, ns=None):
+                    # Try with namespace first
+                    if ns:
+                        elements = element.findall(f".//{{{ns}}}{tag_name}")
+                        if elements:
+                            return elements
+                    
+                    # Try without namespace
+                    elements = element.findall(f".//{tag_name}")
+                    if elements:
+                        return elements
+                    
+                    # Try every possible namespace combination in the document
+                    for prefix in root.attrib.keys():
+                        if prefix.startswith('{') and prefix.endswith('}'):
+                            ns_uri = prefix[1:-1]
+                            elements = element.findall(f".//{{{ns_uri}}}{tag_name}")
+                            if elements:
+                                return elements
+                    
+                    return []
+                
+                # Extract classes
+                class_elements = find_elements_with_namespace(root, "Class", namespaces.get('owl'))
+                for cls in class_elements:
+                    # Try to get the IRI attribute
+                    iri = cls.get('IRI')
+                    if iri:
+                        class_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                        self.bfo_classes.append(class_name)
+                
+                # Extract object properties
+                obj_prop_elements = find_elements_with_namespace(root, "ObjectProperty", namespaces.get('owl'))
+                for prop in obj_prop_elements:
+                    iri = prop.get('IRI')
+                    if iri:
+                        prop_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                        self.bfo_relations.append(prop_name)
+                
+                # Extract individuals
+                indiv_elements = find_elements_with_namespace(root, "NamedIndividual", namespaces.get('owl'))
+                for indiv in indiv_elements:
+                    iri = indiv.get('IRI')
+                    if iri:
+                        indiv_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                        self.individuals.append(indiv_name)
+                
+                # Handle declarations - these might contain nested class definitions
+                decl_elements = find_elements_with_namespace(root, "Declaration", namespaces.get('owl'))
+                for decl in decl_elements:
+                    # Look for Class declarations
+                    cls_elements = find_elements_with_namespace(decl, "Class", namespaces.get('owl'))
+                    for cls in cls_elements:
+                        iri = cls.get('IRI')
+                        if iri:
+                            class_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                            if class_name not in self.bfo_classes:
+                                self.bfo_classes.append(class_name)
+                    
+                    # Look for ObjectProperty declarations
+                    prop_elements = find_elements_with_namespace(decl, "ObjectProperty", namespaces.get('owl'))
+                    for prop in prop_elements:
+                        iri = prop.get('IRI')
+                        if iri:
+                            prop_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                            if prop_name not in self.bfo_relations:
+                                self.bfo_relations.append(prop_name)
+                                
+                    # Look for NamedIndividual declarations
+                    indiv_elements = find_elements_with_namespace(decl, "NamedIndividual", namespaces.get('owl'))
+                    for indiv in indiv_elements:
+                        iri = indiv.get('IRI')
+                        if iri:
+                            indiv_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                            if indiv_name not in self.individuals:
+                                self.individuals.append(indiv_name)
+                
+                # Get ontology IRI if possible
+                self.ontology_iri = None
+                # Try to get the base attribute from the root Ontology element
+                base = root.get('{http://www.w3.org/XML/1998/namespace}base')
+                if base:
+                    self.ontology_iri = base
+                
+                # Reset report data
+                self.axioms = []
+                self.inconsistencies = []
+                self.inferred_axioms = []
+                
+                print(f"Successfully used XML fallback parsing for {file_path}")
+                print(f"Loaded {len(self.bfo_classes)} classes, {len(self.bfo_relations)} relations, and {len(self.individuals)} individuals")
+                
+                # Set flag for XML fallback mode
+                self.is_rdflib_model = True  # We'll use the RDFLib model methods since the capabilities are similar
+                self.is_xml_fallback = True
+                
+                return True
+                
+            except ImportError as ie:
+                error_msg = f"Method 3 (XML fallback) failed - XML parser not available: {str(ie)}"
+                print(error_msg)
+                all_errors.append(error_msg)
+            except Exception as xml_e:
+                error_msg = f"Method 3 (XML fallback) failed: {str(xml_e)}"
+                print(error_msg)
+                all_errors.append(error_msg)
         
         # If all methods failed, return False with error details
         return False, f"Failed to load ontology. Errors: {'; '.join(all_errors)}"

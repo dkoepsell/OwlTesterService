@@ -1,0 +1,272 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="xsd" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="rdfs" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Contract"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Court"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#FunctionBearingContinuant"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Judgment"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Justice"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#LegalArtifact"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#LegalEntity"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#LegalPerson"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#LegalProcess"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#LegalRole"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#LegalSystem"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Obligation"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Precedent"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Right"/>
+    </Declaration>
+    <Declaration>
+        <Class IRI="http://example.org/legal#Statute"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#creates"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#ensuresConsistencyAmong"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#grounds"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#hasBearer"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#invalidates"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#invokes"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#isRealizedIn"/>
+    </Declaration>
+    <Declaration>
+        <ObjectProperty IRI="http://example.org/legal#legitimates"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://example.org/legal#SupremeCourt"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://example.org/legal#Plainview_Law"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://example.org/legal#Precedent"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://example.org/legal#Justice_as_Principle"/>
+    </Declaration>
+    <Declaration>
+        <NamedIndividual IRI="http://example.org/legal#Brown_v_Board"/>
+    </Declaration>
+    <ClassAssertion>
+        <Class IRI="http://example.org/legal#Judgment"/>
+        <NamedIndividual IRI="http://example.org/legal#Brown_v_Board"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="http://example.org/legal#Justice"/>
+        <NamedIndividual IRI="http://example.org/legal#Justice_as_Principle"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="http://example.org/legal#LegalArtifact"/>
+        <NamedIndividual IRI="http://example.org/legal#Plainview_Law"/>
+    </ClassAssertion>
+    <ClassAssertion>
+        <Class IRI="http://example.org/legal#Court"/>
+        <NamedIndividual IRI="http://example.org/legal#SupremeCourt"/>
+    </ClassAssertion>
+    <ObjectPropertyAssertion>
+        <ObjectProperty IRI="http://example.org/legal#grounds"/>
+        <NamedIndividual IRI="http://example.org/legal#Brown_v_Board"/>
+        <NamedIndividual IRI="http://example.org/legal#Precedent"/>
+    </ObjectPropertyAssertion>
+    <ObjectPropertyAssertion>
+        <ObjectProperty IRI="http://example.org/legal#invalidates"/>
+        <NamedIndividual IRI="http://example.org/legal#Justice_as_Principle"/>
+        <NamedIndividual IRI="http://example.org/legal#Plainview_Law"/>
+    </ObjectPropertyAssertion>
+    <ObjectPropertyAssertion>
+        <ObjectProperty IRI="http://example.org/legal#invokes"/>
+        <NamedIndividual IRI="http://example.org/legal#SupremeCourt"/>
+        <NamedIndividual IRI="http://example.org/legal#Justice_as_Principle"/>
+    </ObjectPropertyAssertion>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#creates"/>
+        <Class IRI="http://example.org/legal#LegalProcess"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#ensuresConsistencyAmong"/>
+        <Class IRI="http://example.org/legal#Justice"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#grounds"/>
+        <Class IRI="http://example.org/legal#Precedent"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#hasBearer"/>
+        <Class IRI="http://example.org/legal#LegalRole"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#invalidates"/>
+        <Class IRI="http://example.org/legal#Justice"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#invokes"/>
+        <Class IRI="http://example.org/legal#Court"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#isRealizedIn"/>
+        <Class IRI="http://example.org/legal#FunctionBearingContinuant"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyDomain>
+        <ObjectProperty IRI="http://example.org/legal#legitimates"/>
+        <Class IRI="http://example.org/legal#Justice"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#creates"/>
+        <Class IRI="http://example.org/legal#LegalArtifact"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#ensuresConsistencyAmong"/>
+        <Class IRI="http://example.org/legal#LegalEntity"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#grounds"/>
+        <Class IRI="http://example.org/legal#Judgment"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#hasBearer"/>
+        <Class IRI="http://example.org/legal#LegalPerson"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#invalidates"/>
+        <Class IRI="http://example.org/legal#LegalArtifact"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#invokes"/>
+        <Class IRI="http://example.org/legal#Justice"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#isRealizedIn"/>
+        <Class IRI="http://example.org/legal#LegalProcess"/>
+    </ObjectPropertyRange>
+    <ObjectPropertyRange>
+        <ObjectProperty IRI="http://example.org/legal#legitimates"/>
+        <Class IRI="http://example.org/legal#LegalProcess"/>
+    </ObjectPropertyRange>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Contract</IRI>
+        <Literal>A legal artifact representing a binding agreement between parties.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Court</IRI>
+        <Literal>An institution authorized to adjudicate legal disputes.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#FunctionBearingContinuant</IRI>
+        <Literal>An entity capable of playing roles or performing functions in legal processes.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Judgment</IRI>
+        <Literal>The outcome of a legal decision rendered by a court.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Justice</IRI>
+        <Literal>A normative legal principle guiding legitimacy and coherence in law.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#LegalArtifact</IRI>
+        <Literal>A generically dependent continuant such as a statute or legal document.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#LegalEntity</IRI>
+        <Literal>A general class representing any entity within a legal system.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#LegalPerson</IRI>
+        <Literal>An entity recognized by law as having legal rights and obligations.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#LegalProcess</IRI>
+        <Literal>An occurrent legal activity like a trial or legislation process.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#LegalRole</IRI>
+        <Literal>A function-bearing continuant such as defendant, plaintiff, or judge.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#LegalSystem</IRI>
+        <Literal>An institutional structure that generates, interprets, and enforces law.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Obligation</IRI>
+        <Literal>A dependent continuant indicating a requirement or duty imposed by law.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Precedent</IRI>
+        <Literal>A legal artifact representing a judicial decision used as a standard in future cases.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Right</IRI>
+        <Literal>A dependent continuant representing an entitlement granted by law.</Literal>
+    </AnnotationAssertion>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>
+        <IRI>http://example.org/legal#Statute</IRI>
+        <Literal>A legal artifact formally enacted as a written law.</Literal>
+    </AnnotationAssertion>
+</Ontology>
+
+
+
+<!-- Generated by the OWL API (version 4.5.13) https://github.com/owlcs/owlapi -->
+
