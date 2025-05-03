@@ -164,15 +164,31 @@ class OwlTester:
     
     def check_terms_against_bfo(self, terms, result):
         """Check terms against BFO classes and relations."""
+        # Create case-insensitive lookup maps for BFO classes and relations
+        lower_bfo_classes = {cls.lower(): cls for cls in self.bfo_classes}
+        lower_bfo_relations = {rel.lower(): rel for rel in self.bfo_relations}
+        
         for term in terms:
-            if term in self.bfo_classes:
-                if term not in result["bfo_classes_used"]:
-                    result["bfo_classes_used"].append(term)
-            elif term in self.bfo_relations:
-                if term not in result["bfo_relations_used"]:
-                    result["bfo_relations_used"].append(term)
+            # Skip variables and logical operators
+            if term.islower() or term in ['and', 'or', 'not', 'implies', 'iff', 'exists', 'forall']:
+                continue
+                
+            # Case-insensitive check for BFO classes
+            if term.lower() in lower_bfo_classes:
+                original_term = lower_bfo_classes[term.lower()]
+                if original_term not in result["bfo_classes_used"]:
+                    result["bfo_classes_used"].append(original_term)
+                    if term != original_term:
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{original_term}'. Consider using the exact case.")
+            # Case-insensitive check for BFO relations
+            elif term.lower() in lower_bfo_relations:
+                original_term = lower_bfo_relations[term.lower()]
+                if original_term not in result["bfo_relations_used"]:
+                    result["bfo_relations_used"].append(original_term)
+                    if term != original_term:
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{original_term}'. Consider using the exact case.")
             else:
-                # Check if it's a variable (typically lowercase)
+                # Term not found even with case-insensitive matching
                 if not term.islower() and term not in result["non_bfo_terms"]:
                     result["non_bfo_terms"].append(term)
                     result["issues"].append(f"Term '{term}' is not recognized as a BFO class or relation")
