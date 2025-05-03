@@ -28,8 +28,10 @@ class OwlTester:
         # Initialize flags for tracking the loading method
         self.is_rdflib_model = False
         self.is_xml_fallback = False
+        self.is_rdf_xml_manual = False
         self.rdflib_graph = None
         self.ontology_iri = None
+        self.subclass_relations = []
         
         # Initialize logical expressions reader
         self.read_expr = Expression.fromstring
@@ -1250,12 +1252,111 @@ class OwlTester:
                 self.individuals = []
                 self.annotation_properties = []
                 
+                # First, try to handle RDF/XML format which has a different structure
+                try:
+                    # Method 3a: Try manual RDF/XML parsing
+                    with open(file_path, 'r') as file:
+                        content = file.read()
+                        
+                    # Check if it's RDF/XML format by looking for key indicators
+                    if '<rdf:RDF' in content and 'xmlns:rdf=' in content:
+                        print("Detected RDF/XML format, using specialized RDF/XML parsing")
+                        
+                        # Extract all class definitions from rdf:about attributes
+                        class_pattern = r'<owl:Class[^>]*rdf:about="([^"]+)"'
+                        class_matches = re.findall(class_pattern, content)
+                        for class_uri in class_matches:
+                            class_name = class_uri.split('#')[-1] if '#' in class_uri else class_uri.split('/')[-1]
+                            if class_name and class_name not in self.bfo_classes:
+                                self.bfo_classes.append(class_name)
+                        
+                        # Extract object properties
+                        obj_prop_pattern = r'<owl:ObjectProperty[^>]*rdf:about="([^"]+)"'
+                        obj_prop_matches = re.findall(obj_prop_pattern, content)
+                        for prop_uri in obj_prop_matches:
+                            prop_name = prop_uri.split('#')[-1] if '#' in prop_uri else prop_uri.split('/')[-1]
+                            if prop_name and prop_name not in self.bfo_relations:
+                                self.bfo_relations.append(prop_name)
+                        
+                        # Extract individuals
+                        individual_pattern = r'<owl:NamedIndividual[^>]*rdf:about="([^"]+)"'
+                        individual_matches = re.findall(individual_pattern, content)
+                        for indiv_uri in individual_matches:
+                            indiv_name = indiv_uri.split('#')[-1] if '#' in indiv_uri else indiv_uri.split('/')[-1]
+                            if indiv_name and indiv_name not in self.individuals:
+                                self.individuals.append(indiv_name)
+                        
+                        # Extract ontology IRI
+                        ontology_pattern = r'<owl:Ontology[^>]*rdf:about="([^"]+)"'
+                        ontology_matches = re.findall(ontology_pattern, content)
+                        if ontology_matches:
+                            self.ontology_iri = ontology_matches[0]
+                        
+                        # Extract subclass relationships for hierarchy
+                        subclass_pattern = r'<rdfs:subClassOf[^>]*rdf:resource="([^"]+)"'
+                        subclass_matches = re.finditer(subclass_pattern, content)
+                        subclass_relations = []
+                        
+                        for match in subclass_matches:
+                            # Try to find the containing class element
+                            pos = match.start()
+                            class_start = content.rfind('<owl:Class', 0, pos)
+                            class_end = content.find('>', class_start)
+                            
+                            if class_start >= 0 and class_end > class_start:
+                                class_content = content[class_start:class_end+1]
+                                # Extract the subclass (child)
+                                about_match = re.search(r'rdf:about="([^"]+)"', class_content)
+                                if about_match:
+                                    child_uri = about_match.group(1)
+                                    child_name = child_uri.split('#')[-1] if '#' in child_uri else child_uri.split('/')[-1]
+                                    
+                                    # Extract the superclass (parent)
+                                    parent_uri = match.group(1)
+                                    parent_name = parent_uri.split('#')[-1] if '#' in parent_uri else parent_uri.split('/')[-1]
+                                    
+                                    subclass_relations.append((child_name, parent_name))
+                        
+                        # Store subclass relationships for later use
+                        self.subclass_relations = subclass_relations
+                        
+                        # Reset report data
+                        self.axioms = []
+                        self.inconsistencies = []
+                        self.inferred_axioms = []
+                        
+                        print(f"Successfully used manual RDF/XML parsing for {file_path}")
+                        print(f"Loaded {len(self.bfo_classes)} classes, {len(self.bfo_relations)} relations, and {len(self.individuals)} individuals")
+                        
+                        # Set flags for specialized RDF/XML parsing
+                        self.is_rdflib_model = True  # We'll use the RDFLib model methods
+                        self.is_xml_fallback = True
+                        self.is_rdf_xml_manual = True
+                        
+                        return True
+                
+                except Exception as rdf_e:
+                    print(f"Manual RDF/XML parsing failed, falling back to general XML parsing: {str(rdf_e)}")
+                
+                # Method 3b: Try general XML parsing if RDF/XML parsing failed
                 # Parse the XML
                 tree = ET.parse(file_path)
                 root = tree.getroot()
                 
-                # Extract namespace for OWL
-                namespaces = {'owl': 'http://www.w3.org/2002/07/owl#'}
+                # Extract namespaces from root element attributes
+                namespaces = {}
+                for key, value in root.attrib.items():
+                    if key.startswith('{http://www.w3.org/2000/xmlns/}') or key.startswith('xmlns:'):
+                        prefix = key.split('}')[-1] if '}' in key else key.split(':')[-1]
+                        namespaces[prefix] = value
+                
+                # Add known namespaces if not present
+                if 'owl' not in namespaces:
+                    namespaces['owl'] = 'http://www.w3.org/2002/07/owl#'
+                if 'rdf' not in namespaces:
+                    namespaces['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
+                if 'rdfs' not in namespaces:
+                    namespaces['rdfs'] = 'http://www.w3.org/2000/01/rdf-schema#'
                 
                 # Helper function to handle namespaces in tags
                 def find_elements_with_namespace(element, tag_name, ns=None):
@@ -1269,6 +1370,12 @@ class OwlTester:
                     elements = element.findall(f".//{tag_name}")
                     if elements:
                         return elements
+                    
+                    # Try every possible namespace in our map
+                    for prefix, ns_uri in namespaces.items():
+                        elements = element.findall(f".//{{{ns_uri}}}{tag_name}")
+                        if elements:
+                            return elements
                     
                     # Try every possible namespace combination in the document
                     for prefix in root.attrib.keys():
@@ -1284,26 +1391,29 @@ class OwlTester:
                 class_elements = find_elements_with_namespace(root, "Class", namespaces.get('owl'))
                 for cls in class_elements:
                     # Try to get the IRI attribute
-                    iri = cls.get('IRI')
+                    iri = cls.get('IRI') or cls.get('rdf:about') or cls.get(f"{{{namespaces.get('rdf')}}}about")
                     if iri:
                         class_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
-                        self.bfo_classes.append(class_name)
+                        if class_name not in self.bfo_classes:
+                            self.bfo_classes.append(class_name)
                 
                 # Extract object properties
                 obj_prop_elements = find_elements_with_namespace(root, "ObjectProperty", namespaces.get('owl'))
                 for prop in obj_prop_elements:
-                    iri = prop.get('IRI')
+                    iri = prop.get('IRI') or prop.get('rdf:about') or prop.get(f"{{{namespaces.get('rdf')}}}about")
                     if iri:
                         prop_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
-                        self.bfo_relations.append(prop_name)
+                        if prop_name not in self.bfo_relations:
+                            self.bfo_relations.append(prop_name)
                 
                 # Extract individuals
                 indiv_elements = find_elements_with_namespace(root, "NamedIndividual", namespaces.get('owl'))
                 for indiv in indiv_elements:
-                    iri = indiv.get('IRI')
+                    iri = indiv.get('IRI') or indiv.get('rdf:about') or indiv.get(f"{{{namespaces.get('rdf')}}}about")
                     if iri:
                         indiv_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
-                        self.individuals.append(indiv_name)
+                        if indiv_name not in self.individuals:
+                            self.individuals.append(indiv_name)
                 
                 # Handle declarations - these might contain nested class definitions
                 decl_elements = find_elements_with_namespace(root, "Declaration", namespaces.get('owl'))
@@ -1311,7 +1421,7 @@ class OwlTester:
                     # Look for Class declarations
                     cls_elements = find_elements_with_namespace(decl, "Class", namespaces.get('owl'))
                     for cls in cls_elements:
-                        iri = cls.get('IRI')
+                        iri = cls.get('IRI') or cls.get('rdf:about') or cls.get(f"{{{namespaces.get('rdf')}}}about")
                         if iri:
                             class_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
                             if class_name not in self.bfo_classes:
@@ -1320,7 +1430,7 @@ class OwlTester:
                     # Look for ObjectProperty declarations
                     prop_elements = find_elements_with_namespace(decl, "ObjectProperty", namespaces.get('owl'))
                     for prop in prop_elements:
-                        iri = prop.get('IRI')
+                        iri = prop.get('IRI') or prop.get('rdf:about') or prop.get(f"{{{namespaces.get('rdf')}}}about")
                         if iri:
                             prop_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
                             if prop_name not in self.bfo_relations:
@@ -1329,7 +1439,7 @@ class OwlTester:
                     # Look for NamedIndividual declarations
                     indiv_elements = find_elements_with_namespace(decl, "NamedIndividual", namespaces.get('owl'))
                     for indiv in indiv_elements:
-                        iri = indiv.get('IRI')
+                        iri = indiv.get('IRI') or indiv.get('rdf:about') or indiv.get(f"{{{namespaces.get('rdf')}}}about")
                         if iri:
                             indiv_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
                             if indiv_name not in self.individuals:
@@ -1341,6 +1451,14 @@ class OwlTester:
                 base = root.get('{http://www.w3.org/XML/1998/namespace}base')
                 if base:
                     self.ontology_iri = base
+                
+                # Also check for Ontology elements
+                ontology_elements = find_elements_with_namespace(root, "Ontology", namespaces.get('owl'))
+                for onto in ontology_elements:
+                    iri = onto.get('rdf:about') or onto.get(f"{{{namespaces.get('rdf')}}}about")
+                    if iri:
+                        self.ontology_iri = iri
+                        break
                 
                 # Reset report data
                 self.axioms = []
