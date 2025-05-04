@@ -1,0 +1,70 @@
+05-04 04:59:11.53
+9ea2a6a7
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-04 04:59:11.53
+9ea2a6a7
+User
+File "/home/runner/workspace/owl_tester.py", line 66, in __init__
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+raise Exception(f"Failed to load ontology: {result[1]}")
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+Exception: Failed to load ontology: Failed to load ontology. Errors: Method 1 (owlready2) failed: ('error', ('RDF/XML parsing error in file /home/runner/workspace/uploads/6c547ecf59b34bc2b97c2f5a64e5501f.owl, line 2, column 0.',)); Method 2 (RDFLib) failed: file:///home/runner/workspace/uploads/6c547ecf59b34bc2b97c2f5a64e5501f.owl:2:0: unbound prefix; Method 3 (XML fallback) failed: unbound prefix: line 2, column 0
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+During handling of the above exception, another exception occurred:
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+Traceback (most recent call last):
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+File "owlready2_optimized.pyx", line 385, in owlready2_optimized.parse_rdfxml
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+xml.parsers.expat.ExpatError: unbound prefix: line 2, column 0
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+The above exception was the direct cause of the following exception:
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+Traceback (most recent call last):
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/owlready2/driver.py", line 217, in do_parse
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+if format == "rdfxml": owlready2_optimized.parse_rdfxml(f, queue, default_base, batch_size)
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+File "owlready2_optimized.pyx", line 387, in owlready2_optimized.parse_rdfxml
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+owlready2.base.OwlReadyOntologyParsingError: RDF/XML parsing error in file /home/runner/workspace/uploads/6c547ecf59b34bc2b97c2f5a64e5501f.owl, line 2, column 0.
+2025-05-04 04:59:11.54
+9ea2a6a7
+User
+ERROR:app:Error analyzing OWL file: Failed to load ontology: Failed to load ontology. Errors: Method 1 (owlready2) failed: ('error', ('RDF/XML parsing error in file /home/runner/workspace/uploads/6c547ecf59b34bc2b97c2f5a64e5501f.owl, line 2, column 0.',)); Method 2 (RDFLib) failed: file:///home/runner/workspace/uploads/6c547ecf59b34bc2b97c2f5a64e5501f.owl:2:0: unbound prefix; Method 3 (XML fallback) failed: unbound prefix: line 2, column 0

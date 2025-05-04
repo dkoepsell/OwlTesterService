@@ -1254,17 +1254,69 @@ class OwlTester:
                 
                 # First, try to handle RDF/XML format which has a different structure
                 try:
-                    # Method 3a: Try manual RDF/XML parsing
+                    # Method 3a: Try preprocessing and manual RDF/XML parsing
                     with open(file_path, 'r') as file:
                         content = file.read()
-                        
+                    
                     # Check if it's RDF/XML format by looking for key indicators
-                    if '<rdf:RDF' in content and 'xmlns:rdf=' in content:
-                        print("Detected RDF/XML format, using specialized RDF/XML parsing")
+                    if '<rdf:RDF' in content and 'xmlns:' in content:
+                        print("Detected RDF/XML format, using specialized preprocessing and parsing")
+                        
+                        # Extract namespace mappings from the file
+                        namespace_mappings = {}
+                        
+                        # Find the RDF root element which contains namespace declarations
+                        rdf_start = content.find('<rdf:RDF')
+                        if rdf_start >= 0:
+                            rdf_end = content.find('>', rdf_start)
+                            rdf_tag = content[rdf_start:rdf_end+1]
+                            
+                            # Extract all namespace declarations
+                            xmlns_pattern = r'xmlns:([^=]+)="([^"]+)"'
+                            xmlns_matches = re.findall(xmlns_pattern, rdf_tag)
+                            
+                            for prefix, uri in xmlns_matches:
+                                namespace_mappings[prefix] = uri
+                                print(f"Found namespace: {prefix} -> {uri}")
+                        
+                        # Check if there's an issue with prefixed references in attribute values
+                        # Example: rdf:about="bfo:MaterialEntity" - this is not valid RDF/XML
+                        
+                        # Create a fixed copy of the content for parsing
+                        fixed_content = content
+                        
+                        # Look for attribute values that use prefixes but aren't proper URIs
+                        prefixed_uri_pattern = r'(rdf:about|rdf:resource)="([^:]+):([^"]+)"'
+                        prefixed_uri_matches = list(re.finditer(prefixed_uri_pattern, content))
+                        
+                        if prefixed_uri_matches:
+                            print(f"Found {len(prefixed_uri_matches)} prefixed URI references that need fixing")
+                            
+                            # Process from end to start to avoid offset changes affecting positions
+                            for match in reversed(prefixed_uri_matches):
+                                attr_name = match.group(1)
+                                prefix = match.group(2)
+                                local_name = match.group(3)
+                                
+                                if prefix in namespace_mappings:
+                                    # Replace with proper URI
+                                    full_uri = f"{namespace_mappings[prefix]}{local_name}"
+                                    start, end = match.span()
+                                    fixed_content = fixed_content[:start] + f'{attr_name}="{full_uri}"' + fixed_content[end:]
+                                    print(f"Fixed: {attr_name}=\"{prefix}:{local_name}\" -> {attr_name}=\"{full_uri}\"")
+                        
+                        # Save the fixed content to a temporary file
+                        fixed_file_path = file_path + ".fixed.xml"
+                        with open(fixed_file_path, 'w') as fixed_file:
+                            fixed_file.write(fixed_content)
+                        
+                        print(f"Saved fixed content to {fixed_file_path}")
+                        
+                        # Process the fixed content using regex extraction
                         
                         # Extract all class definitions from rdf:about attributes
                         class_pattern = r'<owl:Class[^>]*rdf:about="([^"]+)"'
-                        class_matches = re.findall(class_pattern, content)
+                        class_matches = re.findall(class_pattern, fixed_content)
                         for class_uri in class_matches:
                             class_name = class_uri.split('#')[-1] if '#' in class_uri else class_uri.split('/')[-1]
                             if class_name and class_name not in self.bfo_classes:
@@ -1272,7 +1324,7 @@ class OwlTester:
                         
                         # Extract object properties
                         obj_prop_pattern = r'<owl:ObjectProperty[^>]*rdf:about="([^"]+)"'
-                        obj_prop_matches = re.findall(obj_prop_pattern, content)
+                        obj_prop_matches = re.findall(obj_prop_pattern, fixed_content)
                         for prop_uri in obj_prop_matches:
                             prop_name = prop_uri.split('#')[-1] if '#' in prop_uri else prop_uri.split('/')[-1]
                             if prop_name and prop_name not in self.bfo_relations:
@@ -1280,7 +1332,7 @@ class OwlTester:
                         
                         # Extract individuals
                         individual_pattern = r'<owl:NamedIndividual[^>]*rdf:about="([^"]+)"'
-                        individual_matches = re.findall(individual_pattern, content)
+                        individual_matches = re.findall(individual_pattern, fixed_content)
                         for indiv_uri in individual_matches:
                             indiv_name = indiv_uri.split('#')[-1] if '#' in indiv_uri else indiv_uri.split('/')[-1]
                             if indiv_name and indiv_name not in self.individuals:
@@ -1288,23 +1340,23 @@ class OwlTester:
                         
                         # Extract ontology IRI
                         ontology_pattern = r'<owl:Ontology[^>]*rdf:about="([^"]+)"'
-                        ontology_matches = re.findall(ontology_pattern, content)
+                        ontology_matches = re.findall(ontology_pattern, fixed_content)
                         if ontology_matches:
                             self.ontology_iri = ontology_matches[0]
                         
                         # Extract subclass relationships for hierarchy
                         subclass_pattern = r'<rdfs:subClassOf[^>]*rdf:resource="([^"]+)"'
-                        subclass_matches = re.finditer(subclass_pattern, content)
+                        subclass_matches = re.finditer(subclass_pattern, fixed_content)
                         subclass_relations = []
                         
                         for match in subclass_matches:
                             # Try to find the containing class element
                             pos = match.start()
-                            class_start = content.rfind('<owl:Class', 0, pos)
-                            class_end = content.find('>', class_start)
+                            class_start = fixed_content.rfind('<owl:Class', 0, pos)
+                            class_end = fixed_content.find('>', class_start)
                             
                             if class_start >= 0 and class_end > class_start:
-                                class_content = content[class_start:class_end+1]
+                                class_content = fixed_content[class_start:class_end+1]
                                 # Extract the subclass (child)
                                 about_match = re.search(r'rdf:about="([^"]+)"', class_content)
                                 if about_match:
@@ -1325,7 +1377,7 @@ class OwlTester:
                         self.inconsistencies = []
                         self.inferred_axioms = []
                         
-                        print(f"Successfully used manual RDF/XML parsing for {file_path}")
+                        print(f"Successfully used preprocessed manual RDF/XML parsing for {file_path}")
                         print(f"Loaded {len(self.bfo_classes)} classes, {len(self.bfo_relations)} relations, and {len(self.individuals)} individuals")
                         
                         # Set flags for specialized RDF/XML parsing
