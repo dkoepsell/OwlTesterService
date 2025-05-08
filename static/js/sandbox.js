@@ -55,13 +55,14 @@ function showIndividualForm(show = true) {
 }
 
 // AI Assistant functions
-function requestAISuggestions(domain, subject, callback) {
+function requestAISuggestions(domain, subject, callback, type = 'all') {
     // Make a request to our AI suggestions endpoint
-    fetch(`/api/sandbox/ai/suggestions?domain=${encodeURIComponent(domain)}&subject=${encodeURIComponent(subject)}`)
+    // type can be 'all', 'classes', or 'properties'
+    fetch(`/api/sandbox/ai/suggestions?domain=${encodeURIComponent(domain)}&subject=${encodeURIComponent(subject)}&type=${encodeURIComponent(type)}`)
         .then(response => response.json())
         .then(data => {
             if (callback && typeof callback === 'function') {
-                callback(data);
+                callback(data, type);
             }
         })
         .catch(error => {
@@ -548,7 +549,7 @@ function setupAIAssistantButtons(ontologyId) {
         });
     }
     
-    // Add related entities suggestion button
+    // Add classes suggestion button
     const suggestClassesBtn = document.getElementById('suggest-classes-btn');
     if (suggestClassesBtn) {
         suggestClassesBtn.addEventListener('click', function() {
@@ -568,8 +569,8 @@ function setupAIAssistantButtons(ontologyId) {
             suggestClassesBtn.disabled = true;
             suggestClassesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
             
-            // Request entity suggestions
-            requestAISuggestions(domain, subject, function(data) {
+            // Request class suggestions - use 'classes' type
+            requestAISuggestions(domain, subject, function(data, type) {
                 // Reset button state
                 suggestClassesBtn.disabled = false;
                 suggestClassesBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Classes';
@@ -581,19 +582,72 @@ function setupAIAssistantButtons(ontologyId) {
                 
                 // Display suggested classes
                 if (data.suggestions && data.suggestions.length > 0) {
-                    showSuggestionsList(data.suggestions, ontologyId);
+                    showSuggestionsList(data.suggestions, ontologyId, type);
                 } else {
                     alert('No class suggestions generated');
                 }
-            });
+            }, 'classes'); // Pass 'classes' type parameter
+        });
+    }
+    
+    // Add properties suggestion button
+    const suggestPropertiesBtn = document.getElementById('suggest-properties-btn');
+    if (suggestPropertiesBtn) {
+        suggestPropertiesBtn.addEventListener('click', function() {
+            // Get domain and subject from ontology metadata section
+            const domainElement = document.querySelector('.domain-badge');
+            const subjectElement = document.querySelector('.subject-badge');
+            
+            if (!domainElement || !subjectElement) {
+                alert('Domain and subject information not found');
+                return;
+            }
+            
+            const domain = domainElement.textContent.trim();
+            const subject = subjectElement.textContent.trim();
+            
+            // Show loading state
+            suggestPropertiesBtn.disabled = true;
+            suggestPropertiesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
+            
+            // Request property suggestions - use 'properties' type
+            requestAISuggestions(domain, subject, function(data, type) {
+                // Reset button state
+                suggestPropertiesBtn.disabled = false;
+                suggestPropertiesBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Properties';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Display suggested properties
+                if (data.suggestions && data.suggestions.length > 0) {
+                    showSuggestionsList(data.suggestions, ontologyId, type);
+                } else {
+                    alert('No property suggestions generated');
+                }
+            }, 'properties'); // Pass 'properties' type parameter
         });
     }
 }
 
 // Show a modal with entity suggestions
-function showSuggestionsList(suggestions, ontologyId) {
+function showSuggestionsList(suggestions, ontologyId, type = 'all') {
     // Create or get the suggestions modal
     let modal = document.getElementById('suggestions-modal');
+    
+    // Set title and descriptive text based on suggestion type
+    let modalTitle = "Suggested Classes";
+    let modalDescription = "Here are some suggested classes for your ontology domain:";
+    
+    if (type === 'properties') {
+        modalTitle = "Suggested Properties";
+        modalDescription = "Here are some suggested properties for your ontology domain:";
+    } else if (type === 'all') {
+        modalTitle = "Suggested Ontology Components";
+        modalDescription = "Here are some suggested classes and properties for your ontology domain:";
+    }
     
     // If the modal doesn't exist, create it
     if (!modal) {
@@ -607,11 +661,11 @@ function showSuggestionsList(suggestions, ontologyId) {
             <div class="modal-dialog modal-lg">
                 <div class="modal-content bg-dark">
                     <div class="modal-header">
-                        <h5 class="modal-title">Suggested Classes</h5>
+                        <h5 class="modal-title">${modalTitle}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <p>Here are some suggested classes for your ontology domain:</p>
+                        <p id="suggestions-description">${modalDescription}</p>
                         <div id="suggestions-list" class="list-group mb-3">
                             <!-- Suggestions will be inserted here -->
                         </div>
@@ -625,6 +679,10 @@ function showSuggestionsList(suggestions, ontologyId) {
         `;
         
         document.body.appendChild(modal);
+    } else {
+        // Update the title and description for the existing modal
+        modal.querySelector('.modal-title').textContent = modalTitle;
+        modal.querySelector('#suggestions-description').textContent = modalDescription;
     }
     
     // Get the suggestions list container
@@ -636,16 +694,35 @@ function showSuggestionsList(suggestions, ontologyId) {
         const item = document.createElement('div');
         item.className = 'list-group-item bg-dark d-flex align-items-start';
         
-        item.innerHTML = `
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" value="${index}" id="suggestion-${index}">
-            </div>
-            <div>
-                <h6 class="mb-1">${suggestion.name}</h6>
-                <p class="mb-1 small">${suggestion.description || 'No description provided'}</p>
-                ${suggestion.bfo_category ? `<span class="badge bg-info">BFO: ${suggestion.bfo_category}</span>` : ''}
-            </div>
-        `;
+        // Different formats for properties vs classes
+        if (type === 'properties') {
+            // Property format
+            item.innerHTML = `
+                <div class="form-check me-2">
+                    <input class="form-check-input" type="checkbox" value="${index}" id="suggestion-${index}">
+                </div>
+                <div class="w-100">
+                    <h6 class="mb-1">${suggestion.name}</h6>
+                    <p class="mb-1 small">${suggestion.description || 'No description provided'}</p>
+                    <div class="d-flex justify-content-between">
+                        <span class="badge bg-secondary">${suggestion.type || 'object'} property</span>
+                        ${suggestion.class_name ? `<span class="badge bg-info">Class: ${suggestion.class_name}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        } else {
+            // Class format
+            item.innerHTML = `
+                <div class="form-check me-2">
+                    <input class="form-check-input" type="checkbox" value="${index}" id="suggestion-${index}">
+                </div>
+                <div class="w-100">
+                    <h6 class="mb-1">${suggestion.name}</h6>
+                    <p class="mb-1 small">${suggestion.description || 'No description provided'}</p>
+                    ${suggestion.bfo_category ? `<span class="badge bg-info">BFO: ${suggestion.bfo_category}</span>` : ''}
+                </div>
+            `;
+        }
         
         suggestionsList.appendChild(item);
     });
@@ -666,49 +743,97 @@ function showSuggestionsList(suggestions, ontologyId) {
             return;
         }
         
-        // Add all selected suggestions as classes
+        // Add all selected suggestions based on type
         let added = 0;
         let total = selected.length;
         
-        function addNextClass(i) {
-            if (i >= total) {
-                // All classes added, close modal and refresh page
-                bootstrap.Modal.getInstance(modal).hide();
-                alert(`Added ${added} out of ${total} classes.`);
-                window.location.reload();
-                return;
+        if (type === 'properties') {
+            // Handle adding properties
+            function addNextProperty(i) {
+                if (i >= total) {
+                    // All properties added, close modal and refresh page
+                    bootstrap.Modal.getInstance(modal).hide();
+                    alert(`Added ${added} out of ${total} properties.`);
+                    window.location.reload();
+                    return;
+                }
+                
+                const suggestion = selected[i];
+                
+                // Create the property
+                fetch(`/api/sandbox/${ontologyId}/properties`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: suggestion.name,
+                        description: suggestion.description || '',
+                        property_type: suggestion.type || 'object',
+                        // Optional fields - we might not have these for AI suggestions
+                        domain_class_id: suggestion.domain_class_id || null,
+                        range_class_id: suggestion.range_class_id || null
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        added++;
+                    }
+                    // Continue with the next property regardless of success
+                    addNextProperty(i + 1);
+                })
+                .catch(error => {
+                    console.error('Error adding property:', error);
+                    // Continue with the next property despite the error
+                    addNextProperty(i + 1);
+                });
             }
             
-            const suggestion = selected[i];
+            // Start adding properties
+            addNextProperty(0);
             
-            // Create the class
-            fetch(`/api/sandbox/${ontologyId}/classes`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: suggestion.name,
-                    description: suggestion.description || '',
-                    bfo_category: suggestion.bfo_category || null
-                })
-            })
-            .then(response => {
-                if (response.ok) {
-                    added++;
+        } else {
+            // Handle adding classes (original code)
+            function addNextClass(i) {
+                if (i >= total) {
+                    // All classes added, close modal and refresh page
+                    bootstrap.Modal.getInstance(modal).hide();
+                    alert(`Added ${added} out of ${total} classes.`);
+                    window.location.reload();
+                    return;
                 }
-                // Continue with the next class regardless of success
-                addNextClass(i + 1);
-            })
-            .catch(error => {
-                console.error('Error adding class:', error);
-                // Continue with the next class despite the error
-                addNextClass(i + 1);
-            });
+                
+                const suggestion = selected[i];
+                
+                // Create the class
+                fetch(`/api/sandbox/${ontologyId}/classes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: suggestion.name,
+                        description: suggestion.description || '',
+                        bfo_category: suggestion.bfo_category || null
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        added++;
+                    }
+                    // Continue with the next class regardless of success
+                    addNextClass(i + 1);
+                })
+                .catch(error => {
+                    console.error('Error adding class:', error);
+                    // Continue with the next class despite the error
+                    addNextClass(i + 1);
+                });
+            }
+            
+            // Start adding classes
+            addNextClass(0);
         }
-        
-        // Start adding classes
-        addNextClass(0);
     };
     
     // Show the modal
