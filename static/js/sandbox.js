@@ -549,7 +549,7 @@ function setupAIAssistantButtons(ontologyId) {
         });
     }
     
-    // Add classes suggestion button
+    // Add classes suggestion button in the header area
     const suggestClassesBtn = document.getElementById('suggest-classes-btn');
     if (suggestClassesBtn) {
         suggestClassesBtn.addEventListener('click', function() {
@@ -574,6 +574,47 @@ function setupAIAssistantButtons(ontologyId) {
                 // Reset button state
                 suggestClassesBtn.disabled = false;
                 suggestClassesBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Classes';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Display suggested classes
+                if (data.suggestions && data.suggestions.length > 0) {
+                    showSuggestionsList(data.suggestions, ontologyId, type);
+                } else {
+                    alert('No class suggestions generated');
+                }
+            }, 'classes'); // Pass 'classes' type parameter
+        });
+    }
+    
+    // Add classes suggestion button in the classes tab
+    const suggestClassesBtnTab = document.getElementById('suggest-classes-btn-tab');
+    if (suggestClassesBtnTab) {
+        suggestClassesBtnTab.addEventListener('click', function() {
+            // Get domain and subject from ontology metadata section
+            const domainElement = document.querySelector('.domain-badge');
+            const subjectElement = document.querySelector('.subject-badge');
+            
+            if (!domainElement || !subjectElement) {
+                alert('Domain and subject information not found');
+                return;
+            }
+            
+            const domain = domainElement.textContent.trim();
+            const subject = subjectElement.textContent.trim();
+            
+            // Show loading state
+            suggestClassesBtnTab.disabled = true;
+            suggestClassesBtnTab.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
+            
+            // Request class suggestions - use 'classes' type
+            requestAISuggestions(domain, subject, function(data, type) {
+                // Reset button state
+                suggestClassesBtnTab.disabled = false;
+                suggestClassesBtnTab.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Classes';
                 
                 if (data.error) {
                     alert('Error: ' + data.error);
