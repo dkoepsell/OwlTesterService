@@ -42,11 +42,36 @@ def suggest_ontology_classes(domain, subject):
         system_prompt = """You are an expert in ontology development and knowledge engineering.
 Your task is to suggest appropriate classes for an ontology based on a specific domain and subject.
 You should consider Basic Formal Ontology (BFO) principles in your suggestions.
-Format your response as a JSON array of objects, each representing a class with:
+
+IMPORTANT: You must format your response as a JSON object with a key called "suggestions" containing an array of class objects.
+Each class object in the array should have:
 1. name: The class name (in CamelCase without spaces)
 2. description: A clear description of what the class represents
 3. bfo_category: The most appropriate BFO upper-level category for this class (if applicable)
 4. properties: An array of suggested properties (object, data, or annotation) for this class
+
+Example response format:
+{
+  "suggestions": [
+    {
+      "name": "ClassName1",
+      "description": "Description of class 1",
+      "bfo_category": "Object",
+      "properties": [
+        {"name": "property1", "type": "object", "description": "Description of property 1"},
+        {"name": "property2", "type": "data", "description": "Description of property 2"}
+      ]
+    },
+    {
+      "name": "ClassName2",
+      "description": "Description of class 2",
+      "bfo_category": "Process",
+      "properties": [
+        {"name": "property3", "type": "object", "description": "Description of property 3"}
+      ]
+    }
+  ]
+}
 """
 
         user_prompt = f"""Please suggest 10-15 core classes and properties for an ontology in the domain of "{domain}" focusing on the subject of "{subject}".
@@ -55,6 +80,8 @@ For each class, provide:
 2. A clear, concise description
 3. The most appropriate BFO upper-level category
 4. 2-3 properties that would be associated with this class
+
+IMPORTANT: Format your response as a JSON object with a "suggestions" array containing all the class objects, as shown in the example in my previous message. Do not return a single class object.
 
 Classes should cover the core concepts needed for this domain and subject.
 Ensure the suggestions follow ontology best practices and would be useful for domain experts.
@@ -91,7 +118,11 @@ Ensure the suggestions follow ontology best practices and would be useful for do
             # Case 3: Response has a 'suggestions' key
             elif result.get("suggestions") and isinstance(result.get("suggestions"), list):
                 suggestions = result.get("suggestions")
-            # Case 4: Handle numbered keys
+            # Case 4: Single object response (as seen in our logs)
+            elif isinstance(result, dict) and "name" in result and "description" in result:
+                # Add single suggestion to the list
+                suggestions = [result]
+            # Case 5: Handle numbered keys
             else:
                 for key, value in result.items():
                     if isinstance(value, dict) and "name" in value:
