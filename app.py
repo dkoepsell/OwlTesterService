@@ -12,7 +12,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, EmailField, SubmitField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from owl_tester import OwlTester
-from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression
+from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression, SandboxOntology, OntologyClass, OntologyProperty, OntologyIndividual
 from openai_utils import generate_real_world_implications
 
 # Set up logging

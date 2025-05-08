@@ -18,6 +18,7 @@ class User(UserMixin, db.Model):
     # Relationships
     ontology_files = db.relationship('OntologyFile', backref='user', lazy=True)
     fol_expressions = db.relationship('FOLExpression', backref='user', lazy=True)
+    # Sandbox ontologies relationship is defined in the SandboxOntology model
     
     def set_password(self, password):
         """Set the user's password hash from a plain text password."""
@@ -104,3 +105,104 @@ class FOLExpression(db.Model):
     
     def __repr__(self):
         return f"<FOLExpression {self.id}: {self.expression[:30]}...>"
+
+
+class SandboxOntology(db.Model):
+    """Model for storing sandbox ontology development projects."""
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    domain = db.Column(db.String(100), nullable=False)
+    subject = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    creation_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    last_modified = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # Can be null for anonymous users
+    
+    # Store the ontology structure as JSON
+    classes = db.Column(db.JSON, default=list)
+    properties = db.Column(db.JSON, default=list)
+    individuals = db.Column(db.JSON, default=list)
+    
+    # Reference to the user (optional)
+    user = db.relationship('User', backref=db.backref('sandbox_ontologies', lazy=True))
+    
+    def __repr__(self):
+        return f"<SandboxOntology {self.id}: {self.title}>"
+        
+        
+class OntologyClass(db.Model):
+    """Model for storing class definitions in sandbox ontologies."""
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    bfo_category = db.Column(db.String(100), nullable=True)  # Link to BFO class if applicable
+    creation_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    # Parent class (for subclass relationships)
+    parent_id = db.Column(db.Integer, db.ForeignKey('ontology_class.id'), nullable=True)
+    children = db.relationship('OntologyClass', backref=db.backref('parent', remote_side=[id]), lazy=True)
+    
+    # Reference to the ontology
+    ontology = db.relationship('SandboxOntology', backref=db.backref('ontology_classes', lazy=True, cascade="all, delete-orphan"))
+    
+    # Custom properties as JSON
+    properties = db.Column(db.JSON, default=dict)
+    
+    def __repr__(self):
+        return f"<OntologyClass {self.id}: {self.name}>"
+        
+        
+class OntologyProperty(db.Model):
+    """Model for storing property/relationship definitions in sandbox ontologies."""
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    property_type = db.Column(db.String(50), nullable=False)  # 'object', 'data', 'annotation'
+    creation_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    # Domain and range (for object properties)
+    domain_class_id = db.Column(db.Integer, db.ForeignKey('ontology_class.id'), nullable=True)
+    range_class_id = db.Column(db.Integer, db.ForeignKey('ontology_class.id'), nullable=True)
+    
+    # References to domain and range classes
+    domain_class = db.relationship('OntologyClass', foreign_keys=[domain_class_id], backref=db.backref('as_domain_properties', lazy=True))
+    range_class = db.relationship('OntologyClass', foreign_keys=[range_class_id], backref=db.backref('as_range_properties', lazy=True))
+    
+    # Reference to the ontology
+    ontology = db.relationship('SandboxOntology', backref=db.backref('ontology_properties', lazy=True, cascade="all, delete-orphan"))
+    
+    # Custom property metadata as JSON
+    property_metadata = db.Column(db.JSON, default=dict)
+    
+    def __repr__(self):
+        return f"<OntologyProperty {self.id}: {self.name}>"
+
+
+class OntologyIndividual(db.Model):
+    """Model for storing individual instances in sandbox ontologies."""
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    creation_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    # Class membership
+    class_id = db.Column(db.Integer, db.ForeignKey('ontology_class.id'), nullable=False)
+    
+    # Reference to the class
+    ontology_class = db.relationship('OntologyClass', backref=db.backref('individuals', lazy=True))
+    
+    # Reference to the ontology
+    ontology = db.relationship('SandboxOntology', backref=db.backref('ontology_individuals', lazy=True, cascade="all, delete-orphan"))
+    
+    # Property values as JSON
+    property_values = db.Column(db.JSON, default=dict)
+    
+    def __repr__(self):
+        return f"<OntologyIndividual {self.id}: {self.name}>"
