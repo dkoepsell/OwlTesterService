@@ -1205,6 +1205,131 @@ def api_sandbox_ai_bfo_category():
         logger.error(f"Error suggesting BFO category: {str(e)}")
         return jsonify({"error": f"Failed to suggest BFO category: {str(e)}"}), 500
 
+@app.route('/api/sandbox/<int:ontology_id>/properties', methods=['GET', 'POST'])
+def api_sandbox_properties(ontology_id):
+    """API for sandbox ontology properties."""
+    ontology = SandboxOntology.query.get_or_404(ontology_id)
+    
+    # Check if the user has access to this ontology
+    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    if request.method == 'GET':
+        # Return all properties for this ontology
+        properties = OntologyProperty.query.filter_by(ontology_id=ontology.id).all()
+        return jsonify({
+            "properties": [
+                {
+                    "id": prop.id,
+                    "name": prop.name,
+                    "description": prop.description,
+                    "property_type": prop.property_type,
+                    "domain_class_id": prop.domain_class_id,
+                    "range_class_id": prop.range_class_id
+                } for prop in properties
+            ]
+        })
+    elif request.method == 'POST':
+        # Create a new property
+        data = request.get_json()
+        
+        if not data.get('name'):
+            return jsonify({"error": "Property name is required"}), 400
+        
+        try:
+            # Create the property
+            prop = OntologyProperty(
+                name=data.get('name'),
+                description=data.get('description', ''),
+                property_type=data.get('property_type', 'object'),  # Default to object property
+                domain_class_id=data.get('domain_class_id'),
+                range_class_id=data.get('range_class_id'),
+                ontology_id=ontology.id
+            )
+            
+            db.session.add(prop)
+            
+            # Update the last_modified timestamp on the ontology
+            ontology.last_modified = datetime.datetime.utcnow()
+            
+            db.session.commit()
+            
+            return jsonify({
+                "id": prop.id,
+                "name": prop.name,
+                "description": prop.description,
+                "property_type": prop.property_type,
+                "domain_class_id": prop.domain_class_id,
+                "range_class_id": prop.range_class_id
+            }), 201
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error creating property: {str(e)}")
+            return jsonify({"error": f"Failed to create property: {str(e)}"}), 500
+
+
+@app.route('/api/sandbox/<int:ontology_id>/properties/<int:property_id>', methods=['GET', 'PUT', 'DELETE'])
+def api_sandbox_property(ontology_id, property_id):
+    """API for a specific sandbox ontology property."""
+    ontology = SandboxOntology.query.get_or_404(ontology_id)
+    
+    # Check if the user has access to this ontology
+    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    # Get the property
+    prop = OntologyProperty.query.filter_by(id=property_id, ontology_id=ontology.id).first_or_404()
+    
+    if request.method == 'GET':
+        # Return property details
+        return jsonify({
+            "id": prop.id,
+            "name": prop.name,
+            "description": prop.description,
+            "property_type": prop.property_type,
+            "domain_class_id": prop.domain_class_id,
+            "range_class_id": prop.range_class_id
+        })
+    elif request.method == 'PUT':
+        # Update the property
+        data = request.get_json()
+        
+        if 'name' in data:
+            prop.name = data['name']
+        if 'description' in data:
+            prop.description = data['description']
+        if 'property_type' in data:
+            prop.property_type = data['property_type']
+        if 'domain_class_id' in data:
+            prop.domain_class_id = data['domain_class_id']
+        if 'range_class_id' in data:
+            prop.range_class_id = data['range_class_id']
+        
+        # Update the last_modified timestamp on the ontology
+        ontology.last_modified = datetime.datetime.utcnow()
+        
+        db.session.commit()
+        
+        return jsonify({
+            "id": prop.id,
+            "name": prop.name,
+            "description": prop.description,
+            "property_type": prop.property_type,
+            "domain_class_id": prop.domain_class_id,
+            "range_class_id": prop.range_class_id
+        })
+    elif request.method == 'DELETE':
+        # Delete the property
+        db.session.delete(prop)
+        
+        # Update the last_modified timestamp on the ontology
+        ontology.last_modified = datetime.datetime.utcnow()
+        
+        db.session.commit()
+        
+        return '', 204
+
+
 @app.route('/api/sandbox/ai/description', methods=['POST'])
 def api_sandbox_ai_description():
     """API endpoint to generate a description for a class."""
