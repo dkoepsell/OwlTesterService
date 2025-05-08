@@ -1127,20 +1127,28 @@ def api_sandbox_ai_suggestions():
     domain = request.args.get('domain', '')
     subject = request.args.get('subject', '')
     
+    logger.info(f"AI suggestions requested for domain: '{domain}', subject: '{subject}'")
+    
     if not domain or not subject:
+        logger.warning("Missing parameters for AI suggestions")
         return jsonify({"error": "Both domain and subject parameters are required"}), 400
     
     try:
         # Call the OpenAI function to get suggestions
+        logger.info(f"Calling OpenAI API to get suggestions for domain: '{domain}', subject: '{subject}'")
         suggestions = suggest_ontology_classes(domain, subject)
         
         if not suggestions:
+            logger.warning(f"No suggestions generated for domain: '{domain}', subject: '{subject}'")
             return jsonify({"error": "No suggestions generated. Try with a different domain/subject."}), 404
             
         # Check if we got an error from the OpenAI function
         if len(suggestions) == 1 and "error" in suggestions[0]:
-            return jsonify({"error": suggestions[0]["error"]}), 500
-            
+            error_msg = suggestions[0]["error"]
+            logger.error(f"OpenAI API returned an error: {error_msg}")
+            return jsonify({"error": error_msg}), 500
+        
+        logger.info(f"Successfully generated {len(suggestions)} suggestions for domain: '{domain}', subject: '{subject}'")
         return jsonify({"suggestions": suggestions, "domain": domain, "subject": subject})
         
     except Exception as e:

@@ -37,6 +37,7 @@ def suggest_ontology_classes(domain, subject):
         list: A list of dictionaries containing suggested classes with name, description, and BFO category
     """
     try:
+        logger.info(f"Starting AI suggestion generation for domain: {domain}, subject: {subject}")
         client = get_openai_client()
         
         system_prompt = """You are an expert in ontology development and knowledge engineering.
@@ -99,37 +100,64 @@ Ensure the suggestions follow ontology best practices and would be useful for do
         )
         
         # Parse the response
+        if response is None or response.choices is None or len(response.choices) == 0:
+            logger.error("OpenAI API returned an empty response")
+            return [{"error": "The OpenAI API returned an empty response. Please try again later."}]
+            
         result_text = response.choices[0].message.content
+        if result_text is None or result_text.strip() == "":
+            logger.error("OpenAI API returned empty content")
+            return [{"error": "The OpenAI API returned empty content. Please try again later."}]
+            
         logger.info(f"Raw OpenAI class suggestions response: {result_text}")
         
         # Handle different JSON formats that might be returned
         try:
+            logger.info(f"Attempting to parse JSON response: {result_text[:min(200, len(result_text))]}...")
             result = json.loads(result_text)
+            logger.info(f"Successfully loaded JSON. Response structure: {type(result).__name__}")
+            if isinstance(result, dict):
+                logger.info(f"JSON keys: {list(result.keys())}")
             
             # Extract the suggestions depending on the structure of the response
             suggestions = []
             
             # Case 1: Response is a list of suggestions
             if isinstance(result, list):
+                logger.info("Case 1: Response is a list")
                 suggestions = result
             # Case 2: Response has a 'classes' key
-            elif result.get("classes") and isinstance(result.get("classes"), list):
+            elif isinstance(result, dict) and result.get("classes") and isinstance(result.get("classes"), list):
+                logger.info("Case 2: Response has a 'classes' key")
                 suggestions = result.get("classes")
             # Case 3: Response has a 'suggestions' key
-            elif result.get("suggestions") and isinstance(result.get("suggestions"), list):
+            elif isinstance(result, dict) and result.get("suggestions") and isinstance(result.get("suggestions"), list):
+                logger.info("Case 3: Response has a 'suggestions' key")
                 suggestions = result.get("suggestions")
             # Case 4: Single object response (as seen in our logs)
             elif isinstance(result, dict) and "name" in result and "description" in result:
+                logger.info("Case 4: Response is a single class object")
                 # Add single suggestion to the list
                 suggestions = [result]
             # Case 5: Handle numbered keys
             else:
-                for key, value in result.items():
-                    if isinstance(value, dict) and "name" in value:
-                        suggestions.append(value)
+                logger.info("Case 5: Checking for other structures")
+                if isinstance(result, dict):
+                    for key, value in result.items():
+                        logger.info(f"Checking key: {key}")
+                        if isinstance(value, dict) and "name" in value:
+                            logger.info(f"Found class in key {key}")
+                            suggestions.append(value)
             
-            logger.info(f"Successfully parsed {len(suggestions)} class suggestions")
-            return suggestions
+            if suggestions:
+                logger.info(f"Successfully parsed {len(suggestions)} class suggestions")
+                # Log the first suggestion as an example
+                if len(suggestions) > 0:
+                    logger.info(f"Example suggestion: {json.dumps(suggestions[0])}")
+                return suggestions
+            else:
+                logger.warning("No suggestions found in the response")
+                return []
             
         except Exception as e:
             logger.error(f"Error parsing OpenAI class suggestions: {str(e)}")
@@ -190,11 +218,20 @@ Be specific about which exact BFO category is most appropriate, not just the gen
         )
         
         # Parse the response
+        if response is None or response.choices is None or len(response.choices) == 0:
+            logger.error("OpenAI API returned an empty response when suggesting BFO category")
+            return {"error": "The OpenAI API returned an empty response. Please try again later."}
+            
         result_text = response.choices[0].message.content
+        if result_text is None or result_text.strip() == "":
+            logger.error("OpenAI API returned empty content when suggesting BFO category")
+            return {"error": "The OpenAI API returned empty content. Please try again later."}
+            
         logger.info(f"Raw OpenAI BFO category suggestion: {result_text}")
         
         try:
             result = json.loads(result_text)
+            logger.info(f"Successfully parsed BFO suggestion. Keys: {list(result.keys())}")
             return {
                 "bfo_category": result.get("bfo_category", ""),
                 "explanation": result.get("explanation", "")
@@ -246,11 +283,20 @@ Focus on what this class would represent in a domain ontology.
         )
         
         # Parse the response
+        if response is None or response.choices is None or len(response.choices) == 0:
+            logger.error("OpenAI API returned an empty response when generating description")
+            return {"error": "The OpenAI API returned an empty response. Please try again later."}
+            
         result_text = response.choices[0].message.content
+        if result_text is None or result_text.strip() == "":
+            logger.error("OpenAI API returned empty content when generating description")
+            return {"error": "The OpenAI API returned empty content. Please try again later."}
+            
         logger.info(f"Raw OpenAI description generation: {result_text}")
         
         try:
             result = json.loads(result_text)
+            logger.info(f"Successfully parsed description. Keys: {list(result.keys())}")
             return {"description": result.get("description", "")}
         except Exception as e:
             logger.error(f"Error parsing OpenAI description generation: {str(e)}")
@@ -330,14 +376,26 @@ Ensure your examples are domain-appropriate, concrete, and clearly connected to 
         )
         
         # Parse the response
+        if response is None or response.choices is None or len(response.choices) == 0:
+            logger.error("OpenAI API returned an empty response when generating implications")
+            return [{"error": "The OpenAI API returned an empty response. Please try again later.", "title": "Error"}]
+            
         result_text = response.choices[0].message.content
+        if result_text is None or result_text.strip() == "":
+            logger.error("OpenAI API returned empty content when generating implications")
+            return [{"error": "The OpenAI API returned empty content. Please try again later.", "title": "Error"}]
+            
         logger.info(f"Raw OpenAI response: {result_text}")
         
         # Handle different JSON formats that might be returned
         implications = []
         
         try:
+            logger.info(f"Attempting to parse implications JSON: {result_text[:min(200, len(result_text))]}...")
             result = json.loads(result_text)
+            logger.info(f"Successfully loaded implications JSON. Response structure: {type(result).__name__}")
+            if isinstance(result, dict):
+                logger.info(f"JSON keys for implications: {list(result.keys())}")
             
             # Case 1: Response is a list of implications
             if isinstance(result, list):
