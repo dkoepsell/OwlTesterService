@@ -24,6 +24,210 @@ def get_openai_client():
         raise ValueError("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
     
     return OpenAI(api_key=api_key)
+    
+def suggest_ontology_classes(domain, subject):
+    """
+    Generate suggested classes and properties for an ontology based on domain and subject.
+    
+    Args:
+        domain (str): The domain of the ontology (e.g., "Medicine", "Law", "Finance")
+        subject (str): The specific subject within the domain (e.g., "Cardiology", "Contract Law")
+        
+    Returns:
+        list: A list of dictionaries containing suggested classes with name, description, and BFO category
+    """
+    try:
+        client = get_openai_client()
+        
+        system_prompt = """You are an expert in ontology development and knowledge engineering.
+Your task is to suggest appropriate classes for an ontology based on a specific domain and subject.
+You should consider Basic Formal Ontology (BFO) principles in your suggestions.
+Format your response as a JSON array of objects, each representing a class with:
+1. name: The class name (in CamelCase without spaces)
+2. description: A clear description of what the class represents
+3. bfo_category: The most appropriate BFO upper-level category for this class (if applicable)
+4. properties: An array of suggested properties (object, data, or annotation) for this class
+"""
+
+        user_prompt = f"""Please suggest 10-15 core classes and properties for an ontology in the domain of "{domain}" focusing on the subject of "{subject}".
+For each class, provide:
+1. A well-formed class name in CamelCase (no spaces)
+2. A clear, concise description
+3. The most appropriate BFO upper-level category
+4. 2-3 properties that would be associated with this class
+
+Classes should cover the core concepts needed for this domain and subject.
+Ensure the suggestions follow ontology best practices and would be useful for domain experts.
+"""
+
+        # Make the API call
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7
+        )
+        
+        # Parse the response
+        result_text = response.choices[0].message.content
+        logger.info(f"Raw OpenAI class suggestions response: {result_text}")
+        
+        # Handle different JSON formats that might be returned
+        try:
+            result = json.loads(result_text)
+            
+            # Extract the suggestions depending on the structure of the response
+            suggestions = []
+            
+            # Case 1: Response is a list of suggestions
+            if isinstance(result, list):
+                suggestions = result
+            # Case 2: Response has a 'classes' key
+            elif result.get("classes") and isinstance(result.get("classes"), list):
+                suggestions = result.get("classes")
+            # Case 3: Response has a 'suggestions' key
+            elif result.get("suggestions") and isinstance(result.get("suggestions"), list):
+                suggestions = result.get("suggestions")
+            # Case 4: Handle numbered keys
+            else:
+                for key, value in result.items():
+                    if isinstance(value, dict) and "name" in value:
+                        suggestions.append(value)
+            
+            logger.info(f"Successfully parsed {len(suggestions)} class suggestions")
+            return suggestions
+            
+        except Exception as e:
+            logger.error(f"Error parsing OpenAI class suggestions: {str(e)}")
+            return []
+        
+    except Exception as e:
+        logger.error(f"Error generating class suggestions: {str(e)}")
+        return [{"error": str(e)}]
+
+def suggest_bfo_category(class_name, description=""):
+    """
+    Suggest the most appropriate BFO category for a given class based on its name and description.
+    
+    Args:
+        class_name (str): The name of the class
+        description (str): The description of the class (optional)
+        
+    Returns:
+        dict: Dictionary with suggested BFO category and explanation
+    """
+    try:
+        client = get_openai_client()
+        
+        system_prompt = """You are an expert in Basic Formal Ontology (BFO).
+Your task is to determine the most appropriate BFO category for a given ontology class.
+Provide your response as a JSON object with:
+1. bfo_category: The name of the most appropriate BFO category
+2. explanation: A brief explanation of why this category is appropriate
+
+Key BFO categories include:
+- Continuant: Entities that persist through time (Independent Continuant, Specifically Dependent Continuant, Generically Dependent Continuant)
+- Occurrent: Entities that unfold or happen in time (Process, Process Boundary, Spatiotemporal Region, Temporal Region)
+- Material Entity: Physical objects with mass (Object, Fiat Object Part, Object Aggregate)
+- Immaterial Entity: Non-physical entities (Site, Spatial Region, Continuant Fiat Boundary)
+- Quality: Dependent entities that inhere in their bearers (e.g., color, shape, temperature)
+- Realizable Entity: Entities whose instances can be realized in processes (Role, Function, Disposition)
+- Process: Entities that happen or unfold in time
+- Information Entity: Generically dependent entities that are about something
+"""
+
+        user_prompt = f"""Class Name: {class_name}
+Description: {description if description else 'No description provided'}
+
+Based on this information, determine the most appropriate BFO category for this class.
+Provide your response as a JSON object with the BFO category name and a brief explanation.
+Be specific about which exact BFO category is most appropriate, not just the general type.
+"""
+
+        # Make the API call
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+        
+        # Parse the response
+        result_text = response.choices[0].message.content
+        logger.info(f"Raw OpenAI BFO category suggestion: {result_text}")
+        
+        try:
+            result = json.loads(result_text)
+            return {
+                "bfo_category": result.get("bfo_category", ""),
+                "explanation": result.get("explanation", "")
+            }
+        except Exception as e:
+            logger.error(f"Error parsing OpenAI BFO category suggestion: {str(e)}")
+            return {"bfo_category": "", "error": str(e)}
+        
+    except Exception as e:
+        logger.error(f"Error suggesting BFO category: {str(e)}")
+        return {"error": str(e)}
+
+def generate_class_description(class_name):
+    """
+    Generate a description for a class based on its name.
+    
+    Args:
+        class_name (str): The name of the class
+        
+    Returns:
+        dict: Dictionary with generated description
+    """
+    try:
+        client = get_openai_client()
+        
+        system_prompt = """You are an expert in ontology development.
+Your task is to generate a clear, concise description for an ontology class based on its name.
+The description should explain what the class represents in the context of domain ontologies.
+Keep descriptions between 30-100 words and focus on essential characteristics of the concept.
+Respond with a JSON object containing a single 'description' field.
+"""
+
+        user_prompt = f"""Class Name: {class_name}
+
+Please generate a clear, concise description for this ontology class.
+Focus on what this class would represent in a domain ontology.
+"""
+
+        # Make the API call
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=200
+        )
+        
+        # Parse the response
+        result_text = response.choices[0].message.content
+        logger.info(f"Raw OpenAI description generation: {result_text}")
+        
+        try:
+            result = json.loads(result_text)
+            return {"description": result.get("description", "")}
+        except Exception as e:
+            logger.error(f"Error parsing OpenAI description generation: {str(e)}")
+            return {"error": str(e)}
+        
+    except Exception as e:
+        logger.error(f"Error generating class description: {str(e)}")
+        return {"error": str(e)}
 
 def generate_real_world_implications(ontology_name, domain_classes, fol_premises, num_implications=5):
     """

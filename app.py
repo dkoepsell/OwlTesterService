@@ -15,7 +15,7 @@ from wtforms import StringField, PasswordField, BooleanField, EmailField, Submit
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from owl_tester import OwlTester
 from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression, SandboxOntology, OntologyClass, OntologyProperty, OntologyIndividual
-from openai_utils import generate_real_world_implications
+from openai_utils import generate_real_world_implications, suggest_ontology_classes, suggest_bfo_category, generate_class_description
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
