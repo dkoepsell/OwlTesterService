@@ -3,13 +3,15 @@ import logging
 import uuid
 import datetime
 import base64
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session
+from html import escape
+import json
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session, make_response
 from werkzeug.utils import secure_filename
 # We'll use urllib for URL parsing instead of werkzeug
 from urllib.parse import urlparse
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf import FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, EmailField, SubmitField
+from wtforms import StringField, PasswordField, BooleanField, EmailField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from owl_tester import OwlTester
 from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression, SandboxOntology, OntologyClass, OntologyProperty, OntologyIndividual
@@ -714,11 +716,409 @@ def dashboard():
         'latest_activity': user_ontologies[0].upload_date if user_ontologies else None
     }
     
+    # Get user's sandbox ontologies
+    user_sandboxes = SandboxOntology.query.filter_by(user_id=current_user.id)\
+                                 .order_by(SandboxOntology.last_modified.desc()).all()
+    
+    # Update stats to include sandbox ontologies
+    stats['sandbox_count'] = len(user_sandboxes)
+    
     return render_template('dashboard.html', 
                          title=f"{current_user.username}'s Dashboard",
                          ontologies=user_ontologies,
                          expressions=user_expressions,
+                         sandboxes=user_sandboxes,
                          stats=stats)
+
+
+# Ontology Development Sandbox Routes
+
+class DomainForm(FlaskForm):
+    """Form for creating a new ontology in the sandbox."""
+    title = StringField('Title', validators=[DataRequired(), Length(min=3, max=255)])
+    domain = StringField('Domain', validators=[DataRequired(), Length(min=2, max=100)])
+    subject = StringField('Subject', validators=[DataRequired(), Length(min=2, max=100)])
+    description = StringField('Description', validators=[Length(max=500)])
+    submit = SubmitField('Create Ontology')
+
+
+@app.route('/sandbox')
+def sandbox_list():
+    """Show a list of sandbox ontologies for the current user or public ones."""
+    if current_user.is_authenticated:
+        # Show user's own ontologies
+        ontologies = SandboxOntology.query.filter_by(user_id=current_user.id)\
+                                   .order_by(SandboxOntology.last_modified.desc()).all()
+    else:
+        # Show only public ontologies or a message to login
+        ontologies = []
+    
+    return render_template('sandbox/list.html', 
+                         title="Ontology Development Sandbox",
+                         ontologies=ontologies)
+
+
+@app.route('/sandbox/new', methods=['GET', 'POST'])
+def sandbox_new():
+    """Create a new sandbox ontology."""
+    form = DomainForm()
+    
+    if form.validate_on_submit():
+        user_id = current_user.id if current_user.is_authenticated else None
+        
+        # Create a new sandbox ontology
+        ontology = SandboxOntology(
+            title=form.title.data,
+            domain=form.domain.data,
+            subject=form.subject.data,
+            description=form.description.data,
+            user_id=user_id,
+            classes=[],
+            properties=[],
+            individuals=[]
+        )
+        
+        db.session.add(ontology)
+        db.session.commit()
+        
+        flash(f'Created new ontology: {ontology.title}', 'success')
+        return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
+    
+    return render_template('sandbox/new.html', 
+                         title="Create New Ontology",
+                         form=form)
+
+
+@app.route('/sandbox/<int:ontology_id>')
+def sandbox_view(ontology_id):
+    """View a sandbox ontology."""
+    ontology = SandboxOntology.query.get_or_404(ontology_id)
+    
+    # Check if the user has access to this ontology
+    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+        flash('You do not have permission to view this ontology', 'error')
+        return redirect(url_for('sandbox_list'))
+    
+    # Get classes, properties, and individuals
+    classes = OntologyClass.query.filter_by(ontology_id=ontology.id).all()
+    properties = OntologyProperty.query.filter_by(ontology_id=ontology.id).all()
+    individuals = OntologyIndividual.query.filter_by(ontology_id=ontology.id).all()
+    
+    return render_template('sandbox/view.html', 
+                          title=f"View Ontology: {ontology.title}",
+                          ontology=ontology, 
+                          classes=classes, 
+                          properties=properties,
+                          individuals=individuals)
+
+
+@app.route('/sandbox/<int:ontology_id>/edit')
+def sandbox_edit(ontology_id):
+    """Edit a sandbox ontology."""
+    ontology = SandboxOntology.query.get_or_404(ontology_id)
+    
+    # Check if the user has access to edit this ontology
+    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+        flash('You do not have permission to edit this ontology', 'error')
+        return redirect(url_for('sandbox_list'))
+    
+    # Get classes, properties, and individuals
+    classes = OntologyClass.query.filter_by(ontology_id=ontology.id).all()
+    properties = OntologyProperty.query.filter_by(ontology_id=ontology.id).all()
+    individuals = OntologyIndividual.query.filter_by(ontology_id=ontology.id).all()
+    
+    # Get BFO classes for reference
+    bfo_classes = owl_tester.get_bfo_classes() if owl_tester else []
+    
+    return render_template('sandbox/edit.html', 
+                          title=f"Edit Ontology: {ontology.title}",
+                          ontology=ontology, 
+                          classes=classes, 
+                          properties=properties,
+                          individuals=individuals,
+                          bfo_classes=bfo_classes)
+
+
+@app.route('/sandbox/<int:ontology_id>/download')
+def sandbox_download(ontology_id):
+    """Download a sandbox ontology as OWL/RDF."""
+    ontology = SandboxOntology.query.get_or_404(ontology_id)
+    
+    # Check if the user has access to this ontology
+    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+        flash('You do not have permission to download this ontology', 'error')
+        return redirect(url_for('sandbox_list'))
+    
+    # Get classes, properties, and individuals
+    classes = OntologyClass.query.filter_by(ontology_id=ontology.id).all()
+    properties = OntologyProperty.query.filter_by(ontology_id=ontology.id).all()
+    individuals = OntologyIndividual.query.filter_by(ontology_id=ontology.id).all()
+    
+    # Generate OWL/RDF XML
+    owl_xml = generate_owl_xml(ontology, classes, properties, individuals)
+    
+    # Return as downloadable file
+    response = make_response(owl_xml)
+    response.headers["Content-Disposition"] = f"attachment; filename={secure_filename(ontology.title)}.owl"
+    response.headers["Content-Type"] = "application/rdf+xml"
+    
+    return response
+
+
+# API routes for the sandbox
+
+@app.route('/api/sandbox/<int:ontology_id>/classes', methods=['GET', 'POST'])
+def api_sandbox_classes(ontology_id):
+    """API for sandbox ontology classes."""
+    ontology = SandboxOntology.query.get_or_404(ontology_id)
+    
+    # Check if the user has access to this ontology
+    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    if request.method == 'GET':
+        # Return all classes for this ontology
+        classes = OntologyClass.query.filter_by(ontology_id=ontology.id).all()
+        return jsonify({
+            "classes": [
+                {
+                    "id": cls.id,
+                    "name": cls.name,
+                    "description": cls.description,
+                    "bfo_category": cls.bfo_category,
+                    "parent_id": cls.parent_id
+                } for cls in classes
+            ]
+        })
+    
+    elif request.method == 'POST':
+        # Add a new class
+        data = request.get_json()
+        
+        if not data or 'name' not in data:
+            return jsonify({"error": "Name is required"}), 400
+        
+        try:
+            new_class = OntologyClass(
+                ontology_id=ontology.id,
+                name=data['name'],
+                description=data.get('description', ''),
+                bfo_category=data.get('bfo_category'),
+                parent_id=data.get('parent_id')
+            )
+            
+            db.session.add(new_class)
+            db.session.commit()
+            
+            return jsonify({
+                "id": new_class.id,
+                "name": new_class.name,
+                "message": f"Class {new_class.name} created successfully"
+            }), 201
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/sandbox/<int:ontology_id>/classes/<int:class_id>', methods=['GET', 'PUT', 'DELETE'])
+def api_sandbox_class(ontology_id, class_id):
+    """API for a specific sandbox ontology class."""
+    ontology = SandboxOntology.query.get_or_404(ontology_id)
+    
+    # Check if the user has access to this ontology
+    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    # Get the class
+    cls = OntologyClass.query.filter_by(id=class_id, ontology_id=ontology.id).first_or_404()
+    
+    if request.method == 'GET':
+        # Return class details
+        return jsonify({
+            "id": cls.id,
+            "name": cls.name,
+            "description": cls.description,
+            "bfo_category": cls.bfo_category,
+            "parent_id": cls.parent_id,
+            "properties": cls.properties
+        })
+    
+    elif request.method == 'PUT':
+        # Update class
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        try:
+            if 'name' in data:
+                cls.name = data['name']
+            if 'description' in data:
+                cls.description = data['description']
+            if 'bfo_category' in data:
+                cls.bfo_category = data['bfo_category']
+            if 'parent_id' in data:
+                cls.parent_id = data['parent_id']
+            if 'properties' in data:
+                cls.properties = data['properties']
+            
+            # Update the ontology's last_modified time
+            ontology.last_modified = datetime.datetime.utcnow()
+            
+            db.session.commit()
+            
+            return jsonify({
+                "id": cls.id,
+                "name": cls.name,
+                "message": f"Class {cls.name} updated successfully"
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
+    
+    elif request.method == 'DELETE':
+        # Delete class
+        try:
+            # Check if there are any dependent entities
+            children = OntologyClass.query.filter_by(parent_id=cls.id).all()
+            
+            if children:
+                return jsonify({
+                    "error": f"Cannot delete class {cls.name} because it has child classes. Please remove or reassign them first."
+                }), 400
+            
+            # Check for individuals
+            individuals = OntologyIndividual.query.filter_by(class_id=cls.id).all()
+            
+            if individuals:
+                return jsonify({
+                    "error": f"Cannot delete class {cls.name} because it has individuals. Please remove them first."
+                }), 400
+            
+            # Check for properties with this class as domain or range
+            domain_props = OntologyProperty.query.filter_by(domain_class_id=cls.id).all()
+            range_props = OntologyProperty.query.filter_by(range_class_id=cls.id).all()
+            
+            if domain_props or range_props:
+                return jsonify({
+                    "error": f"Cannot delete class {cls.name} because it is used as domain or range in properties. Please remove or reassign them first."
+                }), 400
+            
+            # Delete the class
+            db.session.delete(cls)
+            
+            # Update the ontology's last_modified time
+            ontology.last_modified = datetime.datetime.utcnow()
+            
+            db.session.commit()
+            
+            return jsonify({
+                "message": f"Class {cls.name} deleted successfully"
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 500
+
+
+# Helper function to generate OWL/RDF XML
+def generate_owl_xml(ontology, classes, properties, individuals):
+    """Generate OWL/RDF XML for a sandbox ontology."""
+    # Create a base namespace for the ontology
+    base_ns = f"http://example.org/ontology/{secure_filename(ontology.title).lower()}#"
+    
+    # Start XML document
+    xml = '<?xml version="1.0"?>\n'
+    xml += '<rdf:RDF xmlns="' + base_ns + '"\n'
+    xml += '     xml:base="' + base_ns + '"\n'
+    xml += '     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"\n'
+    xml += '     xmlns:owl="http://www.w3.org/2002/07/owl#"\n'
+    xml += '     xmlns:xml="http://www.w3.org/XML/1998/namespace"\n'
+    xml += '     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"\n'
+    xml += '     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">\n\n'
+    
+    # Add ontology definition
+    xml += '    <owl:Ontology rdf:about="' + base_ns + '">\n'
+    xml += '        <rdfs:label>' + escape(ontology.title) + '</rdfs:label>\n'
+    
+    if ontology.description:
+        xml += '        <rdfs:comment>' + escape(ontology.description) + '</rdfs:comment>\n'
+    
+    xml += '    </owl:Ontology>\n\n'
+    
+    # Add classes
+    for cls in classes:
+        xml += '    <owl:Class rdf:about="' + base_ns + escape(cls.name) + '">\n'
+        
+        if cls.description:
+            xml += '        <rdfs:comment>' + escape(cls.description) + '</rdfs:comment>\n'
+        
+        # Add parent class if exists
+        if cls.parent_id:
+            parent = next((c for c in classes if c.id == cls.parent_id), None)
+            if parent:
+                xml += '        <rdfs:subClassOf rdf:resource="' + base_ns + escape(parent.name) + '"/>\n'
+        
+        # Add BFO category if exists
+        if cls.bfo_category:
+            xml += '        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_' + escape(cls.bfo_category) + '"/>\n'
+            
+        xml += '    </owl:Class>\n\n'
+    
+    # Add properties
+    for prop in properties:
+        xml += '    <owl:ObjectProperty rdf:about="' + base_ns + escape(prop.name) + '">\n'
+        
+        if prop.description:
+            xml += '        <rdfs:comment>' + escape(prop.description) + '</rdfs:comment>\n'
+        
+        # Add domain if exists
+        if prop.domain_class_id:
+            domain_class = next((c for c in classes if c.id == prop.domain_class_id), None)
+            if domain_class:
+                xml += '        <rdfs:domain rdf:resource="' + base_ns + escape(domain_class.name) + '"/>\n'
+        
+        # Add range if exists
+        if prop.range_class_id:
+            range_class = next((c for c in classes if c.id == prop.range_class_id), None)
+            if range_class:
+                xml += '        <rdfs:range rdf:resource="' + base_ns + escape(range_class.name) + '"/>\n'
+                
+        xml += '    </owl:ObjectProperty>\n\n'
+    
+    # Add individuals
+    for indiv in individuals:
+        xml += '    <owl:NamedIndividual rdf:about="' + base_ns + escape(indiv.name) + '">\n'
+        
+        if indiv.description:
+            xml += '        <rdfs:comment>' + escape(indiv.description) + '</rdfs:comment>\n'
+        
+        # Add class membership
+        cls = next((c for c in classes if c.id == indiv.class_id), None)
+        if cls:
+            xml += '        <rdf:type rdf:resource="' + base_ns + escape(cls.name) + '"/>\n'
+        
+        # Add property values
+        if indiv.property_values:
+            for prop_id, value_info in indiv.property_values.items():
+                # Find the property
+                prop = next((p for p in properties if str(p.id) == prop_id), None)
+                if prop and value_info.get('value'):
+                    value_id = value_info.get('value')
+                    # Find the target individual
+                    target = next((i for i in individuals if i.id == int(value_id)), None)
+                    if target:
+                        xml += '        <' + escape(prop.name) + ' rdf:resource="' + base_ns + escape(target.name) + '"/>\n'
+                
+        xml += '    </owl:NamedIndividual>\n\n'
+    
+    # Close the RDF root element
+    xml += '</rdf:RDF>\n'
+    
+    return xml
+
 
 if __name__ == '__main__':
     # Run the app on host 0.0.0.0 to make it accessible externally
