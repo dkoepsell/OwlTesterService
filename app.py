@@ -1126,8 +1126,9 @@ def api_sandbox_ai_suggestions():
     """API endpoint to get AI-generated class and property suggestions for an ontology domain."""
     domain = request.args.get('domain', '')
     subject = request.args.get('subject', '')
+    suggestion_type = request.args.get('type', 'all')  # Default to 'all', other options: 'classes', 'properties'
     
-    logger.info(f"AI suggestions requested for domain: '{domain}', subject: '{subject}'")
+    logger.info(f"AI suggestions requested for domain: '{domain}', subject: '{subject}', type: '{suggestion_type}'")
     
     if not domain or not subject:
         logger.warning("Missing parameters for AI suggestions")
@@ -1136,20 +1137,45 @@ def api_sandbox_ai_suggestions():
     try:
         # Call the OpenAI function to get suggestions
         logger.info(f"Calling OpenAI API to get suggestions for domain: '{domain}', subject: '{subject}'")
-        suggestions = suggest_ontology_classes(domain, subject)
+        all_suggestions = suggest_ontology_classes(domain, subject)
         
-        if not suggestions:
+        if not all_suggestions:
             logger.warning(f"No suggestions generated for domain: '{domain}', subject: '{subject}'")
             return jsonify({"error": "No suggestions generated. Try with a different domain/subject."}), 404
             
         # Check if we got an error from the OpenAI function
-        if len(suggestions) == 1 and "error" in suggestions[0]:
-            error_msg = suggestions[0]["error"]
+        if len(all_suggestions) == 1 and "error" in all_suggestions[0]:
+            error_msg = all_suggestions[0]["error"]
             logger.error(f"OpenAI API returned an error: {error_msg}")
             return jsonify({"error": error_msg}), 500
         
-        logger.info(f"Successfully generated {len(suggestions)} suggestions for domain: '{domain}', subject: '{subject}'")
-        return jsonify({"suggestions": suggestions, "domain": domain, "subject": subject})
+        # Filter the suggestions based on the requested type
+        if suggestion_type == 'classes':
+            # Return only the class information without properties
+            filtered_suggestions = []
+            for suggestion in all_suggestions:
+                # Create a copy without the properties field
+                class_suggestion = {k: v for k, v in suggestion.items() if k != 'properties'}
+                filtered_suggestions.append(class_suggestion)
+            logger.info(f"Filtered to {len(filtered_suggestions)} class suggestions (without properties)")
+            response_data = {"suggestions": filtered_suggestions, "domain": domain, "subject": subject}
+        elif suggestion_type == 'properties':
+            # Extract only the properties from all classes
+            all_properties = []
+            for suggestion in all_suggestions:
+                if 'properties' in suggestion and suggestion['properties']:
+                    # Add the class name to each property for context
+                    for prop in suggestion['properties']:
+                        prop['class_name'] = suggestion.get('name', 'Unknown')
+                        all_properties.append(prop)
+            logger.info(f"Extracted {len(all_properties)} property suggestions from classes")
+            response_data = {"suggestions": all_properties, "domain": domain, "subject": subject}
+        else:
+            # Return all suggestions unchanged
+            logger.info(f"Returning all {len(all_suggestions)} suggestions with classes and properties")
+            response_data = {"suggestions": all_suggestions, "domain": domain, "subject": subject}
+        
+        return jsonify(response_data)
         
     except Exception as e:
         logger.error(f"Error generating AI suggestions: {str(e)}")
