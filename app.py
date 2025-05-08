@@ -1120,6 +1120,81 @@ def generate_owl_xml(ontology, classes, properties, individuals):
     return xml
 
 
+# AI Assistance API Routes for the Ontology Sandbox
+@app.route('/api/sandbox/ai/suggestions')
+def api_sandbox_ai_suggestions():
+    """API endpoint to get AI-generated class and property suggestions for an ontology domain."""
+    domain = request.args.get('domain', '')
+    subject = request.args.get('subject', '')
+    
+    if not domain or not subject:
+        return jsonify({"error": "Both domain and subject parameters are required"}), 400
+    
+    try:
+        # Call the OpenAI function to get suggestions
+        suggestions = suggest_ontology_classes(domain, subject)
+        
+        if not suggestions:
+            return jsonify({"error": "No suggestions generated. Try with a different domain/subject."}), 404
+            
+        # Check if we got an error from the OpenAI function
+        if len(suggestions) == 1 and "error" in suggestions[0]:
+            return jsonify({"error": suggestions[0]["error"]}), 500
+            
+        return jsonify({"suggestions": suggestions, "domain": domain, "subject": subject})
+        
+    except Exception as e:
+        logger.error(f"Error generating AI suggestions: {str(e)}")
+        return jsonify({"error": f"Failed to generate suggestions: {str(e)}"}), 500
+
+@app.route('/api/sandbox/ai/bfo-category', methods=['POST'])
+def api_sandbox_ai_bfo_category():
+    """API endpoint to suggest a BFO category for a class."""
+    data = request.get_json()
+    
+    if not data or 'class_name' not in data:
+        return jsonify({"error": "Class name is required"}), 400
+    
+    class_name = data.get('class_name', '')
+    description = data.get('description', '')
+    
+    try:
+        # Call the OpenAI function to suggest a BFO category
+        result = suggest_bfo_category(class_name, description)
+        
+        if "error" in result:
+            return jsonify({"error": result["error"]}), 500
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error suggesting BFO category: {str(e)}")
+        return jsonify({"error": f"Failed to suggest BFO category: {str(e)}"}), 500
+
+@app.route('/api/sandbox/ai/description', methods=['POST'])
+def api_sandbox_ai_description():
+    """API endpoint to generate a description for a class."""
+    data = request.get_json()
+    
+    if not data or 'class_name' not in data:
+        return jsonify({"error": "Class name is required"}), 400
+    
+    class_name = data.get('class_name', '')
+    
+    try:
+        # Call the OpenAI function to generate a description
+        result = generate_class_description(class_name)
+        
+        if "error" in result:
+            return jsonify({"error": result["error"]}), 500
+            
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error generating class description: {str(e)}")
+        return jsonify({"error": f"Failed to generate description: {str(e)}"}), 500
+
+
 if __name__ == '__main__':
     # Run the app on host 0.0.0.0 to make it accessible externally
     app.run(host='0.0.0.0', port=5000, debug=True)
