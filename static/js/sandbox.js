@@ -60,8 +60,8 @@ function requestAISuggestions(domain, subject, callback, type = 'all', ontologyI
     // type can be 'all', 'classes', or 'properties'
     let url = `/api/sandbox/ai/suggestions?domain=${encodeURIComponent(domain)}&subject=${encodeURIComponent(subject)}&type=${encodeURIComponent(type)}`;
     
-    // Add ontologyId parameter if provided (needed for properties to link to existing classes)
-    if (ontologyId && type === 'properties') {
+    // Add ontologyId parameter if provided (needed for both properties and classes)
+    if (ontologyId) {
         url += `&ontology_id=${encodeURIComponent(ontologyId)}`;
     }
     
