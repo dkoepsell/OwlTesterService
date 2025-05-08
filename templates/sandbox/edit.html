@@ -1,0 +1,416 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }} | FOL-BFO-OWL Tester{% endblock %}
+
+{% block extra_head %}
+<style>
+    .entity-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .entity-item {
+        cursor: pointer;
+    }
+    .entity-item:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    .entity-item.active {
+        background-color: rgba(13, 110, 253, 0.2);
+    }
+    .form-container {
+        display: none;
+    }
+    .form-container.active {
+        display: block;
+    }
+    .editor-tab {
+        cursor: pointer;
+    }
+    .editor-tab.active {
+        border-bottom: 2px solid #0d6efd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('sandbox_list') }}">Sandbox</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('sandbox_view', ontology_id=ontology.id) }}">{{ ontology.title }}</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Edit</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-5 mb-0">
+                <i class="fas fa-edit me-2"></i> Edit Ontology
+            </h1>
+            <div>
+                <a href="{{ url_for('sandbox_view', ontology_id=ontology.id) }}" class="btn btn-secondary me-2">
+                    <i class="fas fa-eye me-2"></i> View
+                </a>
+                <a href="{{ url_for('sandbox_download', ontology_id=ontology.id) }}" class="btn btn-success">
+                    <i class="fas fa-download me-2"></i> Download OWL
+                </a>
+            </div>
+        </div>
+        
+        <div class="card mb-4 bg-dark">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h3 class="mb-2">{{ ontology.title }}</h3>
+                        <p class="lead mb-1">{{ ontology.description }}</p>
+                        <div class="mb-0 text-muted">
+                            <span class="badge bg-primary me-2">{{ ontology.domain }}</span>
+                            <span class="badge bg-secondary">{{ ontology.subject }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="text-muted">
+                            <small>Created: {{ ontology.creation_date.strftime('%Y-%m-%d') }}</small><br>
+                            <small>Last modified: {{ ontology.last_modified.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <ul class="nav nav-tabs" id="editorTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active editor-tab" id="classes-tab" data-bs-toggle="tab" data-bs-target="#classes-pane" type="button" role="tab" aria-controls="classes-pane" aria-selected="true">
+                    <i class="fas fa-cube me-2"></i> Classes
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link editor-tab" id="properties-tab" data-bs-toggle="tab" data-bs-target="#properties-pane" type="button" role="tab" aria-controls="properties-pane" aria-selected="false">
+                    <i class="fas fa-link me-2"></i> Properties
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link editor-tab" id="individuals-tab" data-bs-toggle="tab" data-bs-target="#individuals-pane" type="button" role="tab" aria-controls="individuals-pane" aria-selected="false">
+                    <i class="fas fa-dot-circle me-2"></i> Individuals
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="tab-content" id="editorTabContent">
+    <!-- Classes Tab -->
+    <div class="tab-pane fade show active" id="classes-pane" role="tabpanel" aria-labelledby="classes-tab">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card bg-dark mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Classes</h4>
+                        <button type="button" class="btn btn-sm btn-primary" id="new-class-btn">
+                            <i class="fas fa-plus"></i> New
+                        </button>
+                    </div>
+                    <div class="card-body entity-list" id="class-list">
+                        {% if classes %}
+                            {% for class in classes %}
+                            <div class="entity-item p-2 rounded mb-2" data-id="{{ class.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-cube me-2"></i> {{ class.name }}
+                                        {% if class.bfo_category %}
+                                        <span class="badge bg-info ms-2 small">BFO: {{ class.bfo_category }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-danger delete-class-btn" data-id="{{ class.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-4">
+                                No classes defined yet.
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card bg-dark mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0" id="class-form-title">Class Details</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="class-form-container">
+                            <form id="class-form">
+                                <input type="hidden" id="class-id" value="">
+                                
+                                <div class="mb-3">
+                                    <label for="class-name" class="form-label">Name</label>
+                                    <input type="text" class="form-control" id="class-name" required>
+                                    <small class="form-text text-muted">The name of the class (e.g., "Patient", "Disease", "Treatment")</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="class-description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="class-description" rows="3"></textarea>
+                                    <small class="form-text text-muted">A description of what this class represents</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="class-parent" class="form-label">Parent Class</label>
+                                    <select class="form-select" id="class-parent">
+                                        <option value="">None (Top-Level Class)</option>
+                                        {% for class in classes %}
+                                        <option value="{{ class.id }}">{{ class.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">The parent class in the hierarchy (if any)</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="class-bfo-category" class="form-label">BFO Category</label>
+                                    <select class="form-select" id="class-bfo-category">
+                                        <option value="">None</option>
+                                        {% for bfo_class in bfo_classes %}
+                                        <option value="{{ bfo_class.id }}">{{ bfo_class.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">The Basic Formal Ontology category this class aligns with</small>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-secondary me-2" id="clear-class-btn">Clear</button>
+                                    <button type="submit" class="btn btn-primary" id="save-class-btn">Save Class</button>
+                                </div>
+                            </form>
+                            
+                            <div id="class-empty-state" class="text-center py-5">
+                                <p class="text-muted">
+                                    Select a class to edit or create a new one.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Properties Tab -->
+    <div class="tab-pane fade" id="properties-pane" role="tabpanel" aria-labelledby="properties-tab">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card bg-dark mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Properties</h4>
+                        <button type="button" class="btn btn-sm btn-primary" id="new-property-btn">
+                            <i class="fas fa-plus"></i> New
+                        </button>
+                    </div>
+                    <div class="card-body entity-list" id="property-list">
+                        {% if properties %}
+                            {% for property in properties %}
+                            <div class="entity-item p-2 rounded mb-2" data-id="{{ property.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-link me-2"></i> {{ property.name }}
+                                        <span class="badge bg-secondary ms-2 small">{{ property.property_type }}</span>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-danger delete-property-btn" data-id="{{ property.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-4">
+                                No properties defined yet.
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card bg-dark mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0" id="property-form-title">Property Details</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="property-form-container">
+                            <form id="property-form">
+                                <input type="hidden" id="property-id" value="">
+                                
+                                <div class="mb-3">
+                                    <label for="property-name" class="form-label">Name</label>
+                                    <input type="text" class="form-control" id="property-name" required>
+                                    <small class="form-text text-muted">The name of the property (e.g., "hasPart", "treatedWith", "locatedIn")</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="property-description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="property-description" rows="3"></textarea>
+                                    <small class="form-text text-muted">A description of what this property represents</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="property-type" class="form-label">Property Type</label>
+                                    <select class="form-select" id="property-type" required>
+                                        <option value="object">Object Property (relates objects to objects)</option>
+                                        <option value="data">Data Property (relates objects to data values)</option>
+                                        <option value="annotation">Annotation Property (metadata)</option>
+                                    </select>
+                                    <small class="form-text text-muted">The type of property</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="property-domain" class="form-label">Domain</label>
+                                    <select class="form-select" id="property-domain">
+                                        <option value="">None</option>
+                                        {% for class in classes %}
+                                        <option value="{{ class.id }}">{{ class.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">The class that this property applies to</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="property-range" class="form-label">Range</label>
+                                    <select class="form-select" id="property-range">
+                                        <option value="">None</option>
+                                        {% for class in classes %}
+                                        <option value="{{ class.id }}">{{ class.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">The class that this property points to</small>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-secondary me-2" id="clear-property-btn">Clear</button>
+                                    <button type="submit" class="btn btn-primary" id="save-property-btn">Save Property</button>
+                                </div>
+                            </form>
+                            
+                            <div id="property-empty-state" class="text-center py-5">
+                                <p class="text-muted">
+                                    Select a property to edit or create a new one.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Individuals Tab -->
+    <div class="tab-pane fade" id="individuals-pane" role="tabpanel" aria-labelledby="individuals-tab">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card bg-dark mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Individuals</h4>
+                        <button type="button" class="btn btn-sm btn-primary" id="new-individual-btn">
+                            <i class="fas fa-plus"></i> New
+                        </button>
+                    </div>
+                    <div class="card-body entity-list" id="individual-list">
+                        {% if individuals %}
+                            {% for individual in individuals %}
+                            <div class="entity-item p-2 rounded mb-2" data-id="{{ individual.id }}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-dot-circle me-2"></i> {{ individual.name }}
+                                        <span class="badge bg-primary ms-2 small">{{ individual.ontology_class.name }}</span>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-danger delete-individual-btn" data-id="{{ individual.id }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center py-4">
+                                No individuals defined yet.
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card bg-dark mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0" id="individual-form-title">Individual Details</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="individual-form-container">
+                            <form id="individual-form">
+                                <input type="hidden" id="individual-id" value="">
+                                
+                                <div class="mb-3">
+                                    <label for="individual-name" class="form-label">Name</label>
+                                    <input type="text" class="form-control" id="individual-name" required>
+                                    <small class="form-text text-muted">The name of the individual (e.g., "John_Smith", "COVID-19", "Aspirin")</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="individual-description" class="form-label">Description</label>
+                                    <textarea class="form-control" id="individual-description" rows="3"></textarea>
+                                    <small class="form-text text-muted">A description of this individual</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="individual-class" class="form-label">Class</label>
+                                    <select class="form-select" id="individual-class" required>
+                                        <option value="">Select a class</option>
+                                        {% for class in classes %}
+                                        <option value="{{ class.id }}">{{ class.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">The class that this individual belongs to</small>
+                                </div>
+                                
+                                <div class="mb-3" id="property-values-container">
+                                    <label class="form-label">Property Values</label>
+                                    <div id="property-values-list">
+                                        <!-- Dynamically generated property value fields will go here -->
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-secondary mt-2" id="add-property-value-btn">
+                                        <i class="fas fa-plus"></i> Add Property Value
+                                    </button>
+                                </div>
+                                
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-secondary me-2" id="clear-individual-btn">Clear</button>
+                                    <button type="submit" class="btn btn-primary" id="save-individual-btn">Save Individual</button>
+                                </div>
+                            </form>
+                            
+                            <div id="individual-empty-state" class="text-center py-5">
+                                <p class="text-muted">
+                                    Select an individual to edit or create a new one.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Hidden input for ontology ID -->
+<input type="hidden" id="ontology-id" value="{{ ontology.id }}">
+
+<!-- Include the sandbox JavaScript -->
+<script src="{{ url_for('static', filename='js/sandbox.js') }}"></script>
+{% endblock %}

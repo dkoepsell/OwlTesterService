@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }} | FOL-BFO-OWL Tester{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('sandbox_list') }}">Sandbox</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Create New Ontology</li>
+            </ol>
+        </nav>
+        
+        <h1 class="display-5 mb-4">
+            <i class="fas fa-plus-circle me-2"></i> Create New Ontology
+        </h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card bg-dark">
+            <div class="card-header">
+                <h4 class="mb-0">Ontology Details</h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.title.label(class="form-label") }}
+                        {% if form.title.errors %}
+                            {{ form.title(class="form-control is-invalid") }}
+                            <div class="invalid-feedback">
+                                {% for error in form.title.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {{ form.title(class="form-control", placeholder="Enter ontology title") }}
+                        {% endif %}
+                        <small class="form-text text-muted">A descriptive title for your ontology (e.g., "Medical Diagnosis Ontology")</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.domain.label(class="form-label") }}
+                        {% if form.domain.errors %}
+                            {{ form.domain(class="form-control is-invalid") }}
+                            <div class="invalid-feedback">
+                                {% for error in form.domain.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {{ form.domain(class="form-control", placeholder="Enter domain") }}
+                        {% endif %}
+                        <small class="form-text text-muted">The broad domain of your ontology (e.g., "Medicine", "Engineering", "Education")</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.subject.label(class="form-label") }}
+                        {% if form.subject.errors %}
+                            {{ form.subject(class="form-control is-invalid") }}
+                            <div class="invalid-feedback">
+                                {% for error in form.subject.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {{ form.subject(class="form-control", placeholder="Enter subject") }}
+                        {% endif %}
+                        <small class="form-text text-muted">The specific subject within the domain (e.g., "Diagnosis", "Bridge Construction", "Online Courses")</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {% if form.description.errors %}
+                            {{ form.description(class="form-control is-invalid") }}
+                            <div class="invalid-feedback">
+                                {% for error in form.description.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {{ form.description(class="form-control", placeholder="Enter description", rows=3) }}
+                        {% endif %}
+                        <small class="form-text text-muted">A brief description of the purpose and scope of your ontology</small>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('sandbox_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i> Back to List
+                        </a>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

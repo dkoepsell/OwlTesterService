@@ -1,0 +1,286 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }} | FOL-BFO-OWL Tester{% endblock %}
+
+{% block extra_head %}
+<style>
+    .card-stats {
+        text-align: center;
+        padding: 15px 0;
+    }
+    .card-stats .count {
+        font-size: 1.8rem;
+        font-weight: bold;
+    }
+    .card-stats .label {
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        opacity: 0.8;
+    }
+    .class-tree ul {
+        list-style-type: none;
+        padding-left: 20px;
+    }
+    .class-tree > ul {
+        padding-left: 0;
+    }
+    .class-info {
+        cursor: pointer;
+    }
+    .class-card {
+        margin-bottom: 10px;
+    }
+    .property-card {
+        margin-bottom: 10px;
+    }
+    .individual-card {
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('sandbox_list') }}">Sandbox</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ ontology.title }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-5 mb-0">
+                <i class="fas fa-project-diagram me-2"></i> {{ ontology.title }}
+            </h1>
+            <div>
+                <a href="{{ url_for('sandbox_edit', ontology_id=ontology.id) }}" class="btn btn-primary me-2">
+                    <i class="fas fa-edit me-2"></i> Edit
+                </a>
+                <a href="{{ url_for('sandbox_download', ontology_id=ontology.id) }}" class="btn btn-success">
+                    <i class="fas fa-download me-2"></i> Download OWL
+                </a>
+            </div>
+        </div>
+        
+        <div class="card mb-4 bg-dark">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="lead mb-1">{{ ontology.description }}</p>
+                        <div class="mb-0 text-muted">
+                            <span class="badge bg-primary me-2">{{ ontology.domain }}</span>
+                            <span class="badge bg-secondary">{{ ontology.subject }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="text-muted">
+                            <small>Created: {{ ontology.creation_date.strftime('%Y-%m-%d') }}</small><br>
+                            <small>Last modified: {{ ontology.last_modified.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-dark card-stats">
+            <div class="card-body">
+                <div class="count">{{ classes|length }}</div>
+                <div class="label">Classes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-dark card-stats">
+            <div class="card-body">
+                <div class="count">{{ properties|length }}</div>
+                <div class="label">Properties</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-dark card-stats">
+            <div class="card-body">
+                <div class="count">{{ individuals|length }}</div>
+                <div class="label">Individuals</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card bg-dark mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Classes</h4>
+            </div>
+            <div class="card-body">
+                {% if classes %}
+                <div class="class-tree">
+                    <ul>
+                        {% for class in classes if not class.parent_id %}
+                        <li>
+                            <div class="class-info" data-bs-toggle="collapse" data-bs-target="#class-details-{{ class.id }}">
+                                <i class="fas fa-cube me-2"></i> {{ class.name }}
+                                {% if class.bfo_category %}
+                                <span class="badge bg-info ms-2 small">BFO: {{ class.bfo_category }}</span>
+                                {% endif %}
+                            </div>
+                            <div id="class-details-{{ class.id }}" class="collapse mt-2 mb-3">
+                                <div class="card bg-dark-light class-card">
+                                    <div class="card-body">
+                                        <h6>{{ class.name }}</h6>
+                                        {% if class.description %}
+                                        <p class="small mb-2">{{ class.description }}</p>
+                                        {% endif %}
+                                        <div class="small text-muted mb-1">
+                                            {% if class.bfo_category %}
+                                            <div><strong>BFO Category:</strong> {{ class.bfo_category }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% set children = class.children %}
+                            {% if children %}
+                            <ul>
+                                {% for child in children %}
+                                <li>
+                                    <div class="class-info" data-bs-toggle="collapse" data-bs-target="#class-details-{{ child.id }}">
+                                        <i class="fas fa-cube me-2"></i> {{ child.name }}
+                                        {% if child.bfo_category %}
+                                        <span class="badge bg-info ms-2 small">BFO: {{ child.bfo_category }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div id="class-details-{{ child.id }}" class="collapse mt-2 mb-3">
+                                        <div class="card bg-dark-light class-card">
+                                            <div class="card-body">
+                                                <h6>{{ child.name }}</h6>
+                                                {% if child.description %}
+                                                <p class="small mb-2">{{ child.description }}</p>
+                                                {% endif %}
+                                                <div class="small text-muted mb-1">
+                                                    {% if child.bfo_category %}
+                                                    <div><strong>BFO Category:</strong> {{ child.bfo_category }}</div>
+                                                    {% endif %}
+                                                    <div><strong>Parent:</strong> {{ class.name }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">
+                    No classes defined yet.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card bg-dark mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">Properties</h4>
+            </div>
+            <div class="card-body">
+                {% if properties %}
+                <div class="list-group list-group-flush">
+                    {% for property in properties %}
+                    <div class="class-info mb-2" data-bs-toggle="collapse" data-bs-target="#property-details-{{ property.id }}">
+                        <i class="fas fa-link me-2"></i> {{ property.name }}
+                        <span class="badge bg-secondary ms-2 small">{{ property.property_type }}</span>
+                    </div>
+                    <div id="property-details-{{ property.id }}" class="collapse mt-2 mb-3">
+                        <div class="card bg-dark-light property-card">
+                            <div class="card-body">
+                                <h6>{{ property.name }}</h6>
+                                {% if property.description %}
+                                <p class="small mb-2">{{ property.description }}</p>
+                                {% endif %}
+                                <div class="small text-muted">
+                                    <div><strong>Type:</strong> {{ property.property_type }}</div>
+                                    {% if property.domain_class %}
+                                    <div><strong>Domain:</strong> {{ property.domain_class.name }}</div>
+                                    {% endif %}
+                                    {% if property.range_class %}
+                                    <div><strong>Range:</strong> {{ property.range_class.name }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">
+                    No properties defined yet.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card bg-dark">
+            <div class="card-header">
+                <h4 class="mb-0">Individuals</h4>
+            </div>
+            <div class="card-body">
+                {% if individuals %}
+                <div class="list-group list-group-flush">
+                    {% for individual in individuals %}
+                    <div class="class-info mb-2" data-bs-toggle="collapse" data-bs-target="#individual-details-{{ individual.id }}">
+                        <i class="fas fa-dot-circle me-2"></i> {{ individual.name }}
+                        <span class="badge bg-primary ms-2 small">{{ individual.ontology_class.name }}</span>
+                    </div>
+                    <div id="individual-details-{{ individual.id }}" class="collapse mt-2 mb-3">
+                        <div class="card bg-dark-light individual-card">
+                            <div class="card-body">
+                                <h6>{{ individual.name }}</h6>
+                                {% if individual.description %}
+                                <p class="small mb-2">{{ individual.description }}</p>
+                                {% endif %}
+                                <div class="small text-muted mb-2">
+                                    <div><strong>Type:</strong> {{ individual.ontology_class.name }}</div>
+                                </div>
+                                
+                                {% if individual.property_values %}
+                                <h6 class="small">Property Values:</h6>
+                                <ul class="small mb-0">
+                                    {% for prop_id, value_info in individual.property_values.items() %}
+                                    {% set prop = properties|selectattr('id', 'equalto', prop_id|int)|first %}
+                                    {% if prop %}
+                                    {% set target = individuals|selectattr('id', 'equalto', value_info.value|int)|first %}
+                                    {% if target %}
+                                    <li><strong>{{ prop.name }}:</strong> {{ target.name }}</li>
+                                    {% endif %}
+                                    {% endif %}
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">
+                    No individuals defined yet.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
