@@ -74,7 +74,7 @@
                             <small>Last modified: {{ ontology.last_modified.strftime('%Y-%m-%d %H:%M') }}</small>
                         </div>
                         <button type="button" class="btn btn-outline-info btn-sm" id="suggest-classes-btn">
-                            <i class="fas fa-lightbulb me-1"></i> Suggest Classes & Properties
+                            <i class="fas fa-lightbulb me-1"></i> Suggest Classes
                         </button>
                     </div>
                 </div>
@@ -113,9 +113,14 @@
                 <div class="card bg-dark mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4 class="mb-0">Classes</h4>
-                        <button type="button" class="btn btn-sm btn-primary" id="new-class-btn">
-                            <i class="fas fa-plus"></i> New
-                        </button>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-info me-2" id="suggest-classes-btn-tab">
+                                <i class="fas fa-lightbulb"></i> Suggest Classes
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary" id="new-class-btn">
+                                <i class="fas fa-plus"></i> New
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body entity-list" id="class-list">
                         {% if classes %}
@@ -222,9 +227,14 @@
                 <div class="card bg-dark mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h4 class="mb-0">Properties</h4>
-                        <button type="button" class="btn btn-sm btn-primary" id="new-property-btn">
-                            <i class="fas fa-plus"></i> New
-                        </button>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-info me-2" id="suggest-properties-btn">
+                                <i class="fas fa-lightbulb"></i> Suggest Properties
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary" id="new-property-btn">
+                                <i class="fas fa-plus"></i> New
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body entity-list" id="property-list">
                         {% if properties %}
