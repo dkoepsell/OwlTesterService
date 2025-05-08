@@ -1162,14 +1162,62 @@ def api_sandbox_ai_suggestions():
         elif suggestion_type == 'properties':
             # Extract only the properties from all classes
             all_properties = []
+            
+            # Get existing classes from the ontology
+            ontology_id = request.args.get('ontology_id')
+            if ontology_id:
+                try:
+                    ontology_id = int(ontology_id)
+                    existing_classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
+                    existing_class_names = {cls.name.lower(): cls.id for cls in existing_classes}
+                    logger.info(f"Found {len(existing_classes)} existing classes in ontology {ontology_id}")
+                except (ValueError, TypeError):
+                    existing_class_names = {}
+                    logger.warning(f"Invalid ontology_id: {ontology_id}")
+            else:
+                existing_class_names = {}
+                
+            # Add both suggested classes and existing classes to a mapping
+            all_class_names = {suggestion.get('name', '').lower(): None for suggestion in all_suggestions}
             for suggestion in all_suggestions:
                 if 'properties' in suggestion and suggestion['properties']:
+                    suggestion_name = suggestion.get('name', '')
+                    # Find matching existing class if any
+                    matching_class_id = existing_class_names.get(suggestion_name.lower())
+                    
                     # Add the class name to each property for context
                     for prop in suggestion['properties']:
-                        prop['class_name'] = suggestion.get('name', 'Unknown')
+                        prop['class_name'] = suggestion_name
+                        # If we found a matching existing class, use its ID as the domain
+                        if matching_class_id:
+                            prop['domain_class_id'] = matching_class_id
+                            
+                        # For the range, try to find a matching class in existing classes or suggested classes
+                        if prop.get('type') == 'object' and 'range_class' not in prop:
+                            # Try to guess a good range class based on property name
+                            prop_name = prop.get('name', '').lower()
+                            
+                            if prop_name.startswith('has') and len(prop_name) > 3:
+                                # For "hasX" properties, look for a class X
+                                possible_range = prop_name[3:].lower()
+                                # First letter uppercase for camelCase
+                                possible_range = possible_range[0].upper() + possible_range[1:]
+                                
+                                # Check if a class with this name exists
+                                for cls_name, cls_id in existing_class_names.items():
+                                    if cls_name.lower() == possible_range.lower():
+                                        prop['range_class_id'] = cls_id
+                                        break
+                        
                         all_properties.append(prop)
+            
             logger.info(f"Extracted {len(all_properties)} property suggestions from classes")
-            response_data = {"suggestions": all_properties, "domain": domain, "subject": subject}
+            response_data = {
+                "suggestions": all_properties, 
+                "domain": domain, 
+                "subject": subject,
+                "existing_classes": [{"id": id, "name": name} for name, id in existing_class_names.items()]
+            }
         else:
             # Return all suggestions unchanged
             logger.info(f"Returning all {len(all_suggestions)} suggestions with classes and properties")

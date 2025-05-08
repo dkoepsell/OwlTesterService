@@ -55,10 +55,17 @@ function showIndividualForm(show = true) {
 }
 
 // AI Assistant functions
-function requestAISuggestions(domain, subject, callback, type = 'all') {
+function requestAISuggestions(domain, subject, callback, type = 'all', ontologyId = null) {
     // Make a request to our AI suggestions endpoint
     // type can be 'all', 'classes', or 'properties'
-    fetch(`/api/sandbox/ai/suggestions?domain=${encodeURIComponent(domain)}&subject=${encodeURIComponent(subject)}&type=${encodeURIComponent(type)}`)
+    let url = `/api/sandbox/ai/suggestions?domain=${encodeURIComponent(domain)}&subject=${encodeURIComponent(subject)}&type=${encodeURIComponent(type)}`;
+    
+    // Add ontologyId parameter if provided (needed for properties to link to existing classes)
+    if (ontologyId && type === 'properties') {
+        url += `&ontology_id=${encodeURIComponent(ontologyId)}`;
+    }
+    
+    fetch(url)
         .then(response => response.json())
         .then(data => {
             if (callback && typeof callback === 'function') {
@@ -569,7 +576,7 @@ function setupAIAssistantButtons(ontologyId) {
             suggestClassesBtn.disabled = true;
             suggestClassesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
             
-            // Request class suggestions - use 'classes' type
+            // Request class suggestions - use 'classes' type and pass ontology_id
             requestAISuggestions(domain, subject, function(data, type) {
                 // Reset button state
                 suggestClassesBtn.disabled = false;
@@ -586,7 +593,7 @@ function setupAIAssistantButtons(ontologyId) {
                 } else {
                     alert('No class suggestions generated');
                 }
-            }, 'classes'); // Pass 'classes' type parameter
+            }, 'classes', ontologyId); // Pass 'classes' type parameter and ontologyId
         });
     }
     
@@ -610,7 +617,7 @@ function setupAIAssistantButtons(ontologyId) {
             suggestClassesBtnTab.disabled = true;
             suggestClassesBtnTab.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
             
-            // Request class suggestions - use 'classes' type
+            // Request class suggestions - use 'classes' type and pass ontology_id for consistency
             requestAISuggestions(domain, subject, function(data, type) {
                 // Reset button state
                 suggestClassesBtnTab.disabled = false;
@@ -627,7 +634,7 @@ function setupAIAssistantButtons(ontologyId) {
                 } else {
                     alert('No class suggestions generated');
                 }
-            }, 'classes'); // Pass 'classes' type parameter
+            }, 'classes', ontologyId); // Pass 'classes' type parameter and ontologyId
         });
     }
     
@@ -651,7 +658,7 @@ function setupAIAssistantButtons(ontologyId) {
             suggestPropertiesBtn.disabled = true;
             suggestPropertiesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
             
-            // Request property suggestions - use 'properties' type
+            // Request property suggestions - use 'properties' type and pass ontology_id
             requestAISuggestions(domain, subject, function(data, type) {
                 // Reset button state
                 suggestPropertiesBtn.disabled = false;
@@ -665,10 +672,15 @@ function setupAIAssistantButtons(ontologyId) {
                 // Display suggested properties
                 if (data.suggestions && data.suggestions.length > 0) {
                     showSuggestionsList(data.suggestions, ontologyId, type);
+                    
+                    // Log information about existing classes
+                    if (data.existing_classes && data.existing_classes.length > 0) {
+                        console.log(`Found ${data.existing_classes.length} existing classes for linking properties`);
+                    }
                 } else {
                     alert('No property suggestions generated');
                 }
-            }, 'properties'); // Pass 'properties' type parameter
+            }, 'properties', ontologyId); // Pass 'properties' type parameter and ontologyId
         });
     }
 }
