@@ -8,35 +8,110 @@ let selectedClassId = null;
 let selectedPropertyId = null;
 let selectedIndividualId = null;
 
-// Functions to switch between tabs
+// Functions to show/hide forms
 function showClassForm(show = true) {
+    const emptyState = document.getElementById('class-empty-state');
+    const form = document.getElementById('class-form');
+    
+    if (!emptyState || !form) return;
+    
     if (show) {
-        document.getElementById('class-empty-state').style.display = 'none';
-        document.getElementById('class-form').style.display = 'block';
+        emptyState.style.display = 'none';
+        form.style.display = 'block';
     } else {
-        document.getElementById('class-empty-state').style.display = 'block';
-        document.getElementById('class-form').style.display = 'none';
+        emptyState.style.display = 'block';
+        form.style.display = 'none';
     }
 }
 
 function showPropertyForm(show = true) {
+    const emptyState = document.getElementById('property-empty-state');
+    const form = document.getElementById('property-form');
+    
+    if (!emptyState || !form) return;
+    
     if (show) {
-        document.getElementById('property-empty-state').style.display = 'none';
-        document.getElementById('property-form').style.display = 'block';
+        emptyState.style.display = 'none';
+        form.style.display = 'block';
     } else {
-        document.getElementById('property-empty-state').style.display = 'block';
-        document.getElementById('property-form').style.display = 'none';
+        emptyState.style.display = 'block';
+        form.style.display = 'none';
     }
 }
 
 function showIndividualForm(show = true) {
+    const emptyState = document.getElementById('individual-empty-state');
+    const form = document.getElementById('individual-form');
+    
+    if (!emptyState || !form) return;
+    
     if (show) {
-        document.getElementById('individual-empty-state').style.display = 'none';
-        document.getElementById('individual-form').style.display = 'block';
+        emptyState.style.display = 'none';
+        form.style.display = 'block';
     } else {
-        document.getElementById('individual-empty-state').style.display = 'block';
-        document.getElementById('individual-form').style.display = 'none';
+        emptyState.style.display = 'block';
+        form.style.display = 'none';
     }
+}
+
+// AI Assistant functions
+function requestAISuggestions(domain, subject, callback) {
+    // Make a request to our AI suggestions endpoint
+    fetch(`/api/sandbox/ai/suggestions?domain=${encodeURIComponent(domain)}&subject=${encodeURIComponent(subject)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (callback && typeof callback === 'function') {
+                callback(data);
+            }
+        })
+        .catch(error => {
+            console.error('Error getting AI suggestions:', error);
+        });
+}
+
+function suggestBFOCategory(className, description, callback) {
+    // Make a request to suggest appropriate BFO category
+    fetch('/api/sandbox/ai/bfo-category', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            class_name: className,
+            description: description
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (callback && typeof callback === 'function') {
+            callback(data);
+        }
+    })
+    .catch(error => {
+        console.error('Error getting BFO category suggestion:', error);
+    });
+}
+
+function generateDescription(className, callback) {
+    // Generate a description for a class
+    fetch('/api/sandbox/ai/description', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            class_name: className
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (callback && typeof callback === 'function') {
+            callback(data);
+        }
+    })
+    .catch(error => {
+        console.error('Error generating description:', error);
+    });
 }
 
 // Initialize the sandbox when the document is ready
@@ -60,6 +135,9 @@ document.addEventListener('DOMContentLoaded', function() {
     showClassForm(false);
     showPropertyForm(false);
     showIndividualForm(false);
+    
+    // Set up AI assistant buttons if they exist
+    setupAIAssistantButtons(ontologyId);
 });
 
 function initializeClassFunctionality(ontologyId) {
@@ -386,6 +464,254 @@ function initializePropertyFunctionality(ontologyId) {
 
 function initializeIndividualFunctionality(ontologyId) {
     // Similar structure to the class and property functionality
-    // This is a placeholder for the individual-related JavaScript code
-    // You would follow a similar pattern to the class and property functionality
+    // Implementation for individual-related event handlers
+    // This would follow a similar pattern to the class and property functionality
+}
+
+// Set up the AI assistant buttons
+function setupAIAssistantButtons(ontologyId) {
+    // Add BFO category suggestion button
+    const suggestBFOBtn = document.getElementById('suggest-bfo-btn');
+    if (suggestBFOBtn) {
+        suggestBFOBtn.addEventListener('click', function() {
+            const className = document.getElementById('class-name').value;
+            const description = document.getElementById('class-description').value;
+            
+            if (!className) {
+                alert('Please enter a class name first');
+                return;
+            }
+            
+            // Show loading state
+            suggestBFOBtn.disabled = true;
+            suggestBFOBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Thinking...';
+            
+            // Request BFO category suggestion
+            suggestBFOCategory(className, description, function(data) {
+                // Reset button state
+                suggestBFOBtn.disabled = false;
+                suggestBFOBtn.innerHTML = '<i class="fas fa-magic"></i> Suggest BFO Category';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Set the suggested BFO category
+                if (data.bfo_category) {
+                    document.getElementById('class-bfo-category').value = data.bfo_category;
+                    
+                    // Show explanation if provided
+                    if (data.explanation) {
+                        alert('AI Suggestion: ' + data.explanation);
+                    }
+                } else {
+                    alert('No appropriate BFO category found');
+                }
+            });
+        });
+    }
+    
+    // Add description generation button
+    const generateDescBtn = document.getElementById('generate-description-btn');
+    if (generateDescBtn) {
+        generateDescBtn.addEventListener('click', function() {
+            const className = document.getElementById('class-name').value;
+            
+            if (!className) {
+                alert('Please enter a class name first');
+                return;
+            }
+            
+            // Show loading state
+            generateDescBtn.disabled = true;
+            generateDescBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            
+            // Generate description
+            generateDescription(className, function(data) {
+                // Reset button state
+                generateDescBtn.disabled = false;
+                generateDescBtn.innerHTML = '<i class="fas fa-pen"></i> Generate Description';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Set the generated description
+                if (data.description) {
+                    document.getElementById('class-description').value = data.description;
+                } else {
+                    alert('Could not generate a description');
+                }
+            });
+        });
+    }
+    
+    // Add related entities suggestion button
+    const suggestClassesBtn = document.getElementById('suggest-classes-btn');
+    if (suggestClassesBtn) {
+        suggestClassesBtn.addEventListener('click', function() {
+            // Get domain and subject from ontology metadata section
+            const domainElement = document.querySelector('.domain-badge');
+            const subjectElement = document.querySelector('.subject-badge');
+            
+            if (!domainElement || !subjectElement) {
+                alert('Domain and subject information not found');
+                return;
+            }
+            
+            const domain = domainElement.textContent.trim();
+            const subject = subjectElement.textContent.trim();
+            
+            // Show loading state
+            suggestClassesBtn.disabled = true;
+            suggestClassesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
+            
+            // Request entity suggestions
+            requestAISuggestions(domain, subject, function(data) {
+                // Reset button state
+                suggestClassesBtn.disabled = false;
+                suggestClassesBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Classes';
+                
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                
+                // Display suggested classes
+                if (data.suggestions && data.suggestions.length > 0) {
+                    showSuggestionsList(data.suggestions, ontologyId);
+                } else {
+                    alert('No class suggestions generated');
+                }
+            });
+        });
+    }
+}
+
+// Show a modal with entity suggestions
+function showSuggestionsList(suggestions, ontologyId) {
+    // Create or get the suggestions modal
+    let modal = document.getElementById('suggestions-modal');
+    
+    // If the modal doesn't exist, create it
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'suggestions-modal';
+        modal.className = 'modal fade';
+        modal.setAttribute('tabindex', '-1');
+        modal.setAttribute('aria-hidden', 'true');
+        
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content bg-dark">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Suggested Classes</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Here are some suggested classes for your ontology domain:</p>
+                        <div id="suggestions-list" class="list-group mb-3">
+                            <!-- Suggestions will be inserted here -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" id="add-selected-btn">Add Selected</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+    
+    // Get the suggestions list container
+    const suggestionsList = document.getElementById('suggestions-list');
+    suggestionsList.innerHTML = ''; // Clear existing suggestions
+    
+    // Add each suggestion to the list
+    suggestions.forEach((suggestion, index) => {
+        const item = document.createElement('div');
+        item.className = 'list-group-item bg-dark d-flex align-items-start';
+        
+        item.innerHTML = `
+            <div class="form-check me-2">
+                <input class="form-check-input" type="checkbox" value="${index}" id="suggestion-${index}">
+            </div>
+            <div>
+                <h6 class="mb-1">${suggestion.name}</h6>
+                <p class="mb-1 small">${suggestion.description || 'No description provided'}</p>
+                ${suggestion.bfo_category ? `<span class="badge bg-info">BFO: ${suggestion.bfo_category}</span>` : ''}
+            </div>
+        `;
+        
+        suggestionsList.appendChild(item);
+    });
+    
+    // Set up the "Add Selected" button
+    const addSelectedBtn = document.getElementById('add-selected-btn');
+    addSelectedBtn.onclick = function() {
+        const selected = [];
+        
+        // Get all selected suggestions
+        suggestionsList.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            const index = parseInt(checkbox.value);
+            selected.push(suggestions[index]);
+        });
+        
+        if (selected.length === 0) {
+            alert('Please select at least one suggestion');
+            return;
+        }
+        
+        // Add all selected suggestions as classes
+        let added = 0;
+        let total = selected.length;
+        
+        function addNextClass(i) {
+            if (i >= total) {
+                // All classes added, close modal and refresh page
+                bootstrap.Modal.getInstance(modal).hide();
+                alert(`Added ${added} out of ${total} classes.`);
+                window.location.reload();
+                return;
+            }
+            
+            const suggestion = selected[i];
+            
+            // Create the class
+            fetch(`/api/sandbox/${ontologyId}/classes`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: suggestion.name,
+                    description: suggestion.description || '',
+                    bfo_category: suggestion.bfo_category || null
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    added++;
+                }
+                // Continue with the next class regardless of success
+                addNextClass(i + 1);
+            })
+            .catch(error => {
+                console.error('Error adding class:', error);
+                // Continue with the next class despite the error
+                addNextClass(i + 1);
+            });
+        }
+        
+        // Start adding classes
+        addNextClass(0);
+    };
+    
+    // Show the modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
 }

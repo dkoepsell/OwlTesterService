@@ -64,15 +64,18 @@
                         <h3 class="mb-2">{{ ontology.title }}</h3>
                         <p class="lead mb-1">{{ ontology.description }}</p>
                         <div class="mb-0 text-muted">
-                            <span class="badge bg-primary me-2">{{ ontology.domain }}</span>
-                            <span class="badge bg-secondary">{{ ontology.subject }}</span>
+                            <span class="badge bg-primary me-2 domain-badge">{{ ontology.domain }}</span>
+                            <span class="badge bg-secondary subject-badge">{{ ontology.subject }}</span>
                         </div>
                     </div>
                     <div class="col-md-4 text-md-end">
-                        <div class="text-muted">
+                        <div class="text-muted mb-2">
                             <small>Created: {{ ontology.creation_date.strftime('%Y-%m-%d') }}</small><br>
                             <small>Last modified: {{ ontology.last_modified.strftime('%Y-%m-%d %H:%M') }}</small>
                         </div>
+                        <button type="button" class="btn btn-outline-info btn-sm" id="suggest-classes-btn">
+                            <i class="fas fa-lightbulb me-1"></i> Suggest Classes & Properties
+                        </button>
                     </div>
                 </div>
             </div>
@@ -157,7 +160,12 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="class-description" class="form-label">Description</label>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <label for="class-description" class="form-label mb-0">Description</label>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="generate-description-btn">
+                                            <i class="fas fa-pen"></i> Generate Description
+                                        </button>
+                                    </div>
                                     <textarea class="form-control" id="class-description" rows="3"></textarea>
                                     <small class="form-text text-muted">A description of what this class represents</small>
                                 </div>
@@ -174,7 +182,12 @@
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label for="class-bfo-category" class="form-label">BFO Category</label>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <label for="class-bfo-category" class="form-label mb-0">BFO Category</label>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="suggest-bfo-btn">
+                                            <i class="fas fa-magic"></i> Suggest BFO Category
+                                        </button>
+                                    </div>
                                     <select class="form-select" id="class-bfo-category">
                                         <option value="">None</option>
                                         {% for bfo_class in bfo_classes %}
