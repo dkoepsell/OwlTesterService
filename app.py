@@ -610,7 +610,10 @@ def api_analyze_owl(filename):
             if len(g) > 0:
                 app.logger.info(f"Successfully loaded {len(g)} triples with rdflib")
                 
-                # Count classes - support both standard OWL.Class and RDF Schema class definitions
+                # Define OWL namespace explicitly
+                OWL = rdflib.Namespace("http://www.w3.org/2002/07/owl#")
+                
+                # Count classes - support all formats of OWL class declarations
                 classes = set()
                 # Standard OWL class
                 for s, p, o in g.triples((None, RDF.type, OWL.Class)):
@@ -620,6 +623,27 @@ def api_analyze_owl(filename):
                     classes.add(str(s))
                     if str(o) != str(OWL.Thing) and str(o) != str(RDFS.Resource):
                         classes.add(str(o))
+                
+                # Find all domain and range values - they're often classes even if not explicitly typed
+                domain_range_resources = set()
+                for s, p, o in g.triples((None, RDFS.domain, None)):
+                    domain_range_resources.add(str(o))
+                for s, p, o in g.triples((None, RDFS.range, None)):
+                    domain_range_resources.add(str(o))
+                
+                # Add any resource referenced in domain or range if it's not a literal or XSD type
+                for resource in domain_range_resources:
+                    if not str(resource).startswith("http://www.w3.org/2001/XMLSchema#") and str(resource) != str(RDFS.Literal):
+                        # Check if not already a property
+                        is_property = False
+                        for _, _, _ in g.triples((rdflib.URIRef(resource), RDF.type, OWL.ObjectProperty)):
+                            is_property = True
+                            break
+                        for _, _, _ in g.triples((rdflib.URIRef(resource), RDF.type, OWL.DatatypeProperty)):
+                            is_property = True
+                            break
+                        if not is_property:
+                            classes.add(resource)
                 
                 # Count object properties - support both direct declaration and domain/range indicators
                 obj_properties = set()
@@ -672,10 +696,26 @@ def api_analyze_owl(filename):
                         label = str(l)
                         break
                     
-                    class_name = label or cls.split('/')[-1].split('#')[-1]
+                    # Get comment/description if available
+                    description = None
+                    for _, _, c in g.triples((rdflib.URIRef(cls), RDFS.comment, None)):
+                        description = str(c)
+                        break
+                    
+                    # Get a clean name from the URI
+                    if '#' in cls:
+                        class_name = cls.split('#')[-1]
+                    else:
+                        class_name = cls.split('/')[-1]
+                    
+                    # Use label if available
+                    class_name = label or class_name
+                    
                     class_list.append({
                         'uri': cls,
-                        'name': class_name
+                        'name': class_name,
+                        'label': label,
+                        'description': description
                     })
                 
                 # Extract object property names
@@ -687,21 +727,51 @@ def api_analyze_owl(filename):
                         label = str(l)
                         break
                     
+                    # Get comment/description if available
+                    description = None
+                    for _, _, c in g.triples((rdflib.URIRef(prop), RDFS.comment, None)):
+                        description = str(c)
+                        break
+                    
+                    # Get a clean name from the URI
+                    if '#' in prop:
+                        prop_name = prop.split('#')[-1]
+                    else:
+                        prop_name = prop.split('/')[-1]
+                    
+                    # Use label if available
+                    prop_name = label or prop_name
+                    
                     # Get domain and range
                     domain = []
+                    domain_names = []
                     for _, _, d in g.triples((rdflib.URIRef(prop), RDFS.domain, None)):
                         domain.append(str(d))
+                        # Get domain class name
+                        if '#' in str(d):
+                            domain_names.append(str(d).split('#')[-1])
+                        else:
+                            domain_names.append(str(d).split('/')[-1])
                     
                     range_classes = []
+                    range_names = []
                     for _, _, r in g.triples((rdflib.URIRef(prop), RDFS.range, None)):
                         range_classes.append(str(r))
+                        # Get range class name
+                        if '#' in str(r):
+                            range_names.append(str(r).split('#')[-1])
+                        else:
+                            range_names.append(str(r).split('/')[-1])
                     
-                    prop_name = label or prop.split('/')[-1].split('#')[-1]
                     obj_property_list.append({
                         'uri': prop,
                         'name': prop_name,
+                        'label': label,
+                        'description': description,
                         'domain': domain,
-                        'range': range_classes
+                        'domain_names': domain_names,
+                        'range': range_classes,
+                        'range_names': range_names
                     })
                 
                 # Extract data property names
@@ -713,21 +783,51 @@ def api_analyze_owl(filename):
                         label = str(l)
                         break
                     
+                    # Get comment/description if available
+                    description = None
+                    for _, _, c in g.triples((rdflib.URIRef(prop), RDFS.comment, None)):
+                        description = str(c)
+                        break
+                    
+                    # Get a clean name from the URI
+                    if '#' in prop:
+                        prop_name = prop.split('#')[-1]
+                    else:
+                        prop_name = prop.split('/')[-1]
+                    
+                    # Use label if available
+                    prop_name = label or prop_name
+                    
                     # Get domain and range
                     domain = []
+                    domain_names = []
                     for _, _, d in g.triples((rdflib.URIRef(prop), RDFS.domain, None)):
                         domain.append(str(d))
+                        # Get domain class name
+                        if '#' in str(d):
+                            domain_names.append(str(d).split('#')[-1])
+                        else:
+                            domain_names.append(str(d).split('/')[-1])
                     
                     range_types = []
+                    range_names = []
                     for _, _, r in g.triples((rdflib.URIRef(prop), RDFS.range, None)):
                         range_types.append(str(r))
+                        # Get range class name
+                        if '#' in str(r):
+                            range_names.append(str(r).split('#')[-1])
+                        else:
+                            range_names.append(str(r).split('/')[-1])
                     
-                    prop_name = label or prop.split('/')[-1].split('#')[-1]
                     data_property_list.append({
                         'uri': prop,
                         'name': prop_name,
+                        'label': label,
+                        'description': description,
                         'domain': domain,
-                        'range': range_types
+                        'domain_names': domain_names,
+                        'range': range_types,
+                        'range_names': range_names
                     })
                 
                 # Extract individual names
@@ -880,6 +980,8 @@ def api_analyze_owl(filename):
                 }
                 
                 app.logger.info(f"Analysis with rdflib successful: {len(classes)} classes, {len(obj_properties)} object properties, {len(fol_premises)} FOL premises")
+                app.logger.info(f"Found classes: {[c.split('#')[-1] if '#' in c else c.split('/')[-1] for c in classes]}")
+                app.logger.info(f"Found object properties: {[p.split('#')[-1] if '#' in p else p.split('/')[-1] for p in obj_properties]}")
                 app.logger.info(f"Class list: {[c['name'] for c in class_list]}")
                 app.logger.info(f"Object property list: {[p['name'] for p in obj_property_list]}")
                 if fol_premises:
