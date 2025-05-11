@@ -610,6 +610,21 @@ def api_analyze_owl(filename):
             if len(g) > 0:
                 app.logger.info(f"Successfully loaded {len(g)} triples with rdflib")
                 
+                # Debug triples to see what's in the graph
+                app.logger.info("Inspecting RDF triples...")
+                type_triples = []
+                for s, p, o in g.triples((None, RDF.type, None)):
+                    type_triples.append(f"{s} {p} {o}")
+                app.logger.info(f"Found {len(type_triples)} type triples")
+                if len(type_triples) > 0:
+                    app.logger.info(f"Sample types: {type_triples[:5]}")
+                    
+                # Debug domain/range
+                domain_triples = []
+                for s, p, o in g.triples((None, RDFS.domain, None)):
+                    domain_triples.append(f"{s} has domain {o}")
+                app.logger.info(f"Found {len(domain_triples)} domain triples: {domain_triples[:5]}")
+                
                 # Explicitly define namespaces
                 OWL = rdflib.Namespace("http://www.w3.org/2002/07/owl#")
                 
@@ -675,47 +690,84 @@ def api_analyze_owl(filename):
                         if not is_property:
                             classes.add(resource)
                 
+                app.logger.info(f"After analyzing domain/range, found {len(classes)} classes: {[c.split('#')[-1] if '#' in c else c.split('/')[-1] for c in classes]}")
+                
                 # Count object properties - support both direct declaration and domain/range indicators
                 obj_properties = set()
+                
+                # First identify explicitly typed ObjectProperties
                 for s, p, o in g.triples((None, RDF.type, OWL.ObjectProperty)):
                     obj_properties.add(str(s))
-                # Also identify properties that have domain and range but might not be explicitly typed
+                    
+                app.logger.info(f"Found {len(obj_properties)} explicitly typed ObjectProperties")
+                
+                # Then identify properties that have domain and range but might not be explicitly typed
+                domain_props = set()
                 for s, _, _ in g.triples((None, RDFS.domain, None)):
-                    for _, _, r in g.triples((s, RDFS.range, None)):
+                    domain_props.add(str(s))
+                
+                # For each property with a domain, check if it has a range that's not a literal
+                range_count = 0
+                for prop in domain_props:
+                    for _, _, r in g.triples((rdflib.URIRef(prop), RDFS.range, None)):
                         if str(r) != str(RDFS.Literal) and not str(r).startswith("http://www.w3.org/2001/XMLSchema#"):
-                            obj_properties.add(str(s))
+                            obj_properties.add(prop)
+                            range_count += 1
+                
+                app.logger.info(f"Found {len(domain_props)} properties with domain declarations")
+                app.logger.info(f"Found {range_count} non-literal range declarations")
+                app.logger.info(f"Total object properties after domain/range analysis: {len(obj_properties)}")
+                app.logger.info(f"Object property URIs: {list(obj_properties)}")
                 
                 # Count data properties
                 data_properties = set()
+                
+                # First identify explicitly typed DatatypeProperties
                 for s, p, o in g.triples((None, RDF.type, OWL.DatatypeProperty)):
                     data_properties.add(str(s))
-                # Also identify properties with literal or XMLSchema ranges
+                
+                app.logger.info(f"Found {len(data_properties)} explicitly typed DatatypeProperties")
+                
+                # Then identify properties with literal or XMLSchema ranges
                 for s, _, _ in g.triples((None, RDFS.domain, None)):
                     for _, _, r in g.triples((s, RDFS.range, None)):
                         if str(r) == str(RDFS.Literal) or str(r).startswith("http://www.w3.org/2001/XMLSchema#"):
                             data_properties.add(str(s))
-                            # Remove from object properties if it was misclassified
-                            if str(s) in obj_properties:
-                                obj_properties.remove(str(s))
+                
+                app.logger.info(f"Total data properties after range analysis: {len(data_properties)}")
+                app.logger.info(f"Data property URIs: {list(data_properties)}")
+                
+                # Remove from object properties if it was misclassified
+                for s in data_properties:
+                    if s in obj_properties:
+                        obj_properties.remove(s)
                 
                 # Count individuals
                 individuals = set()
+                
+                # First look for explicitly typed NamedIndividuals
                 for s, p, o in g.triples((None, RDF.type, OWL.NamedIndividual)):
                     individuals.add(str(s))
-                    
-                # Also check for instances of classes
-                for s, p, o in g.triples((None, RDF.type, None)):
-                    if o in classes:
+                
+                app.logger.info(f"Found {len(individuals)} explicitly typed NamedIndividuals")
+                
+                # Then check for instances of classes
+                instance_count = 0
+                for c in classes:
+                    for s, p, o in g.triples((None, RDF.type, rdflib.URIRef(c))):
                         individuals.add(str(s))
-                    elif str(o) != str(OWL.Class) and str(o) != str(OWL.ObjectProperty) and str(o) != str(OWL.DatatypeProperty) and str(o) != str(OWL.Ontology):
-                        # Make sure it's not a class, property, or system type
-                        if str(s) not in classes and str(s) not in obj_properties and str(s) not in data_properties:
-                            individuals.add(str(s))
+                        instance_count += 1
+                
+                app.logger.info(f"Found {instance_count} instances of defined classes")
+                app.logger.info(f"Total individuals: {len(individuals)}")
+                app.logger.info(f"Individual URIs: {list(individuals)[:5] if len(individuals) > 0 else []}...")
                 
                 # Count annotation properties
                 annot_properties = set()
                 for s, p, o in g.triples((None, RDF.type, OWL.AnnotationProperty)):
                     annot_properties.add(str(s))
+                
+                app.logger.info(f"Found {len(annot_properties)} annotation properties")
                 
                 # Extract class names for display
                 class_list = []
