@@ -59,7 +59,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Fetch the ontology data from the server
-        fetch('{{ url_for("api_get_diagram_data", filename=filename) }}')
+        fetch('{{ url_for("api_diagram_data", filename=filename) }}')
             .then(response => response.json())
             .then(data => {
                 // Initialize the visualization with the data
