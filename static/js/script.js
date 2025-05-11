@@ -22,12 +22,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
+    if (typeof bootstrap !== 'undefined') {
+        const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
 
     // Handle form submission
-    expressionForm.addEventListener('submit', function(e) {
+    if (expressionForm) {
+        expressionForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const expression = expressionInput.value.trim();
         

@@ -908,11 +908,30 @@ def dashboard():
         # Get all FOL expressions for the current user, ordered by test date (newest first)
         expressions = FOLExpression.query.filter_by(user_id=current_user.id).order_by(FOLExpression.test_date.desc()).limit(20).all()
         
+        # Calculate statistics
+        ontology_count = len(ontologies)
+        analysis_count = OntologyAnalysis.query.join(OntologyFile).filter(OntologyFile.user_id == current_user.id).count()
+        expression_count = FOLExpression.query.filter_by(user_id=current_user.id).count()
+        
+        # Get recent activity
+        recent_analyses = OntologyAnalysis.query.join(OntologyFile).filter(
+            OntologyFile.user_id == current_user.id
+        ).order_by(OntologyAnalysis.analysis_date.desc()).limit(5).all()
+        
+        stats = {
+            'ontology_count': ontology_count,
+            'analysis_count': analysis_count,
+            'expression_count': expression_count
+        }
+        
         return render_template('dashboard.html', 
+                              title="User Dashboard",
                               ontologies=ontologies,
-                              expressions=expressions)
+                              expressions=expressions,
+                              recent_analyses=recent_analyses,
+                              stats=stats)
     except Exception as e:
-        logger.error(f"Error accessing dashboard: {str(e)}")
+        app.logger.error(f"Error accessing dashboard: {str(e)}")
         flash(f"Error accessing dashboard: {str(e)}", 'error')
         return redirect(url_for('index'))
 
