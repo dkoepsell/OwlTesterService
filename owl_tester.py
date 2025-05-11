@@ -342,6 +342,7 @@ class OwlTester:
         Returns:
             dict: Information about the loaded ontology
         """
+        # First try direct loading with owlready2
         try:
             # Try to load the ontology
             onto = owlready2.get_ontology(ontology_path).load()
@@ -354,11 +355,55 @@ class OwlTester:
                 'loaded': True
             }
         except Exception as e:
-            logging.error(f"Error loading ontology from {ontology_path}: {e}")
-            return {
-                'loaded': False,
-                'error': str(e)
-            }
+            logging.warning(f"Initial owlready2 loading failed for {ontology_path}: {e}")
+            
+            # Try alternate loading methods using rdflib as an intermediary
+            try:
+                import rdflib
+                import tempfile
+                
+                # Load with rdflib first
+                g = rdflib.Graph()
+                g.parse(ontology_path)
+                
+                if len(g) > 0:
+                    logging.info(f"Successfully loaded {len(g)} triples with rdflib")
+                    
+                    # Create a temporary file
+                    with tempfile.NamedTemporaryFile(suffix='.owl', delete=False) as temp:
+                        # Serialize to RDF/XML with explicit namespaces
+                        temp_path = temp.name
+                        g.serialize(destination=temp_path, format='xml')
+                    
+                    try:
+                        # Try to load the re-serialized file with owlready2
+                        onto = owlready2.get_ontology(temp_path).load()
+                        
+                        # Return basic information about the ontology
+                        return {
+                            'name': onto.name or "Unknown",
+                            'base_iri': onto.base_iri or "Not specified",
+                            'ontology': onto,
+                            'loaded': True
+                        }
+                    except Exception as inner_e:
+                        logging.error(f"Failed to load re-serialized ontology: {inner_e}")
+                        return {
+                            'loaded': False,
+                            'error': f"Failed to load re-serialized ontology: {inner_e}"
+                        }
+                else:
+                    logging.error("No triples found in the ontology file")
+                    return {
+                        'loaded': False,
+                        'error': "No triples found in the ontology file"
+                    }
+            except Exception as rdf_e:
+                logging.error(f"Error loading ontology with rdflib from {ontology_path}: {rdf_e}")
+                return {
+                    'loaded': False,
+                    'error': f"Failed with both owlready2 and rdflib: {e}; {rdf_e}"
+                }
     
     def analyze_ontology(self, onto):
         """
@@ -370,15 +415,184 @@ class OwlTester:
         Returns:
             dict: Analysis results
         """
-        # Placeholder implementation
-        return {
-            'classes': len(list(onto.classes())),
-            'object_properties': len(list(onto.object_properties())),
-            'data_properties': len(list(onto.data_properties())),
-            'individuals': len(list(onto.individuals())),
-            'annotation_properties': len(list(onto.annotation_properties())),
-            'imported_ontologies': [o.base_iri for o in onto.imported_ontologies]
-        }
+        try:
+            # Get basic counts from the ontology
+            classes_list = list(onto.classes())
+            object_properties_list = list(onto.object_properties())
+            data_properties_list = list(onto.data_properties())
+            individuals_list = list(onto.individuals())
+            annotation_properties_list = list(onto.annotation_properties())
+            
+            # Count axioms - This is a rough approximation since owlready2 doesn't directly expose axiom counts
+            axiom_count = 0
+            
+            # Count class axioms (subclass relationships, equivalence, etc.)
+            for cls in classes_list:
+                # Count subclass relationships
+                if hasattr(cls, 'is_a') and cls.is_a:
+                    axiom_count += len(cls.is_a)
+                
+                # Count class restrictions
+                if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
+                    axiom_count += len(cls.equivalent_to)
+                
+                # Count disjoint class relationships
+                if hasattr(cls, 'disjoints') and cls.disjoints():
+                    axiom_count += len(list(cls.disjoints()))
+            
+            # Count property axioms
+            for prop in object_properties_list + data_properties_list:
+                # Domain and range axioms
+                if hasattr(prop, 'domain') and prop.domain:
+                    axiom_count += len(prop.domain)
+                if hasattr(prop, 'range') and prop.range:
+                    axiom_count += len(prop.range)
+                
+                # Property characteristics
+                for characteristic in ['functional', 'inverse_functional', 'transitive', 
+                                       'symmetric', 'asymmetric', 'reflexive', 'irreflexive']:
+                    if hasattr(prop, characteristic) and getattr(prop, characteristic):
+                        axiom_count += 1
+            
+            # Count annotations
+            for entity in classes_list + object_properties_list + data_properties_list + individuals_list:
+                if hasattr(entity, 'comment') and entity.comment:
+                    axiom_count += len(entity.comment)
+                if hasattr(entity, 'label') and entity.label:
+                    axiom_count += len(entity.label)
+            
+            # Build the result dictionary
+            result = {
+                'classes': len(classes_list),
+                'object_properties': len(object_properties_list),
+                'data_properties': len(data_properties_list),
+                'individuals': len(individuals_list),
+                'annotation_properties': len(annotation_properties_list),
+                'imported_ontologies': [o.base_iri for o in onto.imported_ontologies],
+                'axioms': axiom_count,
+                'class_list': [cls.name for cls in classes_list if hasattr(cls, 'name')],
+                'object_property_list': [prop.name for prop in object_properties_list if hasattr(prop, 'name')],
+                'data_property_list': [prop.name for prop in data_properties_list if hasattr(prop, 'name')],
+                'individual_list': [ind.name for ind in individuals_list if hasattr(ind, 'name')]
+            }
+            
+            # Check consistency
+            try:
+                # owlready2's reasoner for consistency checking
+                with onto:
+                    consistency = owlready2.sync_reasoner_pellet(infer_property_values=True, 
+                                                               infer_data_property_values=True)
+                result['consistency'] = 'Consistent'
+            except Exception as e:
+                result['consistency'] = 'Inconsistent'
+                result['consistency_error'] = str(e)
+            
+            # Get expressivity (this is a placeholder, as owlready2 doesn't directly expose DL expressivity)
+            result['expressivity'] = self._determine_expressivity(onto)
+            
+            return result
+        except Exception as e:
+            logging.error(f"Error analyzing ontology: {e}")
+            # Return empty values on error
+            return {
+                'classes': 0,
+                'object_properties': 0,
+                'data_properties': 0,
+                'individuals': 0,
+                'annotation_properties': 0,
+                'imported_ontologies': [],
+                'axioms': 0,
+                'consistency': 'Unknown',
+                'expressivity': 'Unknown',
+                'error': str(e)
+            }
+    
+    def _determine_expressivity(self, onto):
+        """
+        Determine the DL expressivity of an ontology.
+        This is a rough approximation as owlready2 doesn't expose this directly.
+        """
+        expressivity = "AL"  # Start with basic expressivity
+        
+        # Check for complex classes that would indicate higher expressivity
+        has_union = False
+        has_complement = False
+        has_cardinality = False
+        has_nominals = False
+        has_inverse = False
+        has_role_hierarchy = False
+        has_transitivity = False
+        has_functionality = False
+        
+        # Check classes for complex expressions
+        for cls in onto.classes():
+            # Check for union (U)
+            if hasattr(cls, 'equivalent_to'):
+                for eq in cls.equivalent_to:
+                    if isinstance(eq, owlready2.Or):
+                        has_union = True
+                    elif isinstance(eq, owlready2.Not):
+                        has_complement = True
+                    elif isinstance(eq, owlready2.Restriction):
+                        if eq.type == owlready2.SOME:  # Existential (E)
+                            expressivity = expressivity.replace("AL", "ALE")
+                        elif eq.type == owlready2.ONLY:  # Universal (U)
+                            pass  # Already included in AL
+                        elif eq.type in [owlready2.MIN, owlready2.MAX, owlready2.EXACTLY]:  # Number restrictions (N)
+                            has_cardinality = True
+                        if eq.value and isinstance(eq.value, owlready2.Thing):  # Nominals (O)
+                            has_nominals = True
+        
+        # Check properties for complex characteristics
+        for prop in onto.object_properties():
+            # Check for inverse properties (I)
+            if hasattr(prop, 'inverse') and prop.inverse:
+                has_inverse = True
+            
+            # Check for role hierarchy (H)
+            if hasattr(prop, 'is_a') and len(prop.is_a) > 1:  # More than just owl:ObjectProperty
+                has_role_hierarchy = True
+            
+            # Check for transitivity (R+)
+            if hasattr(prop, 'transitive') and prop.transitive:
+                has_transitivity = True
+            
+            # Check for functionality (F)
+            if hasattr(prop, 'functional') and prop.functional:
+                has_functionality = True
+        
+        # Build the expressivity string
+        if has_union:
+            expressivity += "U"
+        if has_complement:
+            expressivity += "C"
+        if has_cardinality:
+            expressivity += "N"
+        if has_inverse:
+            expressivity += "I"
+        if has_role_hierarchy:
+            expressivity += "H"
+        if has_transitivity:
+            expressivity += "R+"
+        if has_functionality:
+            expressivity += "F"
+        if has_nominals:
+            expressivity += "O"
+        
+        # Check for ALC (which requires both U and C)
+        if "U" in expressivity and "C" in expressivity:
+            expressivity = expressivity.replace("AL", "ALC")
+        
+        # Check for SHOIN(D) (OWL DL)
+        if all([has_transitivity, has_role_hierarchy, has_nominals, has_inverse, has_cardinality]):
+            expressivity = "SHOIN(D)"
+        
+        # Check for SROIQ(D) (OWL 2 DL)
+        if all([has_transitivity, has_role_hierarchy, has_nominals, has_inverse, 
+                has_cardinality, has_functionality]):
+            expressivity = "SROIQ(D)"
+        
+        return expressivity
     
     def validate_completeness(self, onto):
         """
