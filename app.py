@@ -372,9 +372,11 @@ def check_enhanced_consistency(analysis_id):
         return jsonify({'error': str(e)}), 500
 
 # File Upload and Analysis
-@app.route('/upload', methods=['POST'])
+@app.route('/upload', methods=['GET', 'POST'])
 def upload_owl():
     """Handle OWL file upload and redirection to analysis page."""
+    if request.method == 'GET':
+        return render_template('upload.html')
     try:
         # Check if a file was uploaded
         if 'file' not in request.files:
