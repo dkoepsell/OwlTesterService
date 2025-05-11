@@ -85,37 +85,37 @@ class PlantUMLGenerator:
             # Create a simple HTML file with the PlantUML code in it
             html_path = os.path.join(self.static_folder, 'diagrams', f"{filename_base}.html")
             
-            # Encode the PlantUML for use with the PlantUML server
+            # Use simpler PlantUML server approach with text encoding
             import base64
-            import zlib
-            
-            def deflate_and_encode(content):
-                """Deflate and encode content for PlantUML server URL."""
-                zlibbed_str = zlib.compress(content.encode('utf-8'))
-                compressed_str = zlibbed_str[2:-4]  # Remove zlib headers and checksum
-                return base64.b64encode(compressed_str).decode('utf-8')
+            import urllib.parse
             
             try:
-                # Encode the PlantUML code for the server URL
-                encoded_uml = deflate_and_encode(plantuml_code)
-                plantuml_url = f"https://www.plantuml.com/plantuml/img/{encoded_uml}"
-                logger.info(f"Generated PlantUML URL: {plantuml_url}")
+                # Use the simpler txt encoding format which is more reliable
+                # This just uses URL encoding for the PlantUML text
+                encoded_uml = urllib.parse.quote(plantuml_code)
+                plantuml_url = f"https://www.plantuml.com/plantuml/txt/{encoded_uml}"
+                logger.info(f"Generated PlantUML URL with txt encoding")
+                
+                # Also provide an alternative SVG URL
+                svg_url = f"https://www.plantuml.com/plantuml/svg/{encoded_uml}"
             except Exception as e:
                 logger.error(f"Error encoding PlantUML: {str(e)}")
-                plantuml_url = "https://www.plantuml.com/plantuml/img/SoWkIImgAStDuNBAJrBGjLDmpCbCJbMmKiX8pSd9vt98pKi1IW80"  # Default image
+                plantuml_url = "https://www.plantuml.com/plantuml/txt/SoWkIImgAStDuNBAJrBGjLDmpCbCJbMmKiX8pSd9vt98pKi1IW80"
+                svg_url = "https://www.plantuml.com/plantuml/svg/SoWkIImgAStDuNBAJrBGjLDmpCbCJbMmKiX8pSd9vt98pKi1IW80"
             
             with open(html_path, 'w') as f:
                 f.write(f"""<!DOCTYPE html>
-<html>
+<html data-bs-theme="dark">
 <head>
     <title>Ontology Diagram - {filename_base}</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <style>
-        pre {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; }}
+        pre {{ padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto; }}
         .diagram-container {{ text-align: center; margin: 20px 0; }}
-        .diagram-container img {{ max-width: 100%; height: auto; border: 1px solid #ddd; }}
+        .diagram-container iframe {{ width: 100%; height: 500px; border: 1px solid #444; }}
+        .tab-content {{ padding-top: 20px; }}
     </style>
 </head>
 <body>
@@ -123,46 +123,75 @@ class PlantUMLGenerator:
         <h1>Ontology Diagram - {filename_base}</h1>
         
         <div class="card mb-4">
-            <div class="card-header">
-                <h5>UML Class Diagram</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">UML Class Diagram</h5>
+                <span class="badge bg-info">Multiple display options available</span>
             </div>
             <div class="card-body">
-                <div class="diagram-container">
-                    <img src="{plantuml_url}" alt="Ontology Class Diagram" />
+                <!-- Tabs for different diagram formats -->
+                <ul class="nav nav-tabs" id="diagramTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text" type="button" role="tab">Text Diagram</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="svg-tab" data-bs-toggle="tab" data-bs-target="#svg" type="button" role="tab">SVG Diagram</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code" type="button" role="tab">PlantUML Code</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="diagramTabContent">
+                    <!-- Text Diagram Tab -->
+                    <div class="tab-pane fade show active" id="text" role="tabpanel">
+                        <div class="diagram-container">
+                            <iframe src="{plantuml_url}" title="Text UML Diagram"></iframe>
+                            <div class="mt-2">
+                                <a href="{plantuml_url}" target="_blank" class="btn btn-primary btn-sm">Open in New Window</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SVG Diagram Tab -->
+                    <div class="tab-pane fade" id="svg" role="tabpanel">
+                        <div class="diagram-container">
+                            <iframe src="{svg_url}" title="SVG UML Diagram"></iframe>
+                            <div class="mt-2">
+                                <a href="{svg_url}" target="_blank" class="btn btn-primary btn-sm">Open in New Window</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PlantUML Code Tab -->
+                    <div class="tab-pane fade" id="code" role="tabpanel">
+                        <div class="d-flex justify-content-end mb-2">
+                            <a href="https://www.plantuml.com/plantuml/uml/" target="_blank" class="btn btn-primary btn-sm">
+                                Open in PlantUML Editor
+                            </a>
+                        </div>
+                        <pre><code>{plantuml_code}</code></pre>
+                    </div>
                 </div>
-                <p class="mt-3 text-center">
-                    <a href="{plantuml_url}" target="_blank" class="btn btn-primary">View Full Size Diagram</a>
-                </p>
             </div>
         </div>
-        
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5>PlantUML Code</h5>
-            </div>
-            <div class="card-body">
-                <p>You can visualize this by copying the code to the 
-                <a href="https://www.plantuml.com/plantuml/uml/" target="_blank">PlantUML web server</a>.</p>
-                <pre><code>{plantuml_code}</code></pre>
-            </div>
-        </div>
-        
-        <h2>Class Structure</h2>
-        <p>The diagram represents the ontology class hierarchy and relationships.</p>
         
         <div class="card mt-3">
             <div class="card-header">
                 <h5>Diagram Information</h5>
             </div>
             <div class="card-body">
-                <ul>
-                    <li><strong>Ontology Name:</strong> {ontology.name}</li>
-                    <li><strong>Classes:</strong> {len(list(ontology.classes()))}</li>
-                    <li><strong>Shown in Diagram:</strong> {min(len(list(ontology.classes())), max_classes)}</li>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Ontology Name:</strong> {ontology.name}</li>
+                    <li class="list-group-item"><strong>Classes:</strong> {len(list(ontology.classes()))}</li>
+                    <li class="list-group-item"><strong>Shown in Diagram:</strong> {min(len(list(ontology.classes())), max_classes)}</li>
+                    <li class="list-group-item"><strong>Diagram Format:</strong> Simple class diagram without stereotypes for maximum compatibility</li>
                 </ul>
             </div>
         </div>
     </div>
+    
+    <!-- Bootstrap JS for tabs -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>""")
             
