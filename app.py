@@ -478,7 +478,15 @@ def analyze_owl(filename):
                     ontology_analysis.ontology_file_id = ontology_file.id
                     ontology_analysis.ontology_name = analysis.get('ontology_name', 'Unknown')
                     ontology_analysis.ontology_iri = analysis.get('ontology_iri', '')
-                    ontology_analysis.is_consistent = analysis.get('consistency', {}).get('consistent', True)
+                    
+                    # Handle consistency properly depending on type
+                    consistency_data = analysis.get('consistency')
+                    if isinstance(consistency_data, dict):
+                        # Traditional analysis with consistency as a dictionary
+                        ontology_analysis.is_consistent = consistency_data.get('consistent', True)
+                    elif isinstance(consistency_data, str):
+                        # RDFLIB analysis with consistency as a string
+                        ontology_analysis.is_consistent = (consistency_data != 'Inconsistent')
                     ontology_analysis.class_count = analysis.get('class_count', 0)
                     ontology_analysis.object_property_count = analysis.get('object_property_count', 0)
                     ontology_analysis.data_property_count = analysis.get('data_property_count', 0)
@@ -487,8 +495,22 @@ def analyze_owl(filename):
                     ontology_analysis.axiom_count = analysis.get('axiom_count', 0)
                     ontology_analysis.expressivity = analysis.get('expressivity', '')
                     ontology_analysis.complexity = analysis.get('complexity', 0)
-                    ontology_analysis.axioms = analysis.get('axioms', [])
-                    ontology_analysis.consistency_issues = analysis.get('consistency', {}).get('issues', [])
+                    
+                    # Handle axioms properly depending on type
+                    axioms_data = analysis.get('axioms', [])
+                    if isinstance(axioms_data, int):
+                        # If axioms is just a count (from rdflib analysis), store an empty list
+                        ontology_analysis.axioms = []
+                    else:
+                        ontology_analysis.axioms = axioms_data
+                        
+                    # Handle consistency issues properly
+                    consistency_data = analysis.get('consistency')
+                    if isinstance(consistency_data, dict):
+                        ontology_analysis.consistency_issues = consistency_data.get('issues', [])
+                    else:
+                        # For rdflib analysis, no detailed issues available
+                        ontology_analysis.consistency_issues = []
                     ontology_analysis.inferred_axioms = analysis.get('inferred', [])
                     ontology_analysis.fol_premises = analysis.get('fol_premises', [])
                     db.session.add(ontology_analysis)
