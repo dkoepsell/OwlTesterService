@@ -1,0 +1,157 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="display-4">{{ ontology.title }}</h1>
+            <h4 class="text-muted">{{ ontology.domain }} / {{ ontology.subject }}</h4>
+            <p class="lead">{{ ontology.description or 'No description provided.' }}</p>
+        </div>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="row mb-4">
+        <div class="col-md-12 d-flex justify-content-between align-items-center">
+            <div>
+                <span class="badge bg-secondary me-2">{{ ontology.ontology_classes|length or 0 }} Classes</span>
+                <span class="badge bg-secondary me-2">{{ ontology.ontology_properties|length or 0 }} Properties</span>
+                <span class="badge bg-secondary">{{ ontology.ontology_individuals|length or 0 }} Individuals</span>
+            </div>
+            <div>
+                <a href="{{ url_for('sandbox_edit', ontology_id=ontology.id) }}" class="btn btn-primary me-2">
+                    <i class="fas fa-edit me-2"></i>Edit Ontology
+                </a>
+                <a href="{{ url_for('sandbox_download', ontology_id=ontology.id) }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-download me-2"></i>Download OWL
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Classes</h4>
+                </div>
+                <div class="card-body">
+                    {% if ontology.ontology_classes %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>BFO Category</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for class in ontology.ontology_classes %}
+                                    <tr>
+                                        <td class="fw-bold">{{ class.name }}</td>
+                                        <td>{{ class.description or 'No description' }}</td>
+                                        <td><span class="badge bg-info">{{ class.bfo_category or 'None' }}</span></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>No classes defined yet. Edit this ontology to add classes.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Properties</h4>
+                </div>
+                <div class="card-body">
+                    {% if ontology.ontology_properties %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Domain</th>
+                                        <th>Range</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for prop in ontology.ontology_properties %}
+                                    <tr>
+                                        <td class="fw-bold">{{ prop.name }}</td>
+                                        <td><span class="badge bg-secondary">{{ prop.property_type }}</span></td>
+                                        <td>{{ prop.domain_class.name if prop.domain_class else '-' }}</td>
+                                        <td>{{ prop.range_class.name if prop.range_class else '-' }}</td>
+                                        <td>{{ prop.description or 'No description' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>No properties defined yet. Edit this ontology to add properties.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Individuals</h4>
+                </div>
+                <div class="card-body">
+                    {% if ontology.ontology_individuals %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Class</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for individual in ontology.ontology_individuals %}
+                                    <tr>
+                                        <td class="fw-bold">{{ individual.name }}</td>
+                                        <td>{{ individual.ontology_class.name if individual.ontology_class else '-' }}</td>
+                                        <td>{{ individual.description or 'No description' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>No individuals defined yet. Edit this ontology to add individuals.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-5">
+        <a href="{{ url_for('sandbox_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to List
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="display-4">Create New Ontology</h1>
+            <p class="lead">Start a new ontology development project in the sandbox.</p>
+        </div>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'error' else 'danger' }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">New Ontology Details</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('sandbox_new') }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.title.label(class="form-label") }}
+                            {{ form.title(class="form-control", placeholder="Enter a descriptive title for your ontology") }}
+                            {% if form.title.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.title.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Choose a meaningful name that describes the scope of your ontology.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.domain.label(class="form-label") }}
+                            {{ form.domain(class="form-control", placeholder="e.g., Medicine, Law, Finance, etc.") }}
+                            {% if form.domain.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.domain.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">The general field or domain that your ontology addresses.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.subject.label(class="form-label") }}
+                            {{ form.subject(class="form-control", placeholder="e.g., Cardiology, Contract Law, etc.") }}
+                            {% if form.subject.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.subject.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">The specific subject within the domain.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control", rows=4, placeholder="Provide a brief description of your ontology's purpose and scope") }}
+                            {% if form.description.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.description.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">A more detailed explanation of what your ontology will cover.</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                            <a href="{{ url_for('sandbox_list') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to List
+                            </a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">How It Works</h5>
+                </div>
+                <div class="card-body">
+                    <p>After creating your ontology:</p>
+                    <ol>
+                        <li>You'll be taken to the editor where you can start defining classes, properties, and individuals.</li>
+                        <li>AI assistance will help suggest appropriate BFO categories and generate descriptions.</li>
+                        <li>Your ontology will be saved automatically as you work.</li>
+                        <li>When finished, you can export your ontology in OWL/RDF format.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
