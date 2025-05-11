@@ -36,6 +36,9 @@ class OwlTester:
         # Initialize logical expressions reader
         self.read_expr = Expression.fromstring
         
+        # Add preprocessing method for handling BFO-style multi-variable quantifiers
+        self.preprocess_expression = self._preprocess_expression
+        
         # Initialize report data
         self.axioms = []
         self.inconsistencies = []
@@ -239,6 +242,52 @@ class OwlTester:
         Extract all terms from the expression string.
         Handles both traditional notation (Class(x)) and BFO-style (instance_of(x,Class,t)) formats.
         """
+        
+    def preprocess_expression(self, expr_string):
+        """
+        Preprocess the input expression to handle BFO-style multi-variable quantifiers.
+        
+        Converts expressions like "forall x,t (...)" to "forall x (forall t (...))"
+        to make them compatible with NLTK's parser.
+        
+        Args:
+            expr_string (str): The original expression string
+            
+        Returns:
+            str: The preprocessed expression
+        """
+        # Return original if no preprocessing needed
+        if ',' not in expr_string:
+            return expr_string
+            
+        # Pattern to match quantifiers with comma-separated variables
+        pattern = r'(forall|exists)\s+([a-zA-Z0-9_]+)(?:,\s*([a-zA-Z0-9_,\s]+))\s*\('
+        
+        def replacement(match):
+            quantifier = match.group(1)  # 'forall' or 'exists'
+            first_var = match.group(2)   # First variable
+            other_vars = match.group(3)  # Remaining variables (comma-separated)
+            
+            # Split remaining variables and strip whitespace
+            var_list = [var.strip() for var in other_vars.split(',')]
+            
+            # Build nested quantifiers from inside out
+            inner_expr = '('  # This will be closed by the original expression
+            
+            # Build the nested quantifier structure from the innermost outward
+            for var in reversed(var_list):
+                if var:  # Skip empty strings
+                    inner_expr = f"{quantifier} {var} {inner_expr}"
+            
+            # Add the outermost quantifier with the first variable
+            result = f"{quantifier} {first_var} {inner_expr}"
+            
+            return result
+        
+        # Apply the regex replacement for all matches
+        preprocessed = re.sub(pattern, replacement, expr_string)
+        
+        return preprocessed
         # First extract instance_of and similar predicates with their arguments
         instance_patterns = [
             r'instance_of\s*\(\s*\w+\s*,\s*(\w+)\s*,',  # instance_of(x,Class,t)
