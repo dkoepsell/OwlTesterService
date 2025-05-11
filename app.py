@@ -1413,6 +1413,8 @@ def sandbox_download(ontology_id):
 @app.route('/api/sandbox/<int:ontology_id>/classes', methods=['GET', 'POST'])
 def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology classes."""
+    # Default fallback response to ensure we always return a proper type
+    fallback_response: tuple[Response, int] = jsonify({"error": "Internal server error"}), 500
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
     # Check if the user has access to this ontology
@@ -1798,6 +1800,8 @@ def api_sandbox_ai_bfo_category():
 @app.route('/api/sandbox/<int:ontology_id>/properties', methods=['GET', 'POST'])
 def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology properties."""
+    # Default fallback response to ensure we always return a proper type
+    fallback_response: tuple[Response, int] = jsonify({"error": "Internal server error"}), 500
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
     # Check if the user has access to this ontology
@@ -1858,8 +1862,10 @@ def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, 
 
 
 @app.route('/api/sandbox/<int:ontology_id>/properties/<int:property_id>', methods=['GET', 'PUT', 'DELETE'])
-def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, tuple[Response, int], tuple[str, int]]:
+def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, tuple[Response, int]]:
     """API for a specific sandbox ontology property."""
+    # Default fallback response to ensure we always return a proper type
+    fallback_response: tuple[Response, int] = jsonify({"error": "Internal server error"}), 500
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
     # Check if the user has access to this ontology
@@ -1916,7 +1922,7 @@ def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, 
         
         db.session.commit()
         
-        return '', 204
+        return jsonify({"status": "success"}), 204
 
 
 @app.route('/api/sandbox/ai/description', methods=['POST'])
