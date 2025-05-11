@@ -644,6 +644,7 @@ def generate_implications(analysis_id):
                 # Use the new comprehensive method that generates implications for all premise types
                 logger.info(f"Generating comprehensive implications for analysis ID {analysis_id}")
                 implications = custom_tester.generate_all_implications(
+                    onto,
                     num_implications_per_premise=max(1, int(num_implications/5))
                 )
             else:
@@ -654,7 +655,7 @@ def generate_implications(analysis_id):
                 ontology_name = analysis.ontology_name or "Ontology"
                 
                 # Get FOL premises
-                fol_premises = analysis.fol_premises or custom_tester.generate_fol_premises()
+                fol_premises = analysis.fol_premises or custom_tester.generate_fol_premises(onto)
                 
                 # Generate implications using the OpenAI integration
                 implications = generate_real_world_implications(
@@ -759,19 +760,28 @@ def generate_diagram(filename):
         # Find the file in the database
         file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
         
-        # Create an OwlTester instance with the file
-        try:
-            tester = OwlTester(file_record.file_path)
-        except Exception as e:
-            logger.error(f"Error creating OwlTester for diagram: {str(e)}")
-            # Try alternative loading method
-            tester = OwlTester()
-            result = tester.load_ontology_from_file(file_record.file_path)
-            if isinstance(result, tuple) and not result[0]:
-                raise Exception(f"Failed to load ontology for diagram: {result[1]}")
+        # Create an OwlTester instance
+        tester = OwlTester()
+        
+        # Load the ontology file
+        result = tester.load_ontology_from_file(file_record.file_path)
+        
+        if isinstance(result, dict) and not result.get('loaded', False):
+            # If load_ontology_from_file returns a dictionary with loaded=False
+            error_msg = result.get('error', 'Unknown error')
+            raise Exception(f"Failed to load ontology for diagram: {error_msg}")
+        
+        # Get the ontology object from the result
+        onto = None
+        if isinstance(result, dict) and 'ontology' in result:
+            onto = result.get('ontology')
+        
+        if not onto:
+            raise Exception("Loaded ontology object not found in result")
         
         # Generate PlantUML code directly with increased max_classes
         result = tester.generate_uml_diagram(
+            onto,
             include_individuals=include_individuals,
             include_data_properties=include_data_properties,
             include_annotation_properties=include_annotation_properties,
@@ -806,19 +816,28 @@ def api_generate_diagram(filename):
         include_annotation_properties = request.args.get('annotation_properties', 'false').lower() == 'true'
         max_classes = int(request.args.get('max_classes', 100))
         
-        # Create an OwlTester instance with the file
-        try:
-            tester = OwlTester(file_record.file_path)
-        except Exception as e:
-            logger.error(f"Error creating OwlTester for API diagram: {str(e)}")
-            # Try alternative loading method
-            tester = OwlTester()
-            result = tester.load_ontology_from_file(file_record.file_path)
-            if isinstance(result, tuple) and not result[0]:
-                raise Exception(f"Failed to load ontology for API diagram: {result[1]}")
+        # Create an OwlTester instance
+        tester = OwlTester()
+        
+        # Load the ontology file
+        result = tester.load_ontology_from_file(file_record.file_path)
+        
+        if isinstance(result, dict) and not result.get('loaded', False):
+            # If load_ontology_from_file returns a dictionary with loaded=False
+            error_msg = result.get('error', 'Unknown error')
+            raise Exception(f"Failed to load ontology for API diagram: {error_msg}")
+        
+        # Get the ontology object from the result
+        onto = None
+        if isinstance(result, dict) and 'ontology' in result:
+            onto = result.get('ontology')
+        
+        if not onto:
+            raise Exception("Loaded ontology object not found in result")
         
         # Generate diagram using the updated method with increased max_classes
         result = tester.generate_uml_diagram(
+            onto,
             include_individuals=include_individuals,
             include_data_properties=include_data_properties,
             include_annotation_properties=include_annotation_properties,
