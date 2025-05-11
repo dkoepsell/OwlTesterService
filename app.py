@@ -610,20 +610,39 @@ def api_analyze_owl(filename):
             if len(g) > 0:
                 app.logger.info(f"Successfully loaded {len(g)} triples with rdflib")
                 
-                # Count classes
+                # Count classes - support both standard OWL.Class and RDF Schema class definitions
                 classes = set()
+                # Standard OWL class
                 for s, p, o in g.triples((None, RDF.type, OWL.Class)):
                     classes.add(str(s))
+                # RDF Schema class definition
+                for s, p, o in g.triples((None, RDFS.subClassOf, None)):
+                    classes.add(str(s))
+                    if str(o) != str(OWL.Thing) and str(o) != str(RDFS.Resource):
+                        classes.add(str(o))
                 
-                # Count object properties
+                # Count object properties - support both direct declaration and domain/range indicators
                 obj_properties = set()
                 for s, p, o in g.triples((None, RDF.type, OWL.ObjectProperty)):
                     obj_properties.add(str(s))
+                # Also identify properties that have domain and range but might not be explicitly typed
+                for s, _, _ in g.triples((None, RDFS.domain, None)):
+                    for _, _, r in g.triples((s, RDFS.range, None)):
+                        if str(r) != str(RDFS.Literal) and not str(r).startswith("http://www.w3.org/2001/XMLSchema#"):
+                            obj_properties.add(str(s))
                 
                 # Count data properties
                 data_properties = set()
                 for s, p, o in g.triples((None, RDF.type, OWL.DatatypeProperty)):
                     data_properties.add(str(s))
+                # Also identify properties with literal or XMLSchema ranges
+                for s, _, _ in g.triples((None, RDFS.domain, None)):
+                    for _, _, r in g.triples((s, RDFS.range, None)):
+                        if str(r) == str(RDFS.Literal) or str(r).startswith("http://www.w3.org/2001/XMLSchema#"):
+                            data_properties.add(str(s))
+                            # Remove from object properties if it was misclassified
+                            if str(s) in obj_properties:
+                                obj_properties.remove(str(s))
                 
                 # Count individuals
                 individuals = set()
@@ -632,8 +651,10 @@ def api_analyze_owl(filename):
                     
                 # Also check for instances of classes
                 for s, p, o in g.triples((None, RDF.type, None)):
-                    if str(o) != str(OWL.Class) and str(o) != str(OWL.ObjectProperty) and str(o) != str(OWL.DatatypeProperty) and str(o) != str(OWL.Ontology):
-                        # Make sure it's not a class or property
+                    if o in classes:
+                        individuals.add(str(s))
+                    elif str(o) != str(OWL.Class) and str(o) != str(OWL.ObjectProperty) and str(o) != str(OWL.DatatypeProperty) and str(o) != str(OWL.Ontology):
+                        # Make sure it's not a class, property, or system type
                         if str(s) not in classes and str(s) not in obj_properties and str(s) not in data_properties:
                             individuals.add(str(s))
                 
@@ -792,6 +813,48 @@ def api_analyze_owl(filename):
                 if has_cardinality:
                     expressivity += "N"
                 
+                # Generate FOL premises
+                fol_premises = []
+                
+                # Class hierarchy premises
+                for s, p, o in g.triples((None, RDFS.subClassOf, None)):
+                    if str(s) in classes and str(o) in classes:
+                        s_label = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                        o_label = str(o).split('#')[-1] if '#' in str(o) else str(o).split('/')[-1]
+                        fol = f"forall x (instance_of(x, {s_label}, t) -> instance_of(x, {o_label}, t))"
+                        fol_premises.append({
+                            'type': 'subclass',
+                            'fol': fol,
+                            'description': f"{s_label} is a subclass of {o_label}"
+                        })
+                
+                # Domain and range premises for object properties
+                for p in obj_properties:
+                    # Get property label
+                    p_label = str(p).split('#')[-1] if '#' in str(p) else str(p).split('/')[-1]
+                    
+                    # Domain restrictions
+                    for _, _, d in g.triples((rdflib.URIRef(p), RDFS.domain, None)):
+                        if str(d) in classes:
+                            d_label = str(d).split('#')[-1] if '#' in str(d) else str(d).split('/')[-1]
+                            fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(x, {d_label}, t))"
+                            fol_premises.append({
+                                'type': 'domain',
+                                'fol': fol,
+                                'description': f"Domain of {p_label} is {d_label}"
+                            })
+                    
+                    # Range restrictions
+                    for _, _, r in g.triples((rdflib.URIRef(p), RDFS.range, None)):
+                        if str(r) in classes:
+                            r_label = str(r).split('#')[-1] if '#' in str(r) else str(r).split('/')[-1]
+                            fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(y, {r_label}, t))"
+                            fol_premises.append({
+                                'type': 'range',
+                                'fol': fol,
+                                'description': f"Range of {p_label} is {r_label}"
+                            })
+                
                 # Create analysis dictionary
                 analysis = {
                     'classes': len(classes),
@@ -812,12 +875,15 @@ def api_analyze_owl(filename):
                         'subclass_relationships': subclass_count,
                         'domain_range_assertions': domain_range_count,
                         'annotations': annotation_count
-                    }
+                    },
+                    'fol_premises': fol_premises
                 }
                 
-                app.logger.info(f"Analysis with rdflib successful: {len(classes)} classes, {len(obj_properties)} object properties")
+                app.logger.info(f"Analysis with rdflib successful: {len(classes)} classes, {len(obj_properties)} object properties, {len(fol_premises)} FOL premises")
                 app.logger.info(f"Class list: {[c['name'] for c in class_list]}")
                 app.logger.info(f"Object property list: {[p['name'] for p in obj_property_list]}")
+                if fol_premises:
+                    app.logger.info(f"FOL premises: {[p['fol'] for p in fol_premises[:3]]}...")
                 
                 # Skip owlready2 analysis
                 onto = "rdflib_analyzed"
