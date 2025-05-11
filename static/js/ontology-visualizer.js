@@ -57,19 +57,19 @@ function initializeOntologyVisualization(containerId, ontologyData) {
     // Add inheritance links
     ontologyData.inheritance.forEach(relation => {
         links.push({
-            source: relation.parent,
-            target: relation.child,
-            type: "inheritance"
+            source: relation.source,
+            target: relation.target,
+            type: relation.type || "inheritance"
         });
     });
     
     // Add property relationships
     ontologyData.properties.forEach(prop => {
         links.push({
-            source: prop.domain,
-            target: prop.range,
-            type: "property",
-            name: prop.name
+            source: prop.source,
+            target: prop.target,
+            type: prop.type || "property",
+            name: prop.label || prop.name
         });
     });
     

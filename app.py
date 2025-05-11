@@ -919,9 +919,10 @@ def api_diagram_data(filename):
                             for range_cls in prop.range:
                                 if hasattr(domain_cls, 'name') and domain_cls.name and hasattr(range_cls, 'name') and range_cls.name:
                                     properties.append({
-                                        'domain': domain_cls.name,
-                                        'range': range_cls.name,
-                                        'name': prop.name
+                                        'source': domain_cls.name,
+                                        'target': range_cls.name,
+                                        'label': prop.name,
+                                        'type': 'objectProperty'
                                     })
         
         # Return data as JSON
