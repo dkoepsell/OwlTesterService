@@ -470,9 +470,16 @@ class OwlTester:
             # Count annotations
             for entity in classes_list + object_properties_list + data_properties_list + individuals_list:
                 if hasattr(entity, 'comment') and entity.comment:
-                    axiom_count += len(entity.comment)
+                    if isinstance(entity.comment, list) or hasattr(entity.comment, '__len__'):
+                        axiom_count += len(entity.comment)
+                    else:
+                        axiom_count += 1  # Count as single axiom if it's not a collection
+                        
                 if hasattr(entity, 'label') and entity.label:
-                    axiom_count += len(entity.label)
+                    if isinstance(entity.label, list) or hasattr(entity.label, '__len__'):
+                        axiom_count += len(entity.label)
+                    else:
+                        axiom_count += 1  # Count as single axiom if it's not a collection
             
             # Build the result dictionary
             result = {
@@ -563,8 +570,12 @@ class OwlTester:
                 has_inverse = True
             
             # Check for role hierarchy (H)
-            if hasattr(prop, 'is_a') and len(prop.is_a) > 1:  # More than just owl:ObjectProperty
-                has_role_hierarchy = True
+            if hasattr(prop, 'is_a') and prop.is_a:
+                # Check if it's a collection with length > 1
+                if (isinstance(prop.is_a, list) or hasattr(prop.is_a, '__len__')) and len(prop.is_a) > 1:
+                    has_role_hierarchy = True
+                # If it's not a collection but is defined, assume it's a single value (so len would be 1)
+                # which wouldn't trigger the "has_role_hierarchy" flag
             
             # Check for transitivity (R+)
             if hasattr(prop, 'transitive') and prop.transitive:
