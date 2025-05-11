@@ -544,26 +544,27 @@ def api_analyze_owl(filename):
         if not os.path.exists(file_path):
             return jsonify({"error": "File not found"}), 404
         
-        # Create a new OwlTester instance with the uploaded file
-        try:
-            # First try to create a custom tester with the uploaded file
-            custom_tester = OwlTester(ontology_path=file_path)
-            
-            # Generate analysis report
-            analysis = custom_tester.analyze_ontology()
-        except Exception as e:
-            # If the constructor approach fails, try with explicit load_ontology_from_file
-            logger.error(f"Error creating OwlTester: {str(e)}")
-            
-            custom_tester = OwlTester()  # Create with default BFO ontology
-            result = custom_tester.load_ontology_from_file(file_path)
-            
-            if isinstance(result, tuple) and not result[0]:
-                # If load_ontology_from_file returns False with an error message
-                raise Exception(f"Failed to load ontology: {result[1]}")
-            
-            # Generate analysis report
-            analysis = custom_tester.analyze_ontology()
+        # Create a new OwlTester instance
+        custom_tester = OwlTester()
+        
+        # Load the ontology file
+        result = custom_tester.load_ontology_from_file(file_path)
+        
+        if isinstance(result, dict) and not result.get('loaded', False):
+            # If load_ontology_from_file returns a dictionary with loaded=False
+            error_msg = result.get('error', 'Unknown error')
+            return jsonify({"error": f"Failed to load ontology: {error_msg}"}), 400
+        
+        # Get the ontology object from the result
+        onto = None
+        if isinstance(result, dict) and 'ontology' in result:
+            onto = result.get('ontology')
+        
+        if not onto:
+            return jsonify({"error": "Loaded ontology object not found in result"}), 400
+        
+        # Generate analysis report with the ontology object
+        analysis = custom_tester.analyze_ontology(onto)
         
         # Move stats to top level for API consistency
         if 'stats' in analysis:
@@ -615,15 +616,23 @@ def generate_implications(analysis_id):
                 return jsonify({"error": "Ontology file not found"}), 404
                 
             # Create a custom tester for this ontology
-            try:
-                custom_tester = OwlTester(ontology_path=ontology_file.file_path)
-            except Exception as e:
-                logger.error(f"Error creating OwlTester for implications: {str(e)}")
-                # Try alternative loading method
-                custom_tester = OwlTester()
-                result = custom_tester.load_ontology_from_file(ontology_file.file_path)
-                if isinstance(result, tuple) and not result[0]:
-                    raise Exception(f"Failed to load ontology for implications: {result[1]}")
+            custom_tester = OwlTester()
+            
+            # Load the ontology file
+            result = custom_tester.load_ontology_from_file(ontology_file.file_path)
+            
+            if isinstance(result, dict) and not result.get('loaded', False):
+                # If load_ontology_from_file returns a dictionary with loaded=False
+                error_msg = result.get('error', 'Unknown error')
+                raise Exception(f"Failed to load ontology for implications: {error_msg}")
+            
+            # Get the ontology object from the result
+            onto = None
+            if isinstance(result, dict) and 'ontology' in result:
+                onto = result.get('ontology')
+            
+            if not onto:
+                raise Exception("Loaded ontology object not found in result")
             
             # Get parameters
             num_implications = request.args.get('count', 5, type=int)
