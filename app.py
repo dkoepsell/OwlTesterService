@@ -487,12 +487,53 @@ def analyze_owl(filename):
                     elif isinstance(consistency_data, str):
                         # RDFLIB analysis with consistency as a string
                         ontology_analysis.is_consistent = (consistency_data != 'Inconsistent')
-                    ontology_analysis.class_count = analysis.get('class_count', 0)
-                    ontology_analysis.object_property_count = analysis.get('object_property_count', 0)
-                    ontology_analysis.data_property_count = analysis.get('data_property_count', 0)
-                    ontology_analysis.individual_count = analysis.get('individual_count', 0)
-                    ontology_analysis.annotation_property_count = analysis.get('annotation_property_count', 0)
-                    ontology_analysis.axiom_count = analysis.get('axiom_count', 0)
+                    # Save counts with debug logging
+                    class_count = analysis.get('class_count', 0)
+                    obj_prop_count = analysis.get('object_property_count', 0)
+                    data_prop_count = analysis.get('data_property_count', 0)
+                    indiv_count = analysis.get('individual_count', 0)
+                    annot_prop_count = analysis.get('annotation_property_count', 0)
+                    axiom_count = analysis.get('axiom_count', 0)
+                    
+                    app.logger.info(f"★★★ DATABASE COUNTS - Classes: {class_count}, Obj Props: {obj_prop_count}, Data Props: {data_prop_count}, Individuals: {indiv_count} ★★★")
+                    
+                    # Check for the non-standard naming convention keys
+                    if 'classes' in analysis:
+                        rdflib_class_count = analysis.get('classes')
+                        app.logger.info(f"★★★ Found 'classes' key: {rdflib_class_count} ★★★")
+                        if isinstance(rdflib_class_count, int) and rdflib_class_count > 0:
+                            class_count = rdflib_class_count
+                    
+                    if 'object_properties' in analysis:
+                        rdflib_obj_count = analysis.get('object_properties')
+                        app.logger.info(f"★★★ Found 'object_properties' key: {rdflib_obj_count} ★★★")
+                        if isinstance(rdflib_obj_count, int) and rdflib_obj_count > 0:
+                            obj_prop_count = rdflib_obj_count
+                            
+                    if 'data_properties' in analysis:
+                        rdflib_data_count = analysis.get('data_properties')
+                        app.logger.info(f"★★★ Found 'data_properties' key: {rdflib_data_count} ★★★")
+                        if isinstance(rdflib_data_count, int) and rdflib_data_count > 0:
+                            data_prop_count = rdflib_data_count
+                            
+                    if 'individuals' in analysis:
+                        rdflib_indiv_count = analysis.get('individuals')
+                        app.logger.info(f"★★★ Found 'individuals' key: {rdflib_indiv_count} ★★★")
+                        if isinstance(rdflib_indiv_count, int) and rdflib_indiv_count > 0:
+                            indiv_count = rdflib_indiv_count
+                            
+                    if 'annotation_properties' in analysis:
+                        rdflib_annot_count = analysis.get('annotation_properties')
+                        app.logger.info(f"★★★ Found 'annotation_properties' key: {rdflib_annot_count} ★★★")
+                        if isinstance(rdflib_annot_count, int) and rdflib_annot_count > 0:
+                            annot_prop_count = rdflib_annot_count
+                    
+                    ontology_analysis.class_count = class_count
+                    ontology_analysis.object_property_count = obj_prop_count
+                    ontology_analysis.data_property_count = data_prop_count
+                    ontology_analysis.individual_count = indiv_count
+                    ontology_analysis.annotation_property_count = annot_prop_count
+                    ontology_analysis.axiom_count = axiom_count
                     ontology_analysis.expressivity = analysis.get('expressivity', '')
                     ontology_analysis.complexity = analysis.get('complexity', 0)
                     
@@ -603,12 +644,12 @@ def api_analyze_owl(filename):
             import rdflib
             from rdflib import RDF, RDFS, OWL
             
-            app.logger.info(f"Trying to analyze directly with rdflib first: {file_path}")
+            app.logger.info(f"★★★ TRYING RDFLIB ANALYSIS ★★★: {file_path}")
             g = rdflib.Graph()
             g.parse(file_path)
             
             if len(g) > 0:
-                app.logger.info(f"Successfully loaded {len(g)} triples with rdflib")
+                app.logger.info(f"★★★ Successfully loaded {len(g)} triples with rdflib ★★★")
                 
                 # Debug triples to see what's in the graph
                 app.logger.info("Inspecting RDF triples...")
