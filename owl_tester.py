@@ -1873,21 +1873,28 @@ class OwlTester:
             
     def validate_completeness(self):
         """
-        Cross-check all ontology elements to ensure they are included in the generated FOL propositions.
+        Cross-check all ontology elements to ensure they are included in the generated FOL premises.
         
         Returns:
             dict: A report with missing elements and completeness metrics
         """
         report = {
-            "complete": True,
+            "complete": False,
             "missing_classes": [],
-            "missing_properties": [],
+            "missing_object_properties": [],
+            "missing_data_properties": [],
             "missing_individuals": [],
-            "coverage_percentage": 100.0
+            "coverage_percentage": 0.0
         }
         
         try:
-            # Generate FOL premises to check against
+            # Skip validation for RDFLib parsed ontologies
+            if self.is_rdflib_model:
+                report["complete"] = False
+                report["message"] = "Completeness validation is not supported for RDFLib-parsed ontologies"
+                return report
+                
+            # Generate FOL premises if not already done
             fol_premises = self.generate_fol_premises()
             
             # Extract all terms mentioned in FOL premises

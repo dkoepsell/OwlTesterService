@@ -178,6 +178,105 @@ def get_bfo_relations():
     
     return jsonify({"relations": owl_tester.get_bfo_relations()})
 
+@app.route('/api/validate-completeness/<int:analysis_id>', methods=['GET'])
+def validate_ontology_completeness(analysis_id):
+    """
+    Validate the completeness of an ontology by checking if all elements are included in FOL premises.
+    
+    Returns detailed report about missing classes, properties, and individuals.
+    """
+    try:
+        # Find the analysis
+        analysis = OntologyAnalysis.query.get(analysis_id)
+        if not analysis:
+            return jsonify({"error": "Analysis not found"}), 404
+            
+        # Get the ontology file
+        ontology_file = OntologyFile.query.get(analysis.ontology_file_id)
+        if not ontology_file:
+            return jsonify({"error": "Ontology file not found"}), 404
+            
+        # Create a custom tester for this ontology
+        try:
+            custom_tester = OwlTester(ontology_path=ontology_file.file_path)
+        except Exception as e:
+            logger.error(f"Error creating OwlTester for completeness validation: {str(e)}")
+            # Try alternative loading method
+            custom_tester = OwlTester()
+            result = custom_tester.load_ontology_from_file(ontology_file.file_path)
+            if isinstance(result, tuple) and not result[0]:
+                raise Exception(f"Failed to load ontology for completeness validation: {result[1]}")
+        
+        # Perform completeness validation
+        completeness_report = custom_tester.validate_completeness()
+        
+        # Store the result in the database if possible
+        # Update analysis model if needed - for now just return
+        
+        logger.info(f"Validated completeness for analysis ID {analysis_id}: {completeness_report.get('complete')}")
+        
+        return jsonify({
+            "success": True,
+            "completeness": completeness_report
+        })
+        
+    except Exception as e:
+        logger.error(f"Error validating completeness: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error validating completeness: {str(e)}"
+        }), 500
+
+@app.route('/api/enhanced-consistency/<int:analysis_id>', methods=['GET'])
+def check_enhanced_consistency(analysis_id):
+    """
+    Perform enhanced consistency checking using multiple reasoners.
+    
+    Returns detailed report about contradictions and problematic axioms.
+    """
+    try:
+        # Find the analysis
+        analysis = OntologyAnalysis.query.get(analysis_id)
+        if not analysis:
+            return jsonify({"error": "Analysis not found"}), 404
+            
+        # Get the ontology file
+        ontology_file = OntologyFile.query.get(analysis.ontology_file_id)
+        if not ontology_file:
+            return jsonify({"error": "Ontology file not found"}), 404
+            
+        # Create a custom tester for this ontology
+        try:
+            custom_tester = OwlTester(ontology_path=ontology_file.file_path)
+        except Exception as e:
+            logger.error(f"Error creating OwlTester for enhanced consistency: {str(e)}")
+            # Try alternative loading method
+            custom_tester = OwlTester()
+            result = custom_tester.load_ontology_from_file(ontology_file.file_path)
+            if isinstance(result, tuple) and not result[0]:
+                raise Exception(f"Failed to load ontology for enhanced consistency: {result[1]}")
+        
+        # Perform enhanced consistency checking
+        consistency_report = custom_tester.check_consistency()
+        
+        # Update the analysis record if possible
+        analysis.consistency_issues = consistency_report
+        db.session.commit()
+        
+        logger.info(f"Checked enhanced consistency for analysis ID {analysis_id}: {consistency_report.get('consistent')}")
+        
+        return jsonify({
+            "success": True,
+            "consistency": consistency_report
+        })
+        
+    except Exception as e:
+        logger.error(f"Error checking enhanced consistency: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error checking enhanced consistency: {str(e)}"
+        }), 500
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_owl():
     """Handle OWL file upload and redirection to analysis page."""
@@ -449,9 +548,35 @@ def generate_implications(analysis_id):
                 if isinstance(result, tuple) and not result[0]:
                     raise Exception(f"Failed to load ontology for implications: {result[1]}")
             
-            # Generate the implications (default 5)
+            # Get parameters
             num_implications = request.args.get('count', 5, type=int)
-            implications = custom_tester.generate_real_world_implications(num_implications)
+            comprehensive = request.args.get('comprehensive', False, type=bool)
+            
+            implications = []
+            
+            if comprehensive:
+                # Use the new comprehensive method that generates implications for all premise types
+                logger.info(f"Generating comprehensive implications for analysis ID {analysis_id}")
+                implications = custom_tester.generate_all_implications(
+                    num_implications_per_premise=max(1, int(num_implications/5))
+                )
+            else:
+                # Use the original method
+                logger.info(f"Generating standard implications for analysis ID {analysis_id}")
+                # Get domain classes and ontology name for the generate_real_world_implications function
+                domain_classes = custom_tester.bfo_classes
+                ontology_name = analysis.ontology_name or "Ontology"
+                
+                # Get FOL premises
+                fol_premises = analysis.fol_premises or custom_tester.generate_fol_premises()
+                
+                # Generate implications using the OpenAI integration
+                implications = generate_real_world_implications(
+                    ontology_name=ontology_name,
+                    domain_classes=domain_classes,
+                    fol_premises=fol_premises,
+                    num_implications=num_implications
+                )
             
             # Save the implications to the database
             analysis.real_world_implications = implications
@@ -461,7 +586,11 @@ def generate_implications(analysis_id):
             
             logger.info(f"Generated {len(implications)} real-world implications for analysis ID {analysis_id}")
             
-            return jsonify({"implications": implications})
+            return jsonify({
+                "implications": implications, 
+                "comprehensive": comprehensive,
+                "count": len(implications)
+            })
         
         # GET request but no implications yet
         return jsonify({"implications": [], "message": "No implications generated yet. Use POST to generate."}), 200
