@@ -1151,7 +1151,7 @@ def sandbox_download(ontology_id):
 # API routes for the sandbox
 
 @app.route('/api/sandbox/<int:ontology_id>/classes', methods=['GET', 'POST'])
-def api_sandbox_classes(ontology_id: int):
+def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology classes."""
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
@@ -1536,7 +1536,7 @@ def api_sandbox_ai_bfo_category():
         return jsonify({"error": f"Failed to suggest BFO category: {str(e)}"}), 500
 
 @app.route('/api/sandbox/<int:ontology_id>/properties', methods=['GET', 'POST'])
-def api_sandbox_properties(ontology_id: int):
+def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology properties."""
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
@@ -1598,7 +1598,7 @@ def api_sandbox_properties(ontology_id: int):
 
 
 @app.route('/api/sandbox/<int:ontology_id>/properties/<int:property_id>', methods=['GET', 'PUT', 'DELETE'])
-def api_sandbox_property(ontology_id: int, property_id: int):
+def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, tuple[Response, int], tuple[str, int]]:
     """API for a specific sandbox ontology property."""
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
