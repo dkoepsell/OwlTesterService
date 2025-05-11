@@ -71,10 +71,37 @@ class OwlTester:
     def prepare_ontology(self):
         """Prepare the ontology for testing by collecting classes and relations."""
         self.bfo_classes = []
+        self.bfo_class_map = {}  # Map for lookup by name
         self.bfo_relations = []
+        self.relation_map = {}   # Map for lookup by name
         self.data_properties = []
         self.individuals = []
         self.annotation_properties = []
+        
+        # Helper function to get human-readable label
+        def get_readable_label(entity):
+            # First check for rdfs:label
+            if hasattr(entity, 'label') and entity.label:
+                labels = entity.label
+                if isinstance(labels, list) and labels:
+                    return str(labels[0])
+                return str(labels)
+            
+            # Then check for name attribute
+            if hasattr(entity, 'name') and entity.name:
+                # Format name for better readability
+                name = entity.name
+                # Extract the term after '#' or '/' if applicable (common in URIs)
+                if '#' in name:
+                    name = name.split('#')[-1]
+                elif '/' in name:
+                    name = name.split('/')[-1]
+                # Format: replace underscores with spaces, capitalize
+                name = name.replace('_', ' ').title()
+                return name
+                
+            # If no label or name, use the string representation as last resort
+            return str(entity)
         
         try:
             # Collect classes - convert generator to list first
@@ -82,7 +109,12 @@ class OwlTester:
             for c in ontology_classes:
                 classname = c.name
                 if classname is not None:
-                    self.bfo_classes.append(classname)
+                    label = get_readable_label(c)
+                    self.bfo_classes.append(label)  # Use label for display
+                    self.bfo_class_map[classname.lower()] = {
+                        'id': classname,
+                        'label': label
+                    }
         except Exception as e:
             print(f"Error collecting classes: {str(e)}")
         
@@ -92,7 +124,12 @@ class OwlTester:
             for op in obj_properties:
                 propname = op.name
                 if propname is not None:
-                    self.bfo_relations.append(propname)
+                    label = get_readable_label(op)
+                    self.bfo_relations.append(label)  # Use label for display
+                    self.relation_map[propname.lower()] = {
+                        'id': propname,
+                        'label': label
+                    }
         except Exception as e:
             print(f"Error collecting object properties: {str(e)}")
         
@@ -102,7 +139,8 @@ class OwlTester:
             for dp in data_properties:
                 propname = dp.name
                 if propname is not None:
-                    self.data_properties.append(propname)
+                    label = get_readable_label(dp)
+                    self.data_properties.append(label)
         except Exception as e:
             print(f"Error collecting data properties: {str(e)}")
         
@@ -112,7 +150,8 @@ class OwlTester:
             for i in indiv_list:
                 indname = i.name
                 if indname is not None:
-                    self.individuals.append(indname)
+                    label = get_readable_label(i)
+                    self.individuals.append(label)
         except Exception as e:
             print(f"Error collecting individuals: {str(e)}")
                 
@@ -122,7 +161,8 @@ class OwlTester:
             for ap in annot_properties:
                 propname = ap.name
                 if propname is not None:
-                    self.annotation_properties.append(propname)
+                    label = get_readable_label(ap)
+                    self.annotation_properties.append(label)
         except Exception as e:
             print(f"Error collecting annotation properties: {str(e)}")
     
@@ -212,34 +252,58 @@ class OwlTester:
     
     def check_terms_against_bfo(self, terms, result):
         """Check terms against BFO classes and relations."""
-        # Create case-insensitive lookup maps for BFO classes and relations
-        lower_bfo_classes = {cls.lower(): cls for cls in self.bfo_classes}
-        lower_bfo_relations = {rel.lower(): rel for rel in self.bfo_relations}
-        
+        # Use our class and relation maps for lookup
         for term in terms:
             # Skip variables and logical operators
             if term.islower() or term in ['and', 'or', 'not', 'implies', 'iff', 'exists', 'forall']:
                 continue
                 
             # Case-insensitive check for BFO classes
-            if term.lower() in lower_bfo_classes:
-                original_term = lower_bfo_classes[term.lower()]
-                if original_term not in result["bfo_classes_used"]:
-                    result["bfo_classes_used"].append(original_term)
-                    if term != original_term:
-                        result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{original_term}'. Consider using the exact case.")
+            term_lower = term.lower()
+            if term_lower in self.bfo_class_map:
+                class_info = self.bfo_class_map[term_lower]
+                original_id = class_info['id']
+                display_label = class_info['label']
+                
+                if display_label not in result["bfo_classes_used"]:
+                    result["bfo_classes_used"].append(display_label)
+                    if term != original_id:
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{display_label}'. Consider using the exact ID '{original_id}'.")
+            
             # Case-insensitive check for BFO relations
-            elif term.lower() in lower_bfo_relations:
-                original_term = lower_bfo_relations[term.lower()]
-                if original_term not in result["bfo_relations_used"]:
-                    result["bfo_relations_used"].append(original_term)
-                    if term != original_term:
-                        result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{original_term}'. Consider using the exact case.")
+            elif term_lower in self.relation_map:
+                relation_info = self.relation_map[term_lower]
+                original_id = relation_info['id']
+                display_label = relation_info['label']
+                
+                if display_label not in result["bfo_relations_used"]:
+                    result["bfo_relations_used"].append(display_label)
+                    if term != original_id:
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{display_label}'. Consider using the exact ID '{original_id}'.")
+            
+            # Handle terms that might be in BFO but with different formatting
+            elif any(term_lower in label.lower() for label in self.bfo_classes):
+                # Find matching class by partial name match
+                matching_classes = [cls for cls in self.bfo_classes if term_lower in cls.lower()]
+                if matching_classes:
+                    closest_match = matching_classes[0]
+                    result["bfo_classes_used"].append(closest_match)
+                    result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{closest_match}'. This is a partial match.")
+            
+            # Handle terms that might be object properties with different formatting
+            elif any(term_lower in rel.lower() for rel in self.bfo_relations):
+                # Find matching relation by partial name match
+                matching_relations = [rel for rel in self.bfo_relations if term_lower in rel.lower()]
+                if matching_relations:
+                    closest_match = matching_relations[0]
+                    result["bfo_relations_used"].append(closest_match)
+                    result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{closest_match}'. This is a partial match.")
+            
             else:
                 # Term not found even with case-insensitive matching
                 if not term.islower() and term not in result["non_bfo_terms"]:
                     result["non_bfo_terms"].append(term)
-                    result["issues"].append(f"Term '{term}' is not recognized as a BFO class or relation")
+                    result["issues"].append(f"Term '{term}' is not recognized as a BFO class or relation.")
     
     def check_syntax_and_structure(self, expr_string, result):
         """Check the syntax and structure of the expression."""
@@ -260,12 +324,52 @@ class OwlTester:
             result["issues"].append("Quantifier used without a variable")
 
     def get_bfo_classes(self):
-        """Return all available BFO classes."""
-        return sorted(self.bfo_classes)
+        """
+        Return all available BFO classes with their human-readable labels.
+        
+        Returns:
+            list: A list of dictionaries with id and label for each class
+        """
+        class_info = []
+        for cls_label in self.bfo_classes:
+            # Find the class ID from our map (if available)
+            cls_id = None
+            for key, value in self.bfo_class_map.items():
+                if value['label'] == cls_label:
+                    cls_id = value['id']
+                    break
+            
+            class_info.append({
+                'id': cls_id or cls_label,  # Fallback to label if ID not found
+                'label': cls_label
+            })
+        
+        # Sort by label for better readability
+        return sorted(class_info, key=lambda x: x['label'])
     
     def get_bfo_relations(self):
-        """Return all available BFO relations."""
-        return sorted(self.bfo_relations)
+        """
+        Return all available BFO relations with their human-readable labels.
+        
+        Returns:
+            list: A list of dictionaries with id and label for each relation
+        """
+        relation_info = []
+        for rel_label in self.bfo_relations:
+            # Find the relation ID from our map (if available)
+            rel_id = None
+            for key, value in self.relation_map.items():
+                if value['label'] == rel_label:
+                    rel_id = value['id']
+                    break
+            
+            relation_info.append({
+                'id': rel_id or rel_label,  # Fallback to label if ID not found
+                'label': rel_label
+            })
+        
+        # Sort by label for better readability
+        return sorted(relation_info, key=lambda x: x['label'])
         
     def get_data_properties(self):
         """Return all available data properties."""
