@@ -254,17 +254,28 @@ def validate_ontology_completeness(analysis_id):
             
         # Create a custom tester for this ontology
         try:
-            custom_tester = OwlTester(ontology_path=ontology_file.file_path)
-        except Exception as e:
-            logger.error(f"Error creating OwlTester for completeness validation: {str(e)}")
-            # Try alternative loading method
             custom_tester = OwlTester()
+            # Load the ontology file
             result = custom_tester.load_ontology_from_file(ontology_file.file_path)
-            if isinstance(result, tuple) and not result[0]:
-                raise Exception(f"Failed to load ontology for completeness validation: {result[1]}")
+            
+            if isinstance(result, dict) and not result.get('loaded', False):
+                # If load_ontology_from_file returns a dictionary with loaded=False
+                error_msg = result.get('error', 'Unknown error')
+                raise Exception(f"Failed to load ontology for completeness validation: {error_msg}")
+            
+            # Get the ontology object from the result
+            onto = None
+            if isinstance(result, dict) and 'ontology' in result:
+                onto = result.get('ontology')
+            
+            if not onto:
+                raise Exception("Loaded ontology object not found in result")
+        except Exception as e:
+            logger.error(f"Error loading ontology for completeness validation: {str(e)}")
+            raise e
         
         # Perform completeness validation
-        completeness_report = custom_tester.validate_completeness()
+        completeness_report = custom_tester.validate_completeness(onto)
         
         # Store the result in the database if possible
         # Update analysis model if needed - for now just return
@@ -303,17 +314,28 @@ def check_enhanced_consistency(analysis_id):
             
         # Create a custom tester for this ontology
         try:
-            custom_tester = OwlTester(ontology_path=ontology_file.file_path)
-        except Exception as e:
-            logger.error(f"Error creating OwlTester for enhanced consistency: {str(e)}")
-            # Try alternative loading method
             custom_tester = OwlTester()
+            # Load the ontology file
             result = custom_tester.load_ontology_from_file(ontology_file.file_path)
-            if isinstance(result, tuple) and not result[0]:
-                raise Exception(f"Failed to load ontology for enhanced consistency: {result[1]}")
+            
+            if isinstance(result, dict) and not result.get('loaded', False):
+                # If load_ontology_from_file returns a dictionary with loaded=False
+                error_msg = result.get('error', 'Unknown error')
+                raise Exception(f"Failed to load ontology for enhanced consistency: {error_msg}")
+            
+            # Get the ontology object from the result
+            onto = None
+            if isinstance(result, dict) and 'ontology' in result:
+                onto = result.get('ontology')
+            
+            if not onto:
+                raise Exception("Loaded ontology object not found in result")
+        except Exception as e:
+            logger.error(f"Error loading ontology for enhanced consistency: {str(e)}")
+            raise e
         
         # Perform enhanced consistency checking
-        consistency_report = custom_tester.check_consistency()
+        consistency_report = custom_tester.check_consistency(onto)
         
         # Update the analysis record if possible
         analysis.consistency_issues = consistency_report
@@ -1133,13 +1155,12 @@ def api_sandbox_classes(ontology_id):
             return jsonify({"error": "Name is required"}), 400
         
         try:
-            new_class = OntologyClass(
-                ontology_id=ontology.id,
-                name=data['name'],
-                description=data.get('description', ''),
-                bfo_category=data.get('bfo_category'),
-                parent_id=data.get('parent_id')
-            )
+            new_class = OntologyClass()
+            new_class.ontology_id = ontology.id
+            new_class.name = data['name']
+            new_class.description = data.get('description', '')
+            new_class.bfo_category = data.get('bfo_category')
+            new_class.parent_id = data.get('parent_id')
             
             db.session.add(new_class)
             db.session.commit()
@@ -1520,14 +1541,13 @@ def api_sandbox_properties(ontology_id):
         
         try:
             # Create the property
-            prop = OntologyProperty(
-                name=data.get('name'),
-                description=data.get('description', ''),
-                property_type=data.get('property_type', 'object'),  # Default to object property
-                domain_class_id=data.get('domain_class_id'),
-                range_class_id=data.get('range_class_id'),
-                ontology_id=ontology.id
-            )
+            prop = OntologyProperty()
+            prop.name = data.get('name')
+            prop.description = data.get('description', '')
+            prop.property_type = data.get('property_type', 'object')  # Default to object property
+            prop.domain_class_id = data.get('domain_class_id')
+            prop.range_class_id = data.get('range_class_id')
+            prop.ontology_id = ontology.id
             
             db.session.add(prop)
             
