@@ -254,12 +254,68 @@ class OwlTester:
         """Return all individuals in the ontology."""
         return sorted(self.individuals)
     
+    def generate_all_implications(self, num_implications_per_premise=1):
+        """
+        Generate real-world implications for all FOL premises systematically.
+        
+        Args:
+            num_implications_per_premise (int): Number of implications to generate per premise
+            
+        Returns:
+            list: A list of generated implications
+        """
+        all_implications = []
+        
+        try:
+            # Get the domain classes and FOL premises
+            domain_classes = self.bfo_classes
+            fol_premises = self.generate_fol_premises()
+            
+            # Use the existing ontology name or a default
+            ontology_name = getattr(self.onto, 'name', None) or "Ontology"
+            
+            # Group premises by type for more coherent implications
+            premises_by_type = {}
+            for premise in fol_premises:
+                premise_type = premise.get("type", "Unknown")
+                if premise_type not in premises_by_type:
+                    premises_by_type[premise_type] = []
+                premises_by_type[premise_type].append(premise)
+            
+            # Generate implications for each type of premise
+            for premise_type, premises in premises_by_type.items():
+                # Select a representative set of premises for this type
+                # (limit to 3-5 premises per type to avoid excessive API calls)
+                max_premises_per_type = min(5, len(premises))
+                selected_premises = premises[:max_premises_per_type]
+                
+                # Generate implications for this batch of premises
+                try:
+                    # Use the generate_real_world_implications function from openai_utils
+                    batch_implications = generate_real_world_implications(
+                        ontology_name=ontology_name,
+                        domain_classes=domain_classes,
+                        fol_premises=selected_premises,
+                        num_implications=num_implications_per_premise * len(selected_premises)
+                    )
+                    
+                    if batch_implications:
+                        all_implications.extend(batch_implications)
+                except Exception as e:
+                    print(f"Error generating implications for {premise_type}: {str(e)}")
+            
+        except Exception as e:
+            print(f"Error generating all implications: {str(e)}")
+            
+        return all_implications
+    
     def analyze_ontology(self):
         """
         Analyze the loaded ontology for axioms, consistency and generate report.
         
         Returns:
-            dict: A report containing ontology statistics, axioms, and consistency issues
+            dict: A report containing ontology statistics, axioms, consistency issues, 
+                 FOL premises, and completeness metrics
         """
         # Handle differently based on if we're using RDFLib or Owlready2
         if self.is_rdflib_model:
@@ -331,10 +387,12 @@ class OwlTester:
     
     def _analyze_ontology_owlready(self):
         """
-        Analyze the loaded ontology using full Owlready2 capabilities.
+        Analyze the loaded ontology using full Owlready2 capabilities,
+        including axiom extraction, consistency check, FOL premises,
+        completeness validation, and implication generation.
         
         Returns:
-            dict: A complete report for Owlready2-parsed ontologies
+            dict: A comprehensive report for Owlready2-parsed ontologies
         """
         # Extract data first to ensure proper conversion of generators to lists
         axioms = self.extract_axioms()
@@ -342,6 +400,9 @@ class OwlTester:
         inferred_axioms = self.get_inferred_axioms()
         expressivity = self.get_ontology_expressivity()
         fol_premises = self.generate_fol_premises()
+        
+        # NEW: Add completeness validation
+        completeness = self.validate_completeness()
         
         # Ensure axioms and inferred_axioms are lists, not generators
         if not isinstance(axioms, list):
@@ -354,6 +415,17 @@ class OwlTester:
             ontology_iri = str(self.onto.base_iri) if hasattr(self.onto, 'base_iri') else "Unknown"
         except:
             ontology_iri = "Unknown"
+        
+        # NEW: Generate a sample of real-world implications
+        sample_implications = []
+        try:
+            # Generate up to 5 implications to include in the report (limited to avoid delays)
+            # For comprehensive implications, users should call generate_all_implications separately
+            sample_implications = self.generate_all_implications(num_implications_per_premise=1)
+            # Limit to 5 to avoid overwhelming the report
+            sample_implications = sample_implications[:5] if sample_implications else []
+        except Exception as e:
+            print(f"Error generating sample implications: {str(e)}")
             
         report = {
             "ontology_name": self.ontology_source,
@@ -369,23 +441,28 @@ class OwlTester:
             "consistency": consistency,
             "inferred": inferred_axioms,
             "fol_premises": fol_premises,
-            "real_world_implications": []
+            "completeness": completeness,  # NEW: Add completeness report
+            "real_world_implications": sample_implications,  # NEW: Include sample implications
+            "has_additional_implications": len(sample_implications) > 0  # Flag to indicate more are available
         }
         
         # Add additional metrics
         report["metrics"] = {
             "expressivity": expressivity,
-            "complexity": len(axioms) + len(inferred_axioms)
+            "complexity": len(axioms) + len(inferred_axioms),
+            "fol_coverage": completeness.get("coverage_percentage", 0)  # NEW: Add FOL coverage metric
         }
         
         return report
         
     def generate_fol_premises(self):
         """
-        Generate First Order Logic (FOL) premises from the ontology axioms.
+        Generate comprehensive First Order Logic (FOL) premises from the ontology axioms,
+        including class hierarchies, property characteristics, restrictions, cardinality constraints,
+        and complex class expressions.
         
         Returns:
-            list: A list of FOL premises as strings
+            list: A list of FOL premises with type, FOL expression, and human-readable description
         """
         fol_premises = []
         
@@ -462,8 +539,158 @@ class OwlTester:
                             "fol": f"∀x,y,z: ({prop.name}(x,y) ∧ {prop.name}(x,z)) → y = z",
                             "description": f"Property {prop.name} is functional"
                         })
+                    
+                    # NEW: Handle property chains (SubPropertyOf chain axioms)
+                    if hasattr(prop, 'property_chain') and prop.property_chain:
+                        try:
+                            chain_list = list(prop.property_chain)
+                            if len(chain_list) >= 2:
+                                chain_props = []
+                                for chain_prop in chain_list:
+                                    if hasattr(chain_prop, 'name') and chain_prop.name is not None:
+                                        chain_props.append(chain_prop.name)
+                                
+                                if len(chain_props) >= 2:
+                                    # Create FOL expression for the property chain
+                                    chain_fol = f"∀x,z: ("
+                                    
+                                    # Build the chain of existential quantifiers
+                                    variables = ["x", "y1"]
+                                    for i in range(1, len(chain_props)):
+                                        if i < len(chain_props) - 1:
+                                            variables.append(f"y{i+1}")
+                                        else:
+                                            variables.append("z")
+                                    
+                                    # Create the conjunction of property assertions
+                                    conjuncts = []
+                                    for i, prop_name in enumerate(chain_props):
+                                        conjuncts.append(f"{prop_name}({variables[i]},{variables[i+1]})")
+                                    
+                                    chain_fol += " ∧ ".join(conjuncts)
+                                    chain_fol += f") → {prop.name}(x,z)"
+                                    
+                                    fol_premises.append({
+                                        "type": "PropertyChain",
+                                        "fol": chain_fol,
+                                        "description": f"Property {prop.name} is a chain of {' o '.join(chain_props)}"
+                                    })
+                        except Exception as e:
+                            print(f"Error processing property chain for {prop.name}: {str(e)}")
                 except Exception as e:
                     print(f"Error processing property {prop.name}: {str(e)}")
+                    
+            # NEW: Process cardinality restrictions on classes
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    # Check for cardinality restrictions in subclass axioms
+                    if hasattr(cls, 'is_a'):
+                        for parent in list(cls.is_a):
+                            # Check if parent is a restriction
+                            if not hasattr(parent, 'name') and hasattr(parent, 'property') and hasattr(parent, 'type'):
+                                restriction_type = parent.type
+                                prop = parent.property
+                                prop_name = prop.name if hasattr(prop, 'name') else "UnnamedProperty"
+                                
+                                # Cardinality restrictions
+                                if restriction_type in [26, 27, 28]:  # MIN, MAX, EXACTLY
+                                    if hasattr(parent, 'cardinality'):
+                                        card_value = parent.cardinality
+                                        
+                                        # Minimum cardinality (≥ n)
+                                        if restriction_type == 26:  # MIN
+                                            # Create FOL for minimum cardinality
+                                            # ∀x: C(x) → ∃y1,...,yn: P(x,y1) ∧ ... ∧ P(x,yn) ∧ y1≠y2 ∧ ... ∧ yn-1≠yn
+                                            if card_value > 0:
+                                                variables = [f"y{i+1}" for i in range(card_value)]
+                                                conjuncts = [f"{prop_name}(x,{var})" for var in variables]
+                                                
+                                                # Add disequality constraints for distinct variables
+                                                for i in range(card_value):
+                                                    for j in range(i+1, card_value):
+                                                        conjuncts.append(f"{variables[i]} ≠ {variables[j]}")
+                                                
+                                                fol = f"∀x: {cls.name}(x) → ∃{','.join(variables)}: " + " ∧ ".join(conjuncts)
+                                                
+                                                fol_premises.append({
+                                                    "type": "MinCardinality",
+                                                    "fol": fol,
+                                                    "description": f"{cls.name} has at least {card_value} {prop_name} relationships"
+                                                })
+                                        
+                                        # Maximum cardinality (≤ n)
+                                        elif restriction_type == 27:  # MAX
+                                            if card_value == 0:
+                                                # Special case for cardinality 0
+                                                fol = f"∀x: {cls.name}(x) → ¬∃y: {prop_name}(x,y)"
+                                            else:
+                                                # ∀x: C(x) → ∀y1,...,yn+1: (P(x,y1) ∧ ... ∧ P(x,yn+1)) → (y1=y2 ∨ ... ∨ yn=yn+1)
+                                                variables = [f"y{i+1}" for i in range(card_value + 1)]
+                                                rel_conjuncts = [f"{prop_name}(x,{var})" for var in variables]
+                                                
+                                                # Create disjunction of equalities (at least two must be equal)
+                                                eqs = []
+                                                for i in range(card_value + 1):
+                                                    for j in range(i+1, card_value + 1):
+                                                        eqs.append(f"{variables[i]} = {variables[j]}")
+                                                
+                                                fol = f"∀x: {cls.name}(x) → ∀{','.join(variables)}: (" + " ∧ ".join(rel_conjuncts) + ") → (" + " ∨ ".join(eqs) + ")"
+                                            
+                                            fol_premises.append({
+                                                "type": "MaxCardinality",
+                                                "fol": fol,
+                                                "description": f"{cls.name} has at most {card_value} {prop_name} relationships"
+                                            })
+                                        
+                                        # Exact cardinality (= n)
+                                        elif restriction_type == 28:  # EXACTLY
+                                            # Combine min and max cardinality
+                                            if card_value == 0:
+                                                # Special case for cardinality 0
+                                                fol = f"∀x: {cls.name}(x) → ¬∃y: {prop_name}(x,y)"
+                                                
+                                                fol_premises.append({
+                                                    "type": "ExactCardinality",
+                                                    "fol": fol,
+                                                    "description": f"{cls.name} has exactly {card_value} {prop_name} relationships"
+                                                })
+                                            else:
+                                                # Min cardinality part
+                                                variables = [f"y{i+1}" for i in range(card_value)]
+                                                min_conjuncts = [f"{prop_name}(x,{var})" for var in variables]
+                                                
+                                                # Add disequality constraints for distinct variables
+                                                for i in range(card_value):
+                                                    for j in range(i+1, card_value):
+                                                        min_conjuncts.append(f"{variables[i]} ≠ {variables[j]}")
+                                                
+                                                min_fol = f"∃{','.join(variables)}: " + " ∧ ".join(min_conjuncts)
+                                                
+                                                # Max cardinality part
+                                                max_variables = [f"z{i+1}" for i in range(card_value + 1)]
+                                                max_conjuncts = [f"{prop_name}(x,{var})" for var in max_variables]
+                                                
+                                                # Create disjunction of equalities (at least two must be equal)
+                                                eqs = []
+                                                for i in range(card_value + 1):
+                                                    for j in range(i+1, card_value + 1):
+                                                        eqs.append(f"{max_variables[i]} = {max_variables[j]}")
+                                                
+                                                max_fol = f"∀{','.join(max_variables)}: (" + " ∧ ".join(max_conjuncts) + ") → (" + " ∨ ".join(eqs) + ")"
+                                                
+                                                # Combine both
+                                                fol = f"∀x: {cls.name}(x) → ({min_fol} ∧ {max_fol})"
+                                                
+                                                fol_premises.append({
+                                                    "type": "ExactCardinality",
+                                                    "fol": fol,
+                                                    "description": f"{cls.name} has exactly {card_value} {prop_name} relationships"
+                                                })
+                except Exception as e:
+                    print(f"Error processing cardinality restrictions for {cls.name}: {str(e)}")
             
             # Add disjoint class axioms
             # DisjointClasses(A, B) -> ∀x: ¬(A(x) ∧ B(x))
@@ -791,14 +1018,17 @@ class OwlTester:
     
     def check_consistency(self):
         """
-        Check ontology for consistency using the HermiT reasoner.
+        Check ontology for consistency using multiple reasoners and provide detailed explanations.
         
         Returns:
-            dict: Consistency report with status and issues
+            dict: Enhanced consistency report with status, issues, and specific contradiction explanations
         """
         consistency_report = {
             "consistent": True,
-            "issues": []
+            "issues": [],
+            "contradictions": [],
+            "reasoners_used": [],
+            "axioms_involved": []
         }
         
         try:
@@ -815,11 +1045,13 @@ class OwlTester:
                     "This doesn't mean the ontology is inconsistent, just that we can't verify it."
                 )
                 return consistency_report
-                
-            # Create a reasoner
+            
+            # First try with Pellet reasoner
+            consistency_report["reasoners_used"].append("Pellet")
+            
             with self.onto:
                 try:
-                    # Try running the reasoner
+                    # Try running the Pellet reasoner
                     sync_reasoner_pellet(infer_property_values=True, 
                                          infer_data_property_values=True)
                     
@@ -828,17 +1060,56 @@ class OwlTester:
                 except owlready2.base.OwlReadyInconsistentOntologyError as e:
                     # Ontology is inconsistent
                     consistency_report["consistent"] = False
-                    consistency_report["issues"].append(str(e))
+                    consistency_report["issues"].append(f"Pellet found inconsistency: {str(e)}")
                     
                     # Try to extract more detailed inconsistency info
                     try:
                         # Convert to list in case inconsistency_explanations() returns a generator
                         explanations = list(self.onto.inconsistency_explanations())
                         for explanation in explanations:
-                            consistency_report["issues"].append(str(explanation))
+                            explanation_str = str(explanation)
+                            consistency_report["issues"].append(explanation_str)
+                            
+                            # Add to the contradictions list with more structured information
+                            contradiction = {
+                                "reasoner": "Pellet",
+                                "description": explanation_str,
+                                "axioms": self._extract_axioms_from_explanation(explanation_str)
+                            }
+                            consistency_report["contradictions"].append(contradiction)
                     except Exception as e:
                         consistency_report["issues"].append(f"Error getting explanations: {str(e)}")
-                        
+            
+            # If consistent with Pellet, try with HermiT for verification (if available)
+            if consistency_report["consistent"]:
+                try:
+                    consistency_report["reasoners_used"].append("HermiT")
+                    
+                    with self.onto:
+                        try:
+                            # Check if HermiT is available and use it
+                            sync_reasoner_hermit(infer_property_values=True)
+                            # Still consistent
+                        except owlready2.base.OwlReadyInconsistentOntologyError as e:
+                            # Inconsistency found by HermiT but not by Pellet
+                            consistency_report["consistent"] = False
+                            consistency_report["issues"].append(f"HermiT found inconsistency: {str(e)}")
+                            
+                            # Add to contradictions list
+                            contradiction = {
+                                "reasoner": "HermiT",
+                                "description": str(e),
+                                "axioms": self._extract_axioms_from_explanation(str(e))
+                            }
+                            consistency_report["contradictions"].append(contradiction)
+                except Exception as e:
+                    # HermiT might not be available, ignore this error
+                    pass
+            
+            # Collect involved axioms
+            if not consistency_report["consistent"]:
+                self._identify_problematic_axioms(consistency_report)
+                
         except Exception as e:
             # Handle the specific java not found error with a clearer message
             if "No such file or directory: 'java'" in str(e):
@@ -853,6 +1124,68 @@ class OwlTester:
                 consistency_report["issues"].append(f"Error during consistency check: {str(e)}")
         
         return consistency_report
+        
+    def _extract_axioms_from_explanation(self, explanation_str):
+        """
+        Extract axiom identifiers from inconsistency explanation strings.
+        
+        Args:
+            explanation_str (str): The explanation string from the reasoner
+            
+        Returns:
+            list: List of identified axiom references
+        """
+        axioms = []
+        
+        # Look for common patterns in explanations
+        class_pattern = r'\b([A-Z][a-zA-Z0-9_]*)\b'
+        property_pattern = r'\b([a-z][a-zA-Z0-9_]*)\b'
+        
+        # Extract class references
+        classes = re.findall(class_pattern, explanation_str)
+        if classes:
+            axioms.extend([f"Class:{cls}" for cls in classes])
+            
+        # Extract property references
+        properties = re.findall(property_pattern, explanation_str)
+        if properties:
+            axioms.extend([f"Property:{prop}" for prop in properties])
+            
+        return axioms
+        
+    def _identify_problematic_axioms(self, consistency_report):
+        """
+        Identify and add potentially problematic axioms to the consistency report.
+        
+        Args:
+            consistency_report (dict): The consistency report to enhance
+        """
+        try:
+            # Extract all axioms
+            all_axioms = self.extract_axioms()
+            
+            # Collect terms mentioned in contradiction explanations
+            contradiction_terms = set()
+            for contradiction in consistency_report.get("contradictions", []):
+                axioms = contradiction.get("axioms", [])
+                for axiom in axioms:
+                    if ":" in axiom:
+                        contradiction_terms.add(axiom.split(":", 1)[1])
+            
+            # Identify axioms that involve the contradicting terms
+            for axiom in all_axioms:
+                if axiom.get("type", "").startswith("Error"):
+                    continue
+                    
+                # Check if this axiom involves any of the terms in contradictions
+                if (
+                    axiom.get("subject") in contradiction_terms or 
+                    axiom.get("object") in contradiction_terms or
+                    axiom.get("property") in contradiction_terms
+                ):
+                    consistency_report["axioms_involved"].append(axiom)
+        except Exception as e:
+            consistency_report["issues"].append(f"Error identifying problematic axioms: {str(e)}")
     
     def get_inferred_axioms(self):
         """
@@ -1538,6 +1871,72 @@ class OwlTester:
         # If all methods failed, return False with error details
         return False, f"Failed to load ontology. Errors: {'; '.join(all_errors)}"
             
+    def validate_completeness(self):
+        """
+        Cross-check all ontology elements to ensure they are included in the generated FOL propositions.
+        
+        Returns:
+            dict: A report with missing elements and completeness metrics
+        """
+        report = {
+            "complete": True,
+            "missing_classes": [],
+            "missing_properties": [],
+            "missing_individuals": [],
+            "coverage_percentage": 100.0
+        }
+        
+        try:
+            # Generate FOL premises to check against
+            fol_premises = self.generate_fol_premises()
+            
+            # Extract all terms mentioned in FOL premises
+            fol_terms = set()
+            for premise in fol_premises:
+                if "fol" in premise:
+                    # Extract terms from FOL (this is a simplified approach)
+                    # Look for terms that are capitalized (classes) or followed by parentheses (predicates)
+                    fol_text = premise["fol"]
+                    
+                    # Extract class terms (capitalized words)
+                    class_terms = re.findall(r'\b[A-Z][a-zA-Z0-9_]*\b', fol_text)
+                    fol_terms.update(class_terms)
+                    
+                    # Extract property terms (words followed by parentheses)
+                    property_terms = re.findall(r'\b([a-zA-Z0-9_]+)\([^)]*\)', fol_text)
+                    fol_terms.update(property_terms)
+            
+            # Check classes
+            all_classes = set(self.bfo_classes)
+            missing_classes = all_classes - fol_terms
+            report["missing_classes"] = list(missing_classes)
+            
+            # Check properties
+            all_properties = set(self.bfo_relations) | set(self.data_properties)
+            missing_properties = all_properties - fol_terms
+            report["missing_properties"] = list(missing_properties)
+            
+            # Check individuals
+            all_individuals = set(self.individuals)
+            missing_individuals = all_individuals - fol_terms
+            report["missing_individuals"] = list(missing_individuals)
+            
+            # Calculate coverage percentage
+            total_elements = len(all_classes) + len(all_properties) + len(all_individuals)
+            total_missing = len(missing_classes) + len(missing_properties) + len(missing_individuals)
+            
+            if total_elements > 0:
+                coverage = 100.0 * (total_elements - total_missing) / total_elements
+                report["coverage_percentage"] = round(coverage, 2)
+            
+            report["complete"] = total_missing == 0
+            
+        except Exception as e:
+            report["complete"] = False
+            report["error"] = f"Error validating completeness: {str(e)}"
+            
+        return report
+    
     def generate_uml_diagram(self, include_individuals=False, 
                            include_data_properties=True, include_annotation_properties=False,
                            max_classes=1000):
