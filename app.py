@@ -532,9 +532,13 @@ def analyze_owl(filename):
                 analysis[key] = value
         
         # Add total axiom count if not present
-        if 'axioms' in analysis and isinstance(analysis['axioms'], list):
-            analysis['axiom_count'] = len(analysis['axioms'])
-            
+        # Handle axioms properly depending on type
+        if 'axioms' in analysis:
+            if isinstance(analysis['axioms'], list):
+                analysis['axiom_count'] = len(analysis['axioms'])
+            elif isinstance(analysis['axioms'], int):
+                analysis['axiom_count'] = analysis['axioms']
+                
         # Add expressivity from metrics if available
         if 'metrics' in analysis and 'expressivity' in analysis['metrics']:
             analysis['expressivity'] = analysis['metrics']['expressivity']
