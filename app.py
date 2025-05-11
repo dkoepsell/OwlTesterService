@@ -666,10 +666,9 @@ def generate_implications(analysis_id):
             if comprehensive:
                 # Use the new comprehensive method that generates implications for all premise types
                 logger.info(f"Generating comprehensive implications for analysis ID {analysis_id}")
-                implications = custom_tester.generate_all_implications(
-                    onto,
-                    num_implications_per_premise=max(1, int(num_implications/5))
-                )
+                # Get the premises from the analysis
+                premises = analysis.fol_premises if analysis.fol_premises else []
+                implications = custom_tester.generate_all_implications(premises)
             else:
                 # Use the original method
                 logger.info(f"Generating standard implications for analysis ID {analysis_id}")
@@ -869,14 +868,25 @@ def api_generate_diagram(filename):
         if not onto:
             raise Exception("Loaded ontology object not found in result")
         
-        # Generate diagram using the updated method with increased max_classes
-        result = tester.generate_uml_diagram(
-            onto,
+        # Generate diagram using PlantUMLGenerator
+        from plantuml_generator import PlantUMLGenerator
+        plant_generator = PlantUMLGenerator()
+        plantuml_code, diagram_path, svg_path = plant_generator.generate_class_diagram(
+            onto, 
+            filename_base=os.path.splitext(file_record.filename)[0],  # Use the file's basename
             include_individuals=include_individuals,
             include_data_properties=include_data_properties,
             include_annotation_properties=include_annotation_properties,
             max_classes=1000  # Increased to show more classes
         )
+        
+        # Format result to match existing code expectations
+        result = {
+            "success": plantuml_code is not None,
+            "plantuml_code": plantuml_code,
+            "diagram_url": diagram_path,
+            "svg_url": svg_path
+        }
         
         if result["success"]:
             return jsonify({
