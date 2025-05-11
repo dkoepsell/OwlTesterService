@@ -233,7 +233,7 @@
                         </h2>
                         <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#exampleAccordion">
                             <div class="accordion-body">
-                                <code>forall x (Continuant(x) -> exists t (temporal_region(t) & exists_at(x,t)))</code>
+                                <code>forall x,t (instance_of(x,continuant,t) -> exists_at(x,t))</code>
                                 <button class="btn btn-sm btn-outline-primary float-end use-example" 
                                         data-example="forall x,t (instance_of(x,continuant,t) -> exists_at(x,t))">
                                     Use This Example
@@ -249,9 +249,9 @@
                         </h2>
                         <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#exampleAccordion">
                             <div class="accordion-body">
-                                <code>forall p (Process(p) -> exists t (temporal_region(t) & occurs_in(p, t)))</code>
+                                <code>forall p,t (instance_of(p,process,t) -> occurs_in(p,t))</code>
                                 <button class="btn btn-sm btn-outline-primary float-end use-example" 
-                                        data-example="forall p (Process(p) -> exists t (temporal_region(t) & occurs_in(p, t)))">
+                                        data-example="forall p,t (instance_of(p,process,t) -> occurs_in(p,t))">
                                     Use This Example
                                 </button>
                             </div>
@@ -265,9 +265,9 @@
                         </h2>
                         <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#exampleAccordion">
                             <div class="accordion-body">
-                                <code>forall x (material_entity(x) -> IndependentContinuant(x))</code>
+                                <code>forall x,t (instance_of(x,material_entity,t) -> instance_of(x,independent_continuant,t))</code>
                                 <button class="btn btn-sm btn-outline-primary float-end use-example" 
-                                        data-example="forall x (material_entity(x) -> IndependentContinuant(x))">
+                                        data-example="forall x,t (instance_of(x,material_entity,t) -> instance_of(x,independent_continuant,t))">
                                     Use This Example
                                 </button>
                             </div>
