@@ -44,34 +44,87 @@ function initializeOntologyVisualization(containerId, ontologyData) {
     const nodes = [];
     const links = [];
     
-    // Add class nodes
-    ontologyData.classes.forEach(cls => {
+    console.log("Processing ontology data with classes:", ontologyData.classes.length);
+    
+    // Validate data and add default nodes if necessary
+    if (!ontologyData.classes || ontologyData.classes.length === 0) {
+        console.warn("No classes found in ontology data");
+        // Add dummy data to prevent visualization from breaking
         nodes.push({
-            id: cls.id,
-            name: cls.name,
+            id: "Thing",
+            name: "Thing",
             type: "class",
-            bfo: cls.bfo || false
+            bfo: true
         });
-    });
+    } else {
+        // Add class nodes
+        ontologyData.classes.forEach(cls => {
+            if (!cls || !cls.id) {
+                console.warn("Invalid class object in data");
+                return; // Skip this iteration
+            }
+            
+            nodes.push({
+                id: cls.id,
+                name: cls.name || cls.id,
+                type: "class",
+                bfo: cls.bfo || false
+            });
+        });
+    }
     
     // Add inheritance links
-    ontologyData.inheritance.forEach(relation => {
-        links.push({
-            source: relation.source,
-            target: relation.target,
-            type: relation.type || "inheritance"
+    if (ontologyData.inheritance && Array.isArray(ontologyData.inheritance)) {
+        ontologyData.inheritance.forEach(relation => {
+            if (!relation || !relation.source || !relation.target) {
+                console.warn("Invalid inheritance relation:", relation);
+                return; // Skip this iteration
+            }
+            
+            // Verify that source and target exist in nodes
+            const sourceExists = nodes.some(node => node.id === relation.source);
+            const targetExists = nodes.some(node => node.id === relation.target);
+            
+            if (!sourceExists || !targetExists) {
+                console.warn(`Skipping inheritance relation with missing nodes: ${relation.source} -> ${relation.target}`);
+                return;
+            }
+            
+            links.push({
+                source: relation.source,
+                target: relation.target,
+                type: relation.type || "inheritance"
+            });
         });
-    });
+    }
     
     // Add property relationships
-    ontologyData.properties.forEach(prop => {
-        links.push({
-            source: prop.source,
-            target: prop.target,
-            type: prop.type || "property",
-            name: prop.label || prop.name
+    if (ontologyData.properties && Array.isArray(ontologyData.properties)) {
+        ontologyData.properties.forEach(prop => {
+            if (!prop || !prop.source || !prop.target) {
+                console.warn("Invalid property relation:", prop);
+                return; // Skip this iteration
+            }
+            
+            // Verify that source and target exist in nodes
+            const sourceExists = nodes.some(node => node.id === prop.source);
+            const targetExists = nodes.some(node => node.id === prop.target);
+            
+            if (!sourceExists || !targetExists) {
+                console.warn(`Skipping property relation with missing nodes: ${prop.source} -> ${prop.target}`);
+                return;
+            }
+            
+            links.push({
+                source: prop.source,
+                target: prop.target,
+                type: prop.type || "property",
+                name: prop.label || prop.name || "has_relation"
+            });
         });
-    });
+    }
+    
+    console.log("Processed nodes:", nodes.length, "links:", links.length);
     
     // Create the link elements
     const link = g.append("g")

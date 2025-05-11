@@ -477,6 +477,33 @@ def analyze_owl(filename):
             data_properties = analysis.data_property_list if hasattr(analysis, 'data_property_list') and analysis.data_property_list else []
             individuals = analysis.individual_list if hasattr(analysis, 'individual_list') and analysis.individual_list else []
             
+            # Ensure we have non-null values for all statistics
+            if analysis.class_count is None and class_list:
+                analysis.class_count = len(class_list)
+                db.session.commit()
+                
+            if analysis.object_property_count is None and object_properties:
+                analysis.object_property_count = len(object_properties)
+                db.session.commit()
+                
+            if analysis.data_property_count is None and data_properties:
+                analysis.data_property_count = len(data_properties)
+                db.session.commit()
+                
+            if analysis.individual_count is None and individuals:
+                analysis.individual_count = len(individuals)
+                db.session.commit()
+                
+            # Default values for everything
+            if analysis.class_count is None:
+                analysis.class_count = 0
+            if analysis.object_property_count is None:
+                analysis.object_property_count = 0
+            if analysis.data_property_count is None:
+                analysis.data_property_count = 0
+            if analysis.individual_count is None:
+                analysis.individual_count = 0
+                
             return render_template('analysis.html', 
                                  file=file_record, 
                                  analysis=analysis,
