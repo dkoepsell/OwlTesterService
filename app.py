@@ -565,7 +565,14 @@ def analyze_owl(filename):
                         # For rdflib analysis, no detailed issues available
                         ontology_analysis.consistency_issues = []
                     ontology_analysis.inferred_axioms = analysis.get('inferred', [])
-                    ontology_analysis.fol_premises = analysis.get('fol_premises', [])
+                    # Make sure FOL premises are correctly extracted from the analysis
+                    fol_premises = analysis.get('fol_premises', [])
+                    app.logger.info(f"★★★ SAVING FOL PREMISES TO DATABASE: COUNT = {len(fol_premises)} ★★★")
+                    if fol_premises:
+                        app.logger.info(f"★★★ SAMPLE FOL PREMISES BEING SAVED: {fol_premises[:2]} ★★★")
+                    else:
+                        app.logger.warning("★★★ NO FOL PREMISES FOUND TO SAVE TO DATABASE ★★★")
+                    ontology_analysis.fol_premises = fol_premises
                     db.session.add(ontology_analysis)
                     db.session.commit()
                     logger.info(f"★★★ COMMITTED TO DATABASE - Classes: {ontology_analysis.class_count}, Object Props: {ontology_analysis.object_property_count} ★★★")
@@ -609,6 +616,14 @@ def analyze_owl(filename):
         logger.info(f"Data property count: {analysis.get('data_property_count')} or {analysis.get('data_properties')}")
         logger.info(f"Individual count: {analysis.get('individual_count')} or {analysis.get('individuals')}")
         logger.info(f"Axiom count: {analysis.get('axiom_count')}")
+        
+        # Check if FOL premises are present and log them
+        fol_premises = analysis.get('fol_premises', [])
+        logger.info(f"★★★ FOL PREMISES COUNT: {len(fol_premises)} ★★★")
+        if fol_premises:
+            logger.info(f"★★★ SAMPLE FOL PREMISES: {fol_premises[:3]} ★★★")
+        else:
+            logger.info(f"★★★ NO FOL PREMISES FOUND IN ANALYSIS DICT ★★★")
         
         # Update analysis with completeness validation if available
         if 'completeness' in analysis:
@@ -1076,17 +1091,22 @@ def api_analyze_owl(filename):
                 # Generate FOL premises
                 fol_premises = []
                 
+                app.logger.info(f"★★★ GENERATING FOL PREMISES FOR {len(classes)} CLASSES ★★★")
+                
                 # Class instantiation premises for all classes (These form the basic ontology vocabulary)
                 for cls in classes:
                     cls_label = get_clean_label(cls)
+                    app.logger.info(f"★★★ Processing class URI: {cls}, label: {cls_label} ★★★")
                     description = class_descriptions.get(cls, f"Entities that are {cls_label}")
                     
                     # Add a premise for membership in this class
-                    fol_premises.append({
+                    premise = {
                         'type': 'class',
                         'fol': f"instance_of(x, {cls_label}, t)",
                         'description': description
-                    })
+                    }
+                    app.logger.info(f"★★★ Adding FOL premise: {premise['fol']} ★★★")
+                    fol_premises.append(premise)
                 
                 # Class hierarchy premises (subclass relationships)
                 for s, p, o in g.triples((None, RDFS.subClassOf, None)):
