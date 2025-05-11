@@ -1284,6 +1284,40 @@ def api_analyze_owl(filename):
                 app.logger.info(f"★★★ TOTAL FOL PREMISES GENERATED: {total_premises} ★★★")
                 app.logger.info(f"★★★ Classes: {class_count}, Subclasses: {subclass_count}, Properties: {property_count}, Domains: {domain_count}, Ranges: {range_count} ★★★")
                 
+                # Generate default FOL premises if none were created
+                if not fol_premises:
+                    app.logger.warning("★★★ No FOL premises were generated in the regular process, generating defaults ★★★")
+                    
+                    # Generate basic premises for all classes
+                    for cls in classes:
+                        try:
+                            cls_label = get_clean_label(cls)
+                            # Skip external ontology classes like owl:Thing
+                            if cls_label.startswith("owl:") or cls_label == "Thing":
+                                continue
+                                
+                            fol_premises.append({
+                                'type': 'class',
+                                'fol': f"instance_of(x, {cls_label}, t)",
+                                'description': f"Entities that are instances of {cls_label}"
+                            })
+                            app.logger.info(f"★★★ Added default class FOL premise for: {cls_label} ★★★")
+                        except Exception as e:
+                            app.logger.error(f"★★★ Error generating default FOL premise for {cls}: {str(e)} ★★★")
+                    
+                    # Generate basic premises for object properties
+                    for prop in obj_properties:
+                        try:
+                            prop_label = get_clean_label(prop)
+                            fol_premises.append({
+                                'type': 'property',
+                                'fol': f"{prop_label}(x, y, t)",
+                                'description': f"Relation {prop_label} between entities"
+                            })
+                            app.logger.info(f"★★★ Added default property FOL premise for: {prop_label} ★★★")
+                        except Exception as e:
+                            app.logger.error(f"★★★ Error generating default FOL premise for {prop}: {str(e)} ★★★")
+                
                 # Create analysis dictionary
                 analysis = {
                     'classes': len(classes),
