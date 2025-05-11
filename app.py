@@ -117,9 +117,29 @@ def index():
     if owl_tester is None:
         return render_template('index.html', error="OwlTester is not initialized properly")
     
+    # Format BFO classes as a list with id and label attributes for the template
+    bfo_classes_dict = owl_tester.get_bfo_classes()
+    bfo_classes = []
+    for key, data in bfo_classes_dict.items():
+        bfo_classes.append({
+            'id': key,
+            'label': data['label'],
+            'description': data.get('description', '')
+        })
+    
+    # Format BFO relations as a list with id and label attributes for the template
+    bfo_relations_dict = owl_tester.get_bfo_relations()
+    bfo_relations = []
+    for key, data in bfo_relations_dict.items():
+        bfo_relations.append({
+            'id': key,
+            'label': data['label'],
+            'description': data.get('description', '')
+        })
+    
     return render_template('index.html', 
-                           bfo_classes=owl_tester.get_bfo_classes(),
-                           bfo_relations=owl_tester.get_bfo_relations())
+                           bfo_classes=bfo_classes,
+                           bfo_relations=bfo_relations)
 
 @app.route('/about')
 def about():
@@ -185,7 +205,17 @@ def get_bfo_classes():
     if owl_tester is None:
         return jsonify({"error": "OwlTester is not initialized properly"}), 500
     
-    return jsonify({"classes": owl_tester.get_bfo_classes()})
+    # Format BFO classes as a list with id and label attributes
+    bfo_classes_dict = owl_tester.get_bfo_classes()
+    bfo_classes = []
+    for key, data in bfo_classes_dict.items():
+        bfo_classes.append({
+            'id': key,
+            'label': data['label'],
+            'description': data.get('description', '')
+        })
+    
+    return jsonify({"classes": bfo_classes})
 
 @app.route('/api/bfo-relations')
 def get_bfo_relations():
@@ -193,7 +223,17 @@ def get_bfo_relations():
     if owl_tester is None:
         return jsonify({"error": "OwlTester is not initialized properly"}), 500
     
-    return jsonify({"relations": owl_tester.get_bfo_relations()})
+    # Format BFO relations as a list with id and label attributes
+    bfo_relations_dict = owl_tester.get_bfo_relations()
+    bfo_relations = []
+    for key, data in bfo_relations_dict.items():
+        bfo_relations.append({
+            'id': key,
+            'label': data['label'],
+            'description': data.get('description', '')
+        })
+    
+    return jsonify({"relations": bfo_relations})
 
 @app.route('/api/validate-completeness/<int:analysis_id>', methods=['GET'])
 def validate_ontology_completeness(analysis_id):
