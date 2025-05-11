@@ -1,5 +1,53 @@
 {% extends "layout.html" %}
 
+{% block head_scripts %}
+{{ super() }}
+<style>
+    /* Styles for derivation trace visualization */
+    .derivation-node {
+        padding: 8px;
+        border-radius: 4px;
+        margin: 5px 0;
+        border: 1px solid #ccc;
+        background-color: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+    .derivation-node:hover {
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .derivation-node.axiom {
+        background-color: #e3f2fd;
+        border-color: #90caf9;
+    }
+    .derivation-node.inference {
+        background-color: #e8f5e9;
+        border-color: #a5d6a7;
+    }
+    .derivation-node.inconsistency {
+        background-color: #ffebee;
+        border-color: #ef9a9a;
+    }
+    .derivation-connector {
+        border-left: 2px dashed #ccc;
+        height: 20px;
+        margin-left: 15px;
+    }
+    .supporting-fact {
+        margin-left: 20px;
+        font-size: 0.9em;
+        color: #6c757d;
+    }
+    .derivation-header {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .derivation-description {
+        font-style: italic;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-12">
@@ -118,6 +166,126 @@
                     <li class="list-group-item list-group-item-warning">{{ issue }}</li>
                     {% endfor %}
                 </ul>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Reasoning Methodology Panel -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-brain me-2"></i>Reasoning Methodology</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-cogs me-2"></i>Reasoners Used:</h6>
+                        <ul class="list-group mb-3">
+                            {% if analysis.reasoning_methodology and analysis.reasoning_methodology.reasoners_used %}
+                                {% for reasoner in analysis.reasoning_methodology.reasoners_used %}
+                                    <li class="list-group-item">{{ reasoner }}</li>
+                                {% endfor %}
+                            {% else %}
+                                <li class="list-group-item">Pellet (default)</li>
+                            {% endif %}
+                        </ul>
+                        
+                        <h6><i class="fas fa-tasks me-2"></i>Reasoning Tasks:</h6>
+                        <ul class="list-group mb-3">
+                            {% if analysis.reasoning_methodology and analysis.reasoning_methodology.reasoning_tasks %}
+                                {% for task in analysis.reasoning_methodology.reasoning_tasks %}
+                                    <li class="list-group-item">{{ task|title }}</li>
+                                {% endfor %}
+                            {% else %}
+                                <li class="list-group-item">Consistency</li>
+                                <li class="list-group-item">Classification</li>
+                                <li class="list-group-item">Realization</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-shield-alt me-2"></i>Theoretical Guarantees:</h6>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-bordered">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th>Property</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if analysis.reasoning_methodology and analysis.reasoning_methodology.theoretical_guarantees %}
+                                        {% for prop, status in analysis.reasoning_methodology.theoretical_guarantees.items() %}
+                                            <tr>
+                                                <td>{{ prop|title }}</td>
+                                                <td>{{ status }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td>Decidability</td>
+                                            <td>Decidable for OWL DL ontologies</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Completeness</td>
+                                            <td>Complete for SROIQ(D) description logic</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Soundness</td>
+                                            <td>Sound for standard description logics</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <h6><i class="fas fa-exclamation-triangle me-2"></i>Limitations:</h6>
+                        <ul class="list-group">
+                            {% if analysis.reasoning_methodology and analysis.reasoning_methodology.limitations %}
+                                {% for limitation in analysis.reasoning_methodology.limitations %}
+                                    <li class="list-group-item">{{ limitation }}</li>
+                                {% endfor %}
+                            {% else %}
+                                <li class="list-group-item">May time out on very large ontologies</li>
+                                <li class="list-group-item">OWL Full constructs not supported</li>
+                                <li class="list-group-item">Resolution is limited to standard tableaux algorithm capabilities</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Performance metrics if available -->
+                {% if analysis.reasoning_methodology and analysis.reasoning_methodology.performance %}
+                    <div class="mt-3">
+                        <h6><i class="fas fa-tachometer-alt me-2"></i>Performance:</h6>
+                        <div class="alert alert-info">
+                            <p><strong>Reasoning Time:</strong> {{ analysis.reasoning_methodology.performance.reasoning_time_ms|round|int }} ms</p>
+                            <p><strong>Start Time:</strong> {{ analysis.reasoning_methodology.performance.start_time }}</p>
+                            <p><strong>End Time:</strong> {{ analysis.reasoning_methodology.performance.end_time }}</p>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- Error state if available -->
+                {% if analysis.reasoning_methodology and analysis.reasoning_methodology.error_state %}
+                    <div class="mt-3">
+                        <h6><i class="fas fa-exclamation-circle me-2"></i>Error Information:</h6>
+                        <div class="alert alert-danger">
+                            <p><strong>Error Type:</strong> {{ analysis.reasoning_methodology.error_state.error_type }}</p>
+                            <p><strong>Reason:</strong> {{ analysis.reasoning_methodology.error_state.reason }}</p>
+                        </div>
+                    </div>
+                {% endif %}
+                
+                <!-- Inconsistency reason if available -->
+                {% if analysis.reasoning_methodology and analysis.reasoning_methodology.inconsistency_reason %}
+                    <div class="mt-3">
+                        <h6><i class="fas fa-times-circle me-2"></i>Inconsistency Information:</h6>
+                        <div class="alert alert-danger">
+                            <p><strong>Type:</strong> {{ analysis.reasoning_methodology.inconsistency_type }}</p>
+                            <p><strong>Reason:</strong> {{ analysis.reasoning_methodology.inconsistency_reason }}</p>
+                        </div>
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -283,6 +451,61 @@
                 {% if not analysis.inferred_axioms %}
                 <div class="alert alert-info">No inferred axioms found.</div>
                 {% endif %}
+            </div>
+        </div>
+        
+        <!-- Derivation Trace Visualization -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Derivation Trace</h5>
+            </div>
+            <div class="card-body">
+                <p class="lead">This visualization shows how inferences were derived during reasoning:</p>
+                
+                <div id="derivation-trace-container">
+                    {% if analysis.derivation_steps %}
+                        {% for step in analysis.derivation_steps %}
+                            <div class="derivation-node {% if step.axiom_type == 'Inconsistency' %}inconsistency{% elif step.axiom_type == 'SubClassOf' %}inference{% else %}axiom{% endif %}">
+                                <div class="derivation-header">
+                                    <span class="badge {% if step.axiom_type == 'Inconsistency' %}bg-danger{% elif step.axiom_type == 'SubClassOf' %}bg-success{% else %}bg-primary{% endif %} me-2">
+                                        {{ step.axiom_type }}
+                                    </span>
+                                    <span class="badge bg-secondary">{{ step.origin }}</span>
+                                    <span class="badge bg-info ms-2">Confidence: {{ step.confidence }}</span>
+                                </div>
+                                <div class="derivation-description">
+                                    {{ step.description }}
+                                </div>
+                                <div class="mt-2">
+                                    <strong>Reason:</strong> {{ step.reason }}
+                                </div>
+                                {% if step.supporting_facts %}
+                                    <div class="mt-2">
+                                        <strong>Supporting Facts:</strong>
+                                        <ul class="list-unstyled">
+                                            {% for fact in step.supporting_facts %}
+                                                <li class="supporting-fact">• {{ fact }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            {% if not loop.last %}
+                                <div class="derivation-connector"></div>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No derivation steps are available for this ontology. This could be because:
+                            <ul class="mt-2">
+                                <li>No inferences were made during reasoning</li>
+                                <li>The ontology was analyzed using a method that doesn't track derivations</li>
+                                <li>The reasoner encountered an error during the inference process</li>
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
         
