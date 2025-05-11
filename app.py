@@ -701,15 +701,37 @@ def api_analyze_owl(filename):
                 # Count classes - support all formats of OWL class declarations
                 classes = set()
                 
+                app.logger.info("★★★ SEARCHING FOR CLASSES IN MULTIPLE FORMATS ★★★")
+                
                 # Standard OWL class declaration check
+                explicit_classes = []
                 for s, p, o in g.triples((None, RDF.type, OWL.Class)):
-                    classes.add(str(s))
+                    class_uri = str(s)
+                    classes.add(class_uri)
+                    explicit_classes.append(class_uri)
+                    app.logger.info(f"★★★ Found explicit OWL Class: {class_uri} ★★★")
+                app.logger.info(f"★★★ Found {len(explicit_classes)} explicit OWL Classes ★★★")
                 
                 # RDF Schema class definition - subclass relationships
+                subclass_classes = []
                 for s, p, o in g.triples((None, RDFS.subClassOf, None)):
-                    classes.add(str(s))
+                    class_uri = str(s)
+                    classes.add(class_uri)
+                    if class_uri not in explicit_classes:
+                        subclass_classes.append(class_uri)
+                        app.logger.info(f"★★★ Found class from subClassOf: {class_uri} ★★★")
+                app.logger.info(f"★★★ Found {len(subclass_classes)} additional classes from subClassOf ★★★")
+                
+                # Add parent classes from subClassOf relationships as well
+                parent_classes = []
+                for s, p, o in g.triples((None, RDFS.subClassOf, None)):
                     if str(o) != str(OWL.Thing) and str(o) != str(RDFS.Resource):
-                        classes.add(str(o))
+                        parent_class = str(o)
+                        classes.add(parent_class)
+                        if parent_class not in explicit_classes and parent_class not in subclass_classes:
+                            parent_classes.append(parent_class)
+                            app.logger.info(f"★★★ Found parent class from subClassOf: {parent_class} ★★★")
+                app.logger.info(f"★★★ Found {len(parent_classes)} additional parent classes ★★★")
                 
                 # Important: Handle alternate formats - in some RDF/XML formats, classes
                 # are just referenced in domain/range without explicit type declaration
@@ -760,7 +782,9 @@ def api_analyze_owl(filename):
                         if not is_property:
                             classes.add(resource)
                 
-                app.logger.info(f"After analyzing domain/range, found {len(classes)} classes: {[c.split('#')[-1] if '#' in c else c.split('/')[-1] for c in classes]}")
+                app.logger.info(f"★★★ FINAL CLASS COUNT: {len(classes)} ★★★")
+                short_names = [c.split('#')[-1] if '#' in c else c.split('/')[-1] for c in classes]
+                app.logger.info(f"★★★ CLASS SHORT NAMES: {short_names} ★★★")
                 
                 # Count object properties - support both direct declaration and domain/range indicators
                 obj_properties = set()
