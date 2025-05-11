@@ -52,7 +52,7 @@ db.init_app(app)
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'login'  # type: ignore
 login_manager.login_message = 'Please log in to access this page.'
 login_manager.login_message_category = 'info'
 
@@ -372,7 +372,8 @@ def upload_owl():
         
         try:
             # Generate a unique filename to avoid collisions
-            original_filename = secure_filename(file.filename)
+            filename = file.filename or "unknown_file.owl"
+            original_filename = secure_filename(filename)
             file_ext = os.path.splitext(original_filename)[1]
             unique_filename = f"{uuid.uuid4().hex}{file_ext}"
             
