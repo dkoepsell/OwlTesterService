@@ -426,11 +426,11 @@
         <div class="card-header bg-secondary text-white">
             <h5 class="card-title mb-0">
                 <i class="fas fa-cogs me-2"></i>Axioms
-                {% if analysis.axioms %}<span class="badge bg-light text-secondary ms-2">{{ analysis.axioms|length }}</span>{% endif %}
+                <span class="badge bg-light text-secondary ms-2">{{ analysis.axiom_count }}</span>
             </h5>
         </div>
         <div class="card-body">
-            {% if analysis.axioms %}
+            {% if analysis.axioms and analysis.axioms is iterable and analysis.axioms is not string %}
             <div class="table-responsive">
                 <table class="table table-striped axiom-table">
                     <thead>
@@ -448,6 +448,10 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            {% elif analysis.axiom_count and analysis.axiom_count > 0 %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>This ontology contains {{ analysis.axiom_count }} axioms, but detailed information is not available.
             </div>
             {% else %}
             <div class="alert alert-warning">
