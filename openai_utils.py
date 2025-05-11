@@ -424,8 +424,16 @@ def generate_real_world_implications(ontology_name, domain_classes, fol_premises
         # Extract FOL formulas and descriptions
         fol_info = []
         for premise in fol_premises:
-            if isinstance(premise, dict) and 'fol' in premise and 'description' in premise:
-                fol_info.append(f"Formula: {premise['fol']}\nExplanation: {premise['description']}")
+            if isinstance(premise, dict) and 'fol' in premise:
+                if 'description' in premise:
+                    fol_info.append(f"Formula: {premise['fol']}\nExplanation: {premise['description']}")
+                else:
+                    # If no description, use the type if available
+                    description = premise.get('type', 'premise').title()
+                    fol_info.append(f"Formula: {premise['fol']}\nExplanation: {description} premise")
+            elif isinstance(premise, str):
+                # For simple string premises, just use the formula
+                fol_info.append(f"Formula: {premise}\nExplanation: Auto-generated premise")
         
         # If no domain name provided, use a placeholder
         if not ontology_name or ontology_name == "Unknown":
