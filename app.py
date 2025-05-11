@@ -845,8 +845,17 @@ def api_analyze_owl(filename):
                 return jsonify({"error": "Loaded ontology object not found in result"}), 400
         
         # Generate analysis report with the ontology object if it's not already done by rdflib
+        # Initialize analysis as an empty dict to handle errors properly
+        analysis = {}
+        
         if onto != "rdflib_analyzed":
             analysis = custom_tester.analyze_ontology(onto)
+        
+        # Ensure analysis is a dictionary
+        if not isinstance(analysis, dict):
+            analysis = {}
+            logger.error("Analysis result is not a dictionary")
+            return jsonify({"error": "Analysis failed to return valid data"}), 500
         
         # Move stats to top level for API consistency
         if 'stats' in analysis:
@@ -1463,6 +1472,9 @@ def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": str(e)}), 500
+    
+    # If we somehow get here (unexpected method), return the fallback response
+    return fallback_response
 
 
 @app.route('/api/sandbox/<int:ontology_id>/classes/<int:class_id>', methods=['GET', 'PUT', 'DELETE'])
@@ -1802,45 +1814,117 @@ def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, 
     """API for sandbox ontology properties."""
     # Default fallback response to ensure we always return a proper type
     fallback_response: tuple[Response, int] = jsonify({"error": "Internal server error"}), 500
-    ontology = SandboxOntology.query.get_or_404(ontology_id)
     
-    # Check if the user has access to this ontology
-    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    if request.method == 'GET':
-        # Return all properties for this ontology
-        properties = OntologyProperty.query.filter_by(ontology_id=ontology.id).all()
-        return jsonify({
-            "properties": [
-                {
+    # Ensure we always return a proper response
+    try:
+        # Get the ontology
+        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        
+        # Check if the user has access to this ontology
+        if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+            return jsonify({"error": "Unauthorized"}), 403
+        
+        if request.method == 'GET':
+            # GET: Return all properties for this ontology
+            properties = OntologyProperty.query.filter_by(ontology_id=ontology.id).all()
+            return jsonify({
+                "properties": [
+                    {
+                        "id": prop.id,
+                        "name": prop.name,
+                        "description": prop.description,
+                        "property_type": prop.property_type,
+                        "domain_class_id": prop.domain_class_id,
+                        "range_class_id": prop.range_class_id
+                    } for prop in properties
+                ]
+            })
+        elif request.method == 'POST':
+            # POST: Create a new property
+            data = request.get_json()
+            
+            if not data or not data.get('name'):
+                return jsonify({"error": "Property name is required"}), 400
+            
+            # Create the property
+            try:
+                prop = OntologyProperty()
+                prop.name = data.get('name')
+                prop.description = data.get('description', '')
+                prop.property_type = data.get('property_type', 'object')  # Default to object property
+                prop.domain_class_id = data.get('domain_class_id')
+                prop.range_class_id = data.get('range_class_id')
+                prop.ontology_id = ontology.id
+                
+                db.session.add(prop)
+                
+                # Update the last_modified timestamp on the ontology
+                ontology.last_modified = datetime.datetime.utcnow()
+                
+                db.session.commit()
+                
+                return jsonify({
                     "id": prop.id,
                     "name": prop.name,
                     "description": prop.description,
                     "property_type": prop.property_type,
                     "domain_class_id": prop.domain_class_id,
                     "range_class_id": prop.range_class_id
-                } for prop in properties
-            ]
-        })
-    elif request.method == 'POST':
-        # Create a new property
-        data = request.get_json()
+                }), 201
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Error creating property: {str(e)}")
+                return jsonify({"error": f"Failed to create property: {str(e)}"}), 500
+        else:
+            # Unsupported method
+            return jsonify({"error": "Method not allowed"}), 405
+    except Exception as e:
+        # Catch-all error handler
+        logger.error(f"Error in properties API: {str(e)}")
+        return jsonify({"error": f"API error: {str(e)}"}), 500
+
+
+@app.route('/api/sandbox/<int:ontology_id>/properties/<int:property_id>', methods=['GET', 'PUT', 'DELETE'])
+def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, tuple[Response, int]]:
+    """API for a specific sandbox ontology property."""
+    # Default fallback response to ensure we always return a proper type
+    fallback_response: tuple[Response, int] = jsonify({"error": "Internal server error"}), 500
+    
+    try:
+        # Get the ontology
+        ontology = SandboxOntology.query.get_or_404(ontology_id)
         
-        if not data.get('name'):
-            return jsonify({"error": "Property name is required"}), 400
+        # Check if the user has access to this ontology
+        if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
+            return jsonify({"error": "Unauthorized"}), 403
         
-        try:
-            # Create the property
-            prop = OntologyProperty()
-            prop.name = data.get('name')
-            prop.description = data.get('description', '')
-            prop.property_type = data.get('property_type', 'object')  # Default to object property
-            prop.domain_class_id = data.get('domain_class_id')
-            prop.range_class_id = data.get('range_class_id')
-            prop.ontology_id = ontology.id
+        # Get the property
+        prop = OntologyProperty.query.filter_by(id=property_id, ontology_id=ontology.id).first_or_404()
+        
+        if request.method == 'GET':
+            # Return property details
+            return jsonify({
+                "id": prop.id,
+                "name": prop.name,
+                "description": prop.description,
+                "property_type": prop.property_type,
+                "domain_class_id": prop.domain_class_id,
+                "range_class_id": prop.range_class_id
+            })
+        elif request.method == 'PUT':
+            # Update the property
+            data = request.get_json()
             
-            db.session.add(prop)
+            if 'name' in data:
+                prop.name = data['name']
+            if 'description' in data:
+                prop.description = data['description']
+            if 'property_type' in data:
+                prop.property_type = data['property_type']
+            if 'domain_class_id' in data:
+                prop.domain_class_id = data['domain_class_id']
+            if 'range_class_id' in data:
+                prop.range_class_id = data['range_class_id']
             
             # Update the last_modified timestamp on the ontology
             ontology.last_modified = datetime.datetime.utcnow()
@@ -1854,75 +1938,24 @@ def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, 
                 "property_type": prop.property_type,
                 "domain_class_id": prop.domain_class_id,
                 "range_class_id": prop.range_class_id
-            }), 201
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error creating property: {str(e)}")
-            return jsonify({"error": f"Failed to create property: {str(e)}"}), 500
-
-
-@app.route('/api/sandbox/<int:ontology_id>/properties/<int:property_id>', methods=['GET', 'PUT', 'DELETE'])
-def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, tuple[Response, int]]:
-    """API for a specific sandbox ontology property."""
-    # Default fallback response to ensure we always return a proper type
-    fallback_response: tuple[Response, int] = jsonify({"error": "Internal server error"}), 500
-    ontology = SandboxOntology.query.get_or_404(ontology_id)
-    
-    # Check if the user has access to this ontology
-    if ontology.user_id and ontology.user_id != current_user.id and not current_user.is_authenticated:
-        return jsonify({"error": "Unauthorized"}), 403
-    
-    # Get the property
-    prop = OntologyProperty.query.filter_by(id=property_id, ontology_id=ontology.id).first_or_404()
-    
-    if request.method == 'GET':
-        # Return property details
-        return jsonify({
-            "id": prop.id,
-            "name": prop.name,
-            "description": prop.description,
-            "property_type": prop.property_type,
-            "domain_class_id": prop.domain_class_id,
-            "range_class_id": prop.range_class_id
-        })
-    elif request.method == 'PUT':
-        # Update the property
-        data = request.get_json()
-        
-        if 'name' in data:
-            prop.name = data['name']
-        if 'description' in data:
-            prop.description = data['description']
-        if 'property_type' in data:
-            prop.property_type = data['property_type']
-        if 'domain_class_id' in data:
-            prop.domain_class_id = data['domain_class_id']
-        if 'range_class_id' in data:
-            prop.range_class_id = data['range_class_id']
-        
-        # Update the last_modified timestamp on the ontology
-        ontology.last_modified = datetime.datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({
-            "id": prop.id,
-            "name": prop.name,
-            "description": prop.description,
-            "property_type": prop.property_type,
-            "domain_class_id": prop.domain_class_id,
-            "range_class_id": prop.range_class_id
-        })
-    elif request.method == 'DELETE':
-        # Delete the property
-        db.session.delete(prop)
-        
-        # Update the last_modified timestamp on the ontology
-        ontology.last_modified = datetime.datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({"status": "success"}), 204
+            })
+        elif request.method == 'DELETE':
+            # Delete the property
+            db.session.delete(prop)
+            
+            # Update the last_modified timestamp on the ontology
+            ontology.last_modified = datetime.datetime.utcnow()
+            
+            db.session.commit()
+            
+            return jsonify({"status": "success"}), 204
+        else:
+            # Unsupported method
+            return jsonify({"error": "Method not allowed"}), 405
+    except Exception as e:
+        # Catch-all error handler
+        logger.error(f"Error in property API: {str(e)}")
+        return jsonify({"error": f"API error: {str(e)}"}), 500
 
 
 @app.route('/api/sandbox/ai/description', methods=['POST'])
