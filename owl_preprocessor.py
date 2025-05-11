@@ -11,11 +11,21 @@ def preprocess_expression(expr_string):
         expr_string (str): The original expression string
         
     Returns:
-        str: The preprocessed expression
+        tuple: (preprocessed_expression, detected_format)
+            - preprocessed_expression (str): The preprocessed expression
+            - detected_format (str): Detected format ('instance_of', 'traditional', or None)
     """
+    # Detect format (BFO standard with instance_of or traditional)
+    detected_format = None
+    if 'instance_of' in expr_string:
+        detected_format = 'instance_of'
+    elif any(re.search(r'\b' + cls + r'\([a-zA-Z0-9_]+\)', expr_string) 
+             for cls in ['Continuant', 'Occurrent', 'Process', 'Object']):
+        detected_format = 'traditional'
+    
     # Return original if no preprocessing needed
     if ',' not in expr_string:
-        return expr_string
+        return expr_string, detected_format
         
     # Pattern to match quantifiers with comma-separated variables
     pattern = r'(forall|exists)\s+([a-zA-Z0-9_]+)(?:,\s*([a-zA-Z0-9_,\s]+))\s*\('
@@ -44,4 +54,4 @@ def preprocess_expression(expr_string):
     # Apply the regex replacement for all matches
     preprocessed = re.sub(pattern, replacement, expr_string)
     
-    return preprocessed
+    return preprocessed, detected_format
