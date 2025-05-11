@@ -483,7 +483,8 @@ def analyze_owl(filename):
                                  classes=class_list,
                                  relations=object_properties,
                                  data_properties=data_properties,
-                                 individuals=individuals)
+                                 individuals=individuals,
+                                 original_filename=file_record.original_filename)
         else:
             # Create a new analysis
             return redirect(url_for('api_analyze_owl', filename=filename))
