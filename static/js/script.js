@@ -146,8 +146,35 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Display test results
     function displayResults(data) {
-        // Set expression text
-        expressionText.textContent = data.expression;
+        // Set expression text - use original expression if preprocessing was applied
+        expressionText.textContent = data.original_expression || data.expression;
+        
+        // Create or update preprocessed expression display
+        const preprocessedContainer = document.getElementById('preprocessed-container') || 
+            document.createElement('div');
+        preprocessedContainer.id = 'preprocessed-container';
+        
+        // If there was preprocessing applied, show it
+        if (data.preprocessed && data.preprocessed_expression) {
+            preprocessedContainer.innerHTML = `
+                <div class="alert alert-info mt-2">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Preprocessed Expression:</strong>
+                    </div>
+                    <pre class="bg-dark text-light p-2 rounded">${data.preprocessed_expression}</pre>
+                    <small class="text-muted">Multi-variable quantifiers were converted to nested quantifiers for processing.</small>
+                </div>
+            `;
+            
+            // Add after the expression text if not already there
+            if (!document.getElementById('preprocessed-container')) {
+                expressionText.parentNode.insertBefore(preprocessedContainer, expressionText.nextSibling);
+            }
+        } else if (preprocessedContainer.parentNode) {
+            // Remove the preprocessed container if it exists but no preprocessing happened
+            preprocessedContainer.parentNode.removeChild(preprocessedContainer);
+        }
         
         // Display format detected if available
         if (data.format_detected) {

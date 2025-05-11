@@ -3,6 +3,7 @@ import logging
 import uuid
 import datetime
 import base64
+import re
 from html import escape
 import json
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session, make_response
@@ -18,6 +19,8 @@ from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression, Sand
 # Import from improved OpenAI utils to avoid hanging issues
 from improved_openai_utils import suggest_ontology_classes, suggest_bfo_category, generate_class_description  
 from openai_utils import generate_real_world_implications
+# Import the preprocess_expression function for handling comma-separated quantifiers
+from owl_preprocessor import preprocess_expression
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -136,8 +139,22 @@ def test_expression():
     expression = data['expression']
     logger.debug(f"Testing expression: {expression}")
     
+    # Check if the expression contains comma-separated quantifiers and needs preprocessing
+    needs_preprocessing = ',' in expression and re.search(r'(forall|exists)\s+\w+\s*,', expression)
+    if needs_preprocessing:
+        processed_expr = preprocess_expression(expression)
+        logger.debug(f"Preprocessed expression: {processed_expr}")
+    else:
+        processed_expr = expression
+    
     try:
-        result = owl_tester.test_expression(expression)
+        result = owl_tester.test_expression(processed_expr)
+        
+        # Add preprocessing info to the result
+        if needs_preprocessing:
+            result['preprocessed'] = True
+            result['original_expression'] = expression
+            result['preprocessed_expression'] = processed_expr
         
         # Save the test result to the database
         # Associate expression with current user if logged in
