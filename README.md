@@ -1,126 +1,136 @@
-About FOL-BFO-OWL Tester
-Introduction
-The FOL-BFO-OWL Tester is a comprehensive web service designed to validate and test First-Order Logic (FOL) expressions against the Basic Formal Ontology (BFO) classes and relations, as well as analyze complete OWL ontologies for consistency, structure, and real-world implications.
+# FOL-BFO-OWL Tester
 
-This tool helps ontology developers, researchers, and students check if their logical expressions conform to BFO standards, identify potential issues in their formulations, and understand the practical implications of their ontological structures in real-world scenarios.
+## 🧠 Introduction
 
-How It Works
-FOL Expression Testing
-Enter a FOL Expression: Type or paste your first-order logic expression in the input field.
-Test the Expression: Click the "Test Expression" button to analyze your input.
-Review Results: The system will parse your expression, check it against BFO classes and relations, and display detailed results.
-Fix Issues: If any problems are detected, you can use the provided feedback to refine your expression.
-Ontology Analysis
-Upload OWL File: Select and upload your OWL ontology file.
-Review Analysis: The system automatically analyzes the ontology structure, consistency, and logical relationships.
-Explore FOL Premises: View the First-Order Logic premises extracted from your ontology.
-Generate Implications: Generate real-world implications based on your ontology's logical structure.
-The system checks for:
-Syntactic validity of FOL expressions
-Recognition of BFO classes and relations
-Identification of non-BFO terms
-Structural issues in expressions
-Ontology consistency and contradictions
-Class hierarchies and relationships
-Axiom validity and completeness
-Logical implications and entailments
-About BFO
-The Basic Formal Ontology (BFO) is a top-level ontology designed to support information integration, retrieval, and analysis across diverse scientific domains. BFO serves as a foundation for building domain-specific ontologies in a way that supports interoperability.
+**FOL-BFO-OWL Tester** is a comprehensive web service for validating and analyzing First-Order Logic (FOL) expressions and OWL ontologies using the **Basic Formal Ontology (BFO)** framework.
 
-BFO divides entities into two main categories:
+Designed for **ontology developers, researchers, and students**, this tool ensures that your logical expressions and ontological structures conform to BFO standards, revealing structural and semantic issues and offering real-world implications of your ontologies.
 
-Continuants
-Entities that persist through time while maintaining their identity, even as they undergo different sorts of changes. Examples include objects, qualities, and functions.
-Occurrents
-Entities that happen or unfold in time. Examples include processes, events, and temporal regions.
-For more information about BFO, visit the BFO official website.
+---
 
-Ontology Analysis Features
-Our system provides comprehensive ontology analysis capabilities, allowing you to:
+## ⚙️ How It Works
 
-Upload and Analyze OWL Files
-Upload your OWL (Web Ontology Language) ontology files for comprehensive analysis, including:
+### 🔍 FOL Expression Testing
 
-Class hierarchy extraction
-Relationship mapping
-Axiom identification
-Statistical analysis of ontology structure
-Consistency checking using reasoners
-FOL Premises Extraction
-The system extracts First-Order Logic (FOL) premises from your ontology, providing:
+1. **Enter a FOL Expression**: Input your expression in the provided field.
+2. **Test the Expression**: Click `Test Expression` to analyze it.
+3. **Review Results**: The system will validate syntax, check for BFO compatibility, and highlight issues.
+4. **Fix and Refine**: Use the feedback to adjust and correct expressions.
 
-Translation of OWL axioms to FOL statements
-Logical interpretation of ontology relations
-Human-readable descriptions of logical structures
-Identification of logical patterns and rules
-Real-World Implications Generation
-Using advanced AI technology, the system generates practical real-world implications from your ontology:
+### 🧩 Ontology Analysis
 
-AI-powered interpretation of logical structures
-Generation of concrete scenarios demonstrating logical rules
-Domain-specific examples of how ontology principles apply
-Explanations connecting scenarios to specific premises
-History and Analysis Tracking
-The system maintains a comprehensive history of your ontology analyses:
+1. **Upload OWL File**: Load your ontology into the system.
+2. **Review Structure**: View analysis of class hierarchies, axioms, and logical relations.
+3. **Explore FOL Premises**: Extract and inspect FOL expressions derived from your ontology.
+4. **Generate Implications**: Use AI to infer real-world consequences based on your ontology's logic.
 
-Track all uploaded ontologies
-Review previous analysis results
-Compare different versions of ontologies
-Access previously generated implications
-Build a knowledge base of ontology insights
-Recent Updates
-Based on valuable user feedback, we've made the following improvements to the system:
+### ✅ The system checks for:
+- FOL syntax correctness
+- BFO class and relation recognition
+- Use of non-BFO terms
+- Structural errors in logic
+- Ontology consistency and contradictions
+- Class hierarchies and relationships
+- Axiom validity and coverage
+- Logical entailments and real-world implications
 
-Added default BFO classes and relations when ontology file can't be loaded
-Fixed the LogicParser initialization to properly use imported module
-Implemented proper extraction of terms from BFO-style expressions
-Added missing methods for ontology analysis functionality
-System now properly recognizes both traditional and BFO-style notation
-Last updated: May 11, 2025
+---
 
-FOL Syntax Guide
-When writing First-Order Logic expressions for the tester, use the following syntax:
+## 🧱 About BFO
 
-Logical Operator	Symbol	Example
-Universal Quantifier	forall	forall x (Human(x) -> Mortal(x))
-Existential Quantifier	exists	exists x (Student(x) & Happy(x))
-Conjunction (AND)	&	Tall(john) & Strong(john)
-Disjunction (OR)	|	Happy(mary) | Sad(mary)
-Negation (NOT)	~	~Raining(today)
-Implication	->	Wet(grass) -> Rained(recently)
-Biconditional	<->	Bachelor(x) <-> (Man(x) & ~Married(x))
-Variables are typically represented by lowercase letters. Predicates and constants typically start with uppercase letters.
+The **Basic Formal Ontology (BFO)** is a domain-neutral top-level ontology used to support data integration and interoperability across disciplines.
 
-FOL Notation Formats
-The system now detects and supports both traditional and BFO standard notation formats for FOL expressions:
+BFO distinguishes between:
+- **Continuants**: Persistent entities (e.g., objects, qualities, functions)
+- **Occurrents**: Temporal entities (e.g., events, processes)
 
-Traditional Notation
-The legacy format where class membership is represented by applying a predicate to a variable:
+🔗 [Learn more about BFO](https://basic-formal-ontology.org)
 
-Continuant(x)
-This format is simpler but less semantically precise for complex BFO ontologies.
+---
 
-Example:
+## 🔎 Ontology Analysis Features
 
+- **Upload and Analyze OWL Files**
+  - Class hierarchies
+  - Relationship maps
+  - Axiom extraction
+  - Consistency checks with reasoners
+  - Statistical structure summaries
+
+- **FOL Premises Extraction**
+  - OWL → FOL translation
+  - Human-readable logic summaries
+  - Pattern and rule identification
+
+- **Real-World Implications Generation**
+  - AI-generated scenarios based on ontology logic
+  - Concrete use-cases with explanations
+  - Domain-specific insight generation
+
+- **History and Tracking**
+  - View previously uploaded ontologies
+  - Compare different versions
+  - Build a knowledge base over time
+
+---
+
+## 🔄 Recent Updates
+
+✅ **May 11, 2025**
+- Added default BFO terms when no ontology file is available
+- Fixed parser initialization bugs
+- Improved term extraction in BFO-style logic
+- Enhanced support for traditional and BFO notation
+- Expanded ontology analysis capabilities
+
+---
+
+## ✍️ FOL Syntax Guide
+
+| **Logic** | **Symbol** | **Example** |
+|-----------|------------|-------------|
+| Universal Quantifier | `forall` | `forall x (Human(x) -> Mortal(x))` |
+| Existential Quantifier | `exists` | `exists x (Student(x) & Happy(x))` |
+| AND (Conjunction) | `&` | `Tall(John) & Strong(John)` |
+| OR (Disjunction) | `\|` | `Happy(Mary) \| Sad(Mary)` |
+| NOT (Negation) | `~` | `~Raining(today)` |
+| Implication | `->` | `Wet(Grass) -> Rained(Recently)` |
+| Biconditional | `<->` | `Bachelor(x) <-> (Man(x) & ~Married(x))` |
+
+> 💡 *Use lowercase for variables, uppercase for predicates/constants.*
+
+---
+
+## 🔤 FOL Notation Formats
+
+### ✅ Traditional Notation (Simpler)
+```text
 forall x (Human(x) -> Mammal(x))
-BFO Standard Notation (Recommended)
-The BFO-preferred format that uses the instance_of relation to represent class membership with temporal contexts:
+```
 
-instance_of(x, Continuant, t)
-This format is more expressive and handles temporal aspects of BFO entities effectively.
+### ✅ BFO Standard Notation (Recommended)
+```text
+forall x, t (instance_of(x, Human, t) -> instance_of(x, Mammal, t))
+```
+- Uses `instance_of` and time-indexed class membership.
+- Supports temporal reasoning in line with BFO structure.
 
-Example:
+> The system **auto-detects** the format and provides context-sensitive feedback.
 
-forall x,t (instance_of(x, Human, t) -> instance_of(x, Mammal, t))
- New Feature: The system now automatically detects which format you're using and provides appropriate guidance. While both formats are supported, we recommend using the BFO Standard Notation (instance_of) for more precise and temporally-aware expressions.
-Project Information
-This web service is based on the FOL-BFO-OWL-tester by dkoepsell. The original Python script has been adapted and extended to provide a web interface and API for testing FOL expressions against BFO-OWL guidelines.
+---
 
-Technologies used:
+## 🛠️ Project Information
 
-Backend: Flask, Python, NLTK, Owlready2, PostgreSQL Database
-Frontend: HTML5, Bootstrap 5, JavaScript
-AI Integration: OpenAI API for generating real-world implications
-Reasoners: HermiT and Pellet for ontology consistency checking 
+Originally developed by [@dkoepsell](https://github.com/dkoepsell), the FOL-BFO-OWL Tester is built for deep semantic analysis of logical and ontological structures.
 
-#FormalOntology #Ontology #BasicFormalOntology #FirstOrderPredicateLogic
+### 🔧 Tech Stack
+- **Backend**: Python, Flask, NLTK, Owlready2, PostgreSQL
+- **Frontend**: HTML5, Bootstrap 5, JavaScript
+- **AI Integration**: OpenAI API (for implication generation)
+- **Ontology Reasoners**: HermiT, Pellet
+
+---
+
+## 🏷️ Tags
+
+`#FormalOntology` `#OntologyEngineering` `#BasicFormalOntology` `#FirstOrderLogic` `#SemanticWeb` `#AIReasoning` `#OWL` `#BFO`
