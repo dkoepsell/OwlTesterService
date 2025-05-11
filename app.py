@@ -619,11 +619,26 @@ def analyze_owl(filename):
         
         # Check if FOL premises are present and log them
         fol_premises = analysis.get('fol_premises', [])
-        logger.info(f"★★★ FOL PREMISES COUNT: {len(fol_premises)} ★★★")
+        logger.info(f"★★★ FOL PREMISES COUNT BEFORE RENDERING: {len(fol_premises)} ★★★")
         if fol_premises:
-            logger.info(f"★★★ SAMPLE FOL PREMISES: {fol_premises[:3]} ★★★")
+            logger.info(f"★★★ SAMPLE FOL PREMISES BEFORE RENDERING: {fol_premises[:3]} ★★★")
+            
+            # Ensure FOL premises are properly formatted for rendering
+            if isinstance(fol_premises, list) and all(isinstance(p, dict) for p in fol_premises):
+                logger.info("★★★ FOL premises are properly formatted as list of dictionaries ★★★")
+            else:
+                logger.warning("★★★ FOL premises are not properly formatted, converting... ★★★")
+                # Attempt to fix format if needed
+                if isinstance(fol_premises, str):
+                    logger.warning("★★★ FOL premises found as string, converting to list ★★★")
+                    try:
+                        import json
+                        fol_premises = json.loads(fol_premises)
+                        analysis['fol_premises'] = fol_premises
+                    except:
+                        logger.error("★★★ Failed to convert FOL premises from string ★★★")
         else:
-            logger.info(f"★★★ NO FOL PREMISES FOUND IN ANALYSIS DICT ★★★")
+            logger.warning(f"★★★ NO FOL PREMISES FOUND IN ANALYSIS DICT ★★★")
         
         # Update analysis with completeness validation if available
         if 'completeness' in analysis:
@@ -1118,86 +1133,156 @@ def api_analyze_owl(filename):
                 app.logger.info(f"★★★ GENERATING FOL PREMISES FOR {len(classes)} CLASSES ★★★")
                 
                 # Class instantiation premises for all classes (These form the basic ontology vocabulary)
+                class_count = 0
                 for cls in classes:
-                    cls_label = get_clean_label(cls)
-                    app.logger.info(f"★★★ Processing class URI: {cls}, label: {cls_label} ★★★")
-                    description = class_descriptions.get(cls, f"Entities that are {cls_label}")
-                    
-                    # Add a premise for membership in this class
-                    premise = {
-                        'type': 'class',
-                        'fol': f"instance_of(x, {cls_label}, t)",
-                        'description': description
-                    }
-                    app.logger.info(f"★★★ Adding FOL premise: {premise['fol']} ★★★")
-                    fol_premises.append(premise)
+                    try:
+                        cls_label = get_clean_label(cls)
+                        app.logger.info(f"★★★ Processing class URI: {cls}, label: {cls_label} ★★★")
+                        description = class_descriptions.get(cls, f"Entities that are {cls_label}")
+                        
+                        # Add a premise for membership in this class
+                        premise = {
+                            'type': 'class',
+                            'fol': f"instance_of(x, {cls_label}, t)",
+                            'description': description
+                        }
+                        app.logger.info(f"★★★ Adding FOL premise: {premise['fol']} ★★★")
+                        fol_premises.append(premise)
+                        class_count += 1
+                    except Exception as e:
+                        app.logger.error(f"★★★ Error processing class {cls}: {str(e)} ★★★")
+                
+                app.logger.info(f"★★★ Successfully created {class_count} class FOL premises ★★★")
                 
                 # Class hierarchy premises (subclass relationships)
+                subclass_count = 0
+                app.logger.info(f"★★★ PROCESSING SUBCLASS RELATIONSHIPS ★★★")
                 for s, p, o in g.triples((None, RDFS.subClassOf, None)):
-                    if str(s) in classes and str(o) in classes:
-                        s_label = get_clean_label(str(s))
-                        o_label = get_clean_label(str(o))
-                        fol = f"forall x (instance_of(x, {s_label}, t) -> instance_of(x, {o_label}, t))"
-                        fol_premises.append({
-                            'type': 'subclass',
-                            'fol': fol,
-                            'description': f"{s_label} is a subclass of {o_label}"
-                        })
+                    try:
+                        if str(s) in classes and str(o) in classes:
+                            s_label = get_clean_label(str(s))
+                            o_label = get_clean_label(str(o))
+                            app.logger.info(f"★★★ Found subClassOf: {s_label} is a subclass of {o_label} ★★★")
+                            fol = f"forall x (instance_of(x, {s_label}, t) -> instance_of(x, {o_label}, t))"
+                            
+                            premise = {
+                                'type': 'subclass',
+                                'fol': fol,
+                                'description': f"{s_label} is a subclass of {o_label}"
+                            }
+                            app.logger.info(f"★★★ Adding subclass FOL premise: {premise['fol']} ★★★")
+                            fol_premises.append(premise)
+                            subclass_count += 1
+                    except Exception as e:
+                        app.logger.error(f"★★★ Error processing subclass relation: {str(e)} ★★★")
+                
+                app.logger.info(f"★★★ Successfully created {subclass_count} subclass FOL premises ★★★")
                 
                 # Domain and range premises for object properties
+                property_count = 0
+                app.logger.info(f"★★★ PROCESSING OBJECT PROPERTIES: {len(obj_properties)} ★★★")
+                
                 for p in obj_properties:
-                    # Get property label and description
-                    p_label = get_clean_label(p)
-                    p_desc = ""
-                    for _, _, c in g.triples((rdflib.URIRef(p), RDFS.comment, None)):
-                        p_desc = str(c)
-                        break
-                    
-                    # Add a premise for the existence of this property
-                    if not p_desc:
-                        # Create a description based on domain and range if available
-                        domain_labels = []
-                        range_labels = []
+                    try:
+                        # Get property label and description
+                        p_label = get_clean_label(p)
+                        app.logger.info(f"★★★ Processing property URI: {p}, label: {p_label} ★★★")
+                        
+                        p_desc = ""
+                        for _, _, c in g.triples((rdflib.URIRef(p), RDFS.comment, None)):
+                            p_desc = str(c)
+                            break
+                        
+                        # Add a premise for the existence of this property
+                        if not p_desc:
+                            # Create a description based on domain and range if available
+                            domain_labels = []
+                            range_labels = []
+                            for _, _, d in g.triples((rdflib.URIRef(p), RDFS.domain, None)):
+                                if str(d) in classes:
+                                    domain_labels.append(get_clean_label(str(d)))
+                            for _, _, r in g.triples((rdflib.URIRef(p), RDFS.range, None)):
+                                if str(r) in classes:
+                                    range_labels.append(get_clean_label(str(r)))
+                            
+                            if domain_labels and range_labels:
+                                p_desc = f"Relationship from {', '.join(domain_labels)} to {', '.join(range_labels)}"
+                            else:
+                                p_desc = f"The property {p_label}"
+                        
+                        # Add a premise for this property
+                        premise = {
+                            'type': 'property',
+                            'fol': f"{p_label}(x, y, t)",
+                            'description': p_desc
+                        }
+                        app.logger.info(f"★★★ Adding property FOL premise: {premise['fol']} ★★★")
+                        fol_premises.append(premise)
+                        property_count += 1
+                    except Exception as e:
+                        app.logger.error(f"★★★ Error processing property {p}: {str(e)} ★★★")
+                
+                app.logger.info(f"★★★ Successfully created {property_count} property FOL premises ★★★")
+                
+                # Process domain and range restrictions for properties
+                domain_count = 0
+                range_count = 0
+                app.logger.info(f"★★★ PROCESSING DOMAIN AND RANGE RESTRICTIONS ★★★")
+                
+                # Process all domain restrictions
+                for p in obj_properties:
+                    try:
+                        p_label = get_clean_label(p)
+                        app.logger.info(f"★★★ Checking domain restrictions for property: {p_label} ★★★")
+                        
+                        # Domain restrictions
                         for _, _, d in g.triples((rdflib.URIRef(p), RDFS.domain, None)):
                             if str(d) in classes:
-                                domain_labels.append(get_clean_label(str(d)))
+                                d_label = get_clean_label(str(d))
+                                app.logger.info(f"★★★ Found domain restriction: {p_label} has domain {d_label} ★★★")
+                                
+                                # Create FOL for domain restriction
+                                fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(x, {d_label}, t))"
+                                premise = {
+                                    'type': 'domain',
+                                    'fol': fol,
+                                    'description': f"Domain of {p_label} is {d_label}"
+                                }
+                                app.logger.info(f"★★★ Adding domain FOL premise: {fol} ★★★")
+                                fol_premises.append(premise)
+                                domain_count += 1
+                    except Exception as e:
+                        app.logger.error(f"★★★ Error processing domain for property {p}: {str(e)} ★★★")
+                
+                # Process all range restrictions
+                for p in obj_properties:
+                    try:
+                        p_label = get_clean_label(p)
+                        app.logger.info(f"★★★ Checking range restrictions for property: {p_label} ★★★")
+                        
+                        # Range restrictions
                         for _, _, r in g.triples((rdflib.URIRef(p), RDFS.range, None)):
                             if str(r) in classes:
-                                range_labels.append(get_clean_label(str(r)))
-                        
-                        if domain_labels and range_labels:
-                            p_desc = f"Relationship from {', '.join(domain_labels)} to {', '.join(range_labels)}"
-                        else:
-                            p_desc = f"The property {p_label}"
-                    
-                    # Add a premise for this property
-                    fol_premises.append({
-                        'type': 'property',
-                        'fol': f"{p_label}(x, y, t)",
-                        'description': p_desc
-                    })
-                    
-                    # Domain restrictions
-                    for _, _, d in g.triples((rdflib.URIRef(p), RDFS.domain, None)):
-                        if str(d) in classes:
-                            d_label = get_clean_label(str(d))
-                            fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(x, {d_label}, t))"
-                            fol_premises.append({
-                                'type': 'domain',
-                                'fol': fol,
-                                'description': f"Domain of {p_label} is {d_label}"
-                            })
-                    
-                    # Range restrictions
-                    for _, _, r in g.triples((rdflib.URIRef(p), RDFS.range, None)):
-                        if str(r) in classes:
-                            r_label = get_clean_label(str(r))
-                            fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(y, {r_label}, t))"
-                            fol_premises.append({
-                                'type': 'range',
-                                'fol': fol,
-                                'description': f"Range of {p_label} is {r_label}"
-                            })
+                                r_label = get_clean_label(str(r))
+                                app.logger.info(f"★★★ Found range restriction: {p_label} has range {r_label} ★★★")
+                                
+                                # Create FOL for range restriction
+                                fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(y, {r_label}, t))"
+                                premise = {
+                                    'type': 'range',
+                                    'fol': fol,
+                                    'description': f"Range of {p_label} is {r_label}"
+                                }
+                                app.logger.info(f"★★★ Adding range FOL premise: {fol} ★★★")
+                                fol_premises.append(premise)
+                                range_count += 1
+                    except Exception as e:
+                        app.logger.error(f"★★★ Error processing range for property {p}: {str(e)} ★★★")
+                
+                # Log the final count of all FOL premises
+                total_premises = len(fol_premises)
+                app.logger.info(f"★★★ TOTAL FOL PREMISES GENERATED: {total_premises} ★★★")
+                app.logger.info(f"★★★ Classes: {class_count}, Subclasses: {subclass_count}, Properties: {property_count}, Domains: {domain_count}, Ranges: {range_count} ★★★")
                 
                 # Create analysis dictionary
                 analysis = {
@@ -1207,6 +1292,7 @@ def api_analyze_owl(filename):
                     'individuals': len(individuals),
                     'annotation_properties': len(annot_properties),
                     'imported_ontologies': [],
+                    'fol_premises': fol_premises,  # Explicitly add FOL premises to analysis dict
                     'axioms': axiom_count,
                     'class_list': class_list,
                     'object_property_list': obj_property_list,
@@ -1235,8 +1321,13 @@ def api_analyze_owl(filename):
                 app.logger.info(f"Found object properties: {[p.split('#')[-1] if '#' in p else p.split('/')[-1] for p in obj_properties]}")
                 app.logger.info(f"Class list: {[c['name'] for c in class_list]}")
                 app.logger.info(f"Object property list: {[p['name'] for p in obj_property_list]}")
+                
+                # Log FOL premises for verification
                 if fol_premises:
-                    app.logger.info(f"FOL premises: {[p['fol'] for p in fol_premises[:3]]}...")
+                    app.logger.info(f"★★★ FOL PREMISES SAMPLE: {[p['fol'] for p in fol_premises[:3]]} ★★★")
+                    app.logger.info(f"★★★ FOL PREMISES IN ANALYSIS DICT: {len(analysis.get('fol_premises', []))} ★★★")
+                else:
+                    app.logger.warning(f"★★★ NO FOL PREMISES GENERATED FOR THIS ONTOLOGY ★★★")
                 
                 # Skip owlready2 analysis
                 onto = "rdflib_analyzed"
