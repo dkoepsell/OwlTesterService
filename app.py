@@ -524,6 +524,7 @@ def api_analyze_owl(filename):
         
         axioms = analysis_result.get('axioms', [])
         consistency_issues = analysis_result.get('consistency_issues', [])
+        inferred_axioms = analysis_result.get('inferred_axioms', [])
         
         # Create a new analysis record
         analysis = OntologyAnalysis(
@@ -540,7 +541,8 @@ def api_analyze_owl(filename):
             expressivity=expressivity,
             complexity=complexity,
             axioms=axioms,
-            consistency_issues=consistency_issues
+            consistency_issues=consistency_issues,
+            inferred_axioms=inferred_axioms
         )
         
         # Attempt to extract FOL premises from the ontology

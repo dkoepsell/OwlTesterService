@@ -493,6 +493,11 @@ class OwlTester:
                                 'description': f"{cls.name} ⊑ {parent.name}"
                             })
             
+            # Also create a list for inferred axioms
+            inferred_axioms_list = []
+            # For now, add some placeholder inferred axioms (would be populated in a real reasoner)
+            # You can remove this in production or replace with actual inference logic
+            
             # Build the result dictionary
             result = {
                 'classes': len(classes_list),
@@ -503,6 +508,7 @@ class OwlTester:
                 'imported_ontologies': [o.base_iri for o in onto.imported_ontologies],
                 'axiom_count': axiom_count,
                 'axioms': axioms_list,  # List of axioms with type and description
+                'inferred_axioms': inferred_axioms_list,  # List of inferred axioms
                 'class_list': [cls.name for cls in classes_list if hasattr(cls, 'name')],
                 'object_property_list': [prop.name for prop in object_properties_list if hasattr(prop, 'name')],
                 'data_property_list': [prop.name for prop in data_properties_list if hasattr(prop, 'name')],
@@ -536,6 +542,7 @@ class OwlTester:
                 'imported_ontologies': [],
                 'axiom_count': 0,
                 'axioms': [],
+                'inferred_axioms': [],
                 'consistency': 'Unknown',
                 'expressivity': 'Unknown',
                 'error': str(e)

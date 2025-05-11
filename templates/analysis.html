@@ -265,12 +265,18 @@
                             </tr>
                         </thead>
                         <tbody id="inferredAxiomsTable">
-                            {% for axiom in analysis.inferred_axioms %}
-                            <tr>
-                                <td><span class="badge bg-info">{{ axiom.type }}</span></td>
-                                <td>{{ axiom.description }}</td>
-                            </tr>
-                            {% endfor %}
+                            {% if analysis.inferred_axioms %}
+                                {% for axiom in analysis.inferred_axioms %}
+                                <tr>
+                                    <td><span class="badge bg-info">{{ axiom.type }}</span></td>
+                                    <td>{{ axiom.description }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="2" class="text-center">No inferred axioms available</td>
+                                </tr>
+                            {% endif %}
                         </tbody>
                     </table>
                 </div>
