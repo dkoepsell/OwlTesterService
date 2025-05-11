@@ -1,0 +1,2477 @@
+import re
+import os
+import nltk
+import uuid
+import owlready2
+import logging
+from owlready2 import *
+from nltk.sem.logic import LogicalExpressionException
+from nltk.sem import Expression
+from openai_utils import generate_real_world_implications
+from plantuml_generator import PlantUMLGenerator
+
+# Load required NLTK resources if needed
+try:
+    # Check if punkt tokenizer is available
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
+class OwlTester:
+    def __init__(self, ontology_path=None):
+        """
+        Initialize the OwlTester with default ontology and settings.
+        
+        Args:
+            ontology_path (str, optional): Path to custom OWL file. If None, uses BFO ontology.
+        """
+        # Initialize flags for tracking the loading method
+        self.is_rdflib_model = False
+        self.is_xml_fallback = False
+        self.is_rdf_xml_manual = False
+        self.rdflib_graph = None
+        self.ontology_iri = None
+        self.subclass_relations = []
+        
+        # Initialize logical expressions reader
+        self.read_expr = Expression.fromstring
+        
+        # Initialize report data
+        self.axioms = []
+        self.inconsistencies = []
+        self.inferred_axioms = []
+        
+        # Load default BFO ontology if no custom path provided
+        if ontology_path is None:
+            try:
+                self.onto = get_ontology("http://purl.obolibrary.org/obo/bfo.owl").load()
+                self.ontology_source = "BFO (default)"
+                # Prepare ontology for testing
+                self.prepare_ontology()
+            except Exception as e:
+                print(f"Failed to load default BFO ontology: {str(e)}")
+                # Fallback to empty ontology
+                self.onto = None
+                self.ontology_source = "Empty (failed to load BFO)"
+                self.bfo_classes = []
+                self.bfo_relations = []
+        else:
+            # Try to load the custom ontology using our robust method
+            result = self.load_ontology_from_file(ontology_path)
+            
+            # Handle result
+            if result is not True:
+                # If loading failed and returned an error message
+                if isinstance(result, tuple) and len(result) == 2 and not result[0]:
+                    raise Exception(f"Failed to load ontology: {result[1]}")
+                # If loading failed with an unknown result format
+                elif result is not True:
+                    raise Exception("Failed to load ontology for unknown reason")
+    
+    def prepare_ontology(self):
+        """Prepare the ontology for testing by collecting classes and relations."""
+        self.bfo_classes = []
+        self.bfo_class_map = {}  # Map for lookup by name
+        self.bfo_relations = []
+        self.relation_map = {}   # Map for lookup by name
+        self.data_properties = []
+        self.individuals = []
+        self.annotation_properties = []
+        
+        # Helper function to get human-readable label
+        def get_readable_label(entity):
+            # First check for rdfs:label
+            if hasattr(entity, 'label') and entity.label:
+                labels = entity.label
+                if isinstance(labels, list) and labels:
+                    return str(labels[0])
+                return str(labels)
+            
+            # Then check for name attribute
+            if hasattr(entity, 'name') and entity.name:
+                # Format name for better readability
+                name = entity.name
+                # Extract the term after '#' or '/' if applicable (common in URIs)
+                if '#' in name:
+                    name = name.split('#')[-1]
+                elif '/' in name:
+                    name = name.split('/')[-1]
+                # Format: replace underscores with spaces, capitalize
+                name = name.replace('_', ' ').title()
+                return name
+                
+            # If no label or name, use the string representation as last resort
+            return str(entity)
+        
+        try:
+            # Collect classes - convert generator to list first
+            ontology_classes = list(self.onto.classes())
+            for c in ontology_classes:
+                classname = c.name
+                if classname is not None:
+                    label = get_readable_label(c)
+                    self.bfo_classes.append(label)  # Use label for display
+                    self.bfo_class_map[classname.lower()] = {
+                        'id': classname,
+                        'label': label
+                    }
+        except Exception as e:
+            print(f"Error collecting classes: {str(e)}")
+        
+        try:
+            # Collect object properties (relations) - convert generator to list first
+            obj_properties = list(self.onto.object_properties())
+            for op in obj_properties:
+                propname = op.name
+                if propname is not None:
+                    label = get_readable_label(op)
+                    self.bfo_relations.append(label)  # Use label for display
+                    self.relation_map[propname.lower()] = {
+                        'id': propname,
+                        'label': label
+                    }
+        except Exception as e:
+            print(f"Error collecting object properties: {str(e)}")
+        
+        try:
+            # Collect data properties - convert generator to list first
+            data_properties = list(self.onto.data_properties())
+            for dp in data_properties:
+                propname = dp.name
+                if propname is not None:
+                    label = get_readable_label(dp)
+                    self.data_properties.append(label)
+        except Exception as e:
+            print(f"Error collecting data properties: {str(e)}")
+        
+        try:
+            # Collect individuals - convert generator to list first
+            indiv_list = list(self.onto.individuals())
+            for i in indiv_list:
+                indname = i.name
+                if indname is not None:
+                    label = get_readable_label(i)
+                    self.individuals.append(label)
+        except Exception as e:
+            print(f"Error collecting individuals: {str(e)}")
+                
+        try:
+            # Collect annotation properties - convert generator to list first
+            annot_properties = list(self.onto.annotation_properties())
+            for ap in annot_properties:
+                propname = ap.name
+                if propname is not None:
+                    label = get_readable_label(ap)
+                    self.annotation_properties.append(label)
+        except Exception as e:
+            print(f"Error collecting annotation properties: {str(e)}")
+    
+    def preprocess_expression(self, expr_string):
+        """
+        Preprocess the input expression to handle BFO-style multi-variable quantifiers.
+        
+        Converts expressions like "forall x,t (...)" to "forall x (forall t (...))"
+        to make them compatible with NLTK's parser.
+        
+        Args:
+            expr_string (str): The original expression string
+            
+        Returns:
+            str: The preprocessed expression
+        """
+        # Return original if no preprocessing needed
+        if ',' not in expr_string:
+            return expr_string
+            
+        # Pattern to match quantifiers with comma-separated variables
+        pattern = r'(forall|exists)\s+([a-zA-Z0-9_]+)(?:,\s*([a-zA-Z0-9_,\s]+))\s*\('
+        
+        def replacement(match):
+            quantifier = match.group(1)  # 'forall' or 'exists'
+            first_var = match.group(2)   # First variable
+            other_vars = match.group(3)  # Remaining variables (comma-separated)
+            
+            # Split remaining variables and strip whitespace
+            var_list = [var.strip() for var in other_vars.split(',')]
+            
+            # Build nested quantifiers from inside out
+            inner_expr = '('  # This will be closed by the original expression
+            
+            # Build the nested quantifier structure from the innermost outward
+            for var in reversed(var_list):
+                if var:  # Skip empty strings
+                    inner_expr = f"{quantifier} {var} {inner_expr}"
+            
+            # Add the outermost quantifier with the first variable
+            result = f"{quantifier} {first_var} {inner_expr}"
+            
+            return result
+        
+        # Apply the regex replacement for all matches
+        preprocessed = re.sub(pattern, replacement, expr_string)
+        
+        return preprocessed
+    
+    def test_expression(self, input_expr):
+        """
+        Test a FOL expression against BFO-OWL guidelines.
+        
+        Args:
+            input_expr (str): The FOL expression to test
+            
+        Returns:
+            dict: Results of the test including validity, issues, and metadata
+        """
+        result = {
+            "valid": False,
+            "issues": [],
+            "expression": input_expr,
+            "bfo_classes_used": [],
+            "bfo_relations_used": [],
+            "non_bfo_terms": [],
+            "format_detected": None  # Will be set to "instance_of" or "traditional"
+        }
+        
+        # Check if input is empty
+        if not input_expr or input_expr.strip() == "":
+            result["issues"].append("Empty expression provided")
+            return result
+            
+        # Preprocess the expression to handle BFO-style multi-variable quantifiers
+        preprocessed_expr = self.preprocess_expression(input_expr)
+        result["preprocessed_expr"] = preprocessed_expr
+        
+        # Parse the preprocessed expression
+        try:
+            expr = self.read_expr(preprocessed_expr)
+            result["parsed_expr"] = str(expr)
+        except LogicalExpressionException as e:
+            result["issues"].append(f"Parsing error: {str(e)}")
+            # Include info about the original and preprocessed expressions
+            if preprocessed_expr != input_expr:
+                result["issues"].append(f"Note: The system attempted to preprocess your expression to handle multiple variables in quantifiers. If using the instance_of notation with temporal variables, try using multiple nested quantifiers instead of comma-separated variables.")
+            return result
+        
+        # Detect the format used in the expression
+        if re.search(r'instance_of\s*\(', input_expr, re.IGNORECASE):
+            result["format_detected"] = "instance_of"
+        elif re.search(r'\w+\s*\(\w+\)', input_expr):
+            result["format_detected"] = "traditional"
+        else:
+            # If neither format is clearly detected
+            result["format_detected"] = "unknown"
+            
+        # If the instance_of format is not detected, add a suggestion
+        if result["format_detected"] != "instance_of":
+            result["issues"].append("Consider using the BFO standard instance_of(x,Class,t) format for clearer semantics.")
+            
+        # Extract terms from the expression
+        terms = self.extract_terms(input_expr)
+        
+        # Check terms against BFO classes and relations
+        self.check_terms_against_bfo(terms, result)
+        
+        # Check syntax and structure
+        self.check_syntax_and_structure(input_expr, result)
+        
+        # If no issues, mark as valid
+        if not result["issues"]:
+            result["valid"] = True
+        
+        return result
+    
+    def preprocess_expression(self, expr_string):
+        """
+        Preprocess the input expression to handle BFO-style multi-variable quantifiers.
+        
+        Converts expressions like "forall x,t (...)" to "forall x (forall t (...))"
+        to make them compatible with NLTK's parser.
+        
+        Args:
+            expr_string (str): The original expression string
+            
+        Returns:
+            str: The preprocessed expression
+        """
+        # Return original if no preprocessing needed
+        if ',' not in expr_string:
+            return expr_string
+            
+        # Pattern to match quantifiers with comma-separated variables
+        pattern = r'(forall|exists)\s+([a-zA-Z0-9_]+)(?:,\s*([a-zA-Z0-9_,\s]+))\s*\('
+        
+        def replacement(match):
+            quantifier = match.group(1)  # 'forall' or 'exists'
+            first_var = match.group(2)   # First variable
+            other_vars = match.group(3)  # Remaining variables (comma-separated)
+            
+            # Split remaining variables and strip whitespace
+            var_list = [var.strip() for var in other_vars.split(',')]
+            
+            # Build nested quantifiers from inside out
+            inner_expr = '('  # This will be closed by the original expression
+            
+            # Build the nested quantifier structure from the innermost outward
+            for var in reversed(var_list):
+                if var:  # Skip empty strings
+                    inner_expr = f"{quantifier} {var} {inner_expr}"
+            
+            # Add the outermost quantifier with the first variable
+            result = f"{quantifier} {first_var} {inner_expr}"
+            
+            return result
+        
+        # Apply the regex replacement for all matches
+        preprocessed = re.sub(pattern, replacement, expr_string)
+        
+        return preprocessed
+        
+    def extract_terms(self, expr_string):
+        """
+        Extract all terms from the expression string.
+        Handles both traditional notation (Class(x)) and BFO-style (instance_of(x,Class,t)) formats.
+        """
+        # Initialize variables to store extracted terms
+        extracted_terms = []
+        
+        # Pattern for extracting instance_of expressions: instance_of(x, Class, t)
+        instance_of_pattern = r'instance_of\s*\(\s*\w+\s*,\s*(\w+)\s*,\s*\w+\s*\)'
+        
+        # Pattern for extracting traditional class expressions: Class(x)
+        traditional_pattern = r'(\w+)\s*\(\s*\w+\s*\)'
+        
+        # Pattern for extracting binary relations: relation(x, y)
+        relation_pattern = r'(\w+)\s*\(\s*\w+\s*,\s*\w+(?:\s*,\s*\w+)?\s*\)'
+        
+        # Find all instance_of expressions and extract the class names
+        for match in re.finditer(instance_of_pattern, expr_string):
+            class_name = match.group(1)
+            if class_name and class_name not in ['instance_of']:
+                extracted_terms.append(class_name)
+        
+        # Find all traditional class expressions
+        for match in re.finditer(traditional_pattern, expr_string):
+            class_name = match.group(1)
+            if class_name and class_name not in ['instance_of', 'forall', 'exists']:
+                extracted_terms.append(class_name)
+        
+        # Find all binary relation expressions
+        for match in re.finditer(relation_pattern, expr_string):
+            relation_name = match.group(1)
+            if relation_name and relation_name not in ['instance_of', 'forall', 'exists']:
+                extracted_terms.append(relation_name)
+        
+        # Remove duplicates and return
+        return list(set(extracted_terms))
+            r'participates_in\s*\(\s*\w+\s*,\s*(\w+)\s*', # participates_in(x,p)
+            r'has_participant\s*\(\s*\w+\s*,\s*(\w+)\s*'  # has_participant(p,x)
+        ]
+        
+        # Extract relation names as well
+        relation_names = ['instance_of', 'exists_at', 'located_in', 'occurs_in', 
+                         'part_of', 'has_part', 'participates_in', 'has_participant']
+        
+        instance_terms = []
+        for pattern in instance_patterns:
+            matches = re.findall(pattern, expr_string, re.IGNORECASE)
+            instance_terms.extend(matches)
+            
+        # Add relation names themselves to be matched
+        relations_in_expr = []
+        for relation in relation_names:
+            if re.search(r'\b' + relation + r'\b', expr_string, re.IGNORECASE):
+                relations_in_expr.append(relation)
+        
+        # Then extract traditional format Class(x)
+        class_pattern = r'(\w+)\s*\([a-z][a-z0-9_]*\)'  # Class(x)
+        class_terms = re.findall(class_pattern, expr_string)
+        
+        # Remove logical operators and separators for remaining terms
+        cleaned = re.sub(r'[&|~()<>.-]', ' ', expr_string)
+        # Remove logical words and relation words
+        logical_words = ['exists', 'forall', 'implies', 'iff', 'lambda', 'if', 'then', 'and', 'or', 'not']
+        for word in logical_words + relation_names + ['temporal_region', 'continuant']:
+            cleaned = re.sub(r'\b' + word + r'\b', ' ', cleaned, flags=re.IGNORECASE)
+        
+        # Split by spaces and filter out empty strings
+        remaining_terms = [term.strip() for term in cleaned.split() if term.strip()]
+        
+        # Combine all terms and filter out variables (single lowercase letters)
+        all_terms = instance_terms + class_terms + remaining_terms + relations_in_expr
+        filtered_terms = [term for term in all_terms if term and not (len(term) == 1 and term.islower())]
+        
+        return filtered_terms
+    
+    def check_terms_against_bfo(self, terms, result):
+        """Check terms against BFO classes and relations."""
+        # Use our class and relation maps for lookup
+        for term in terms:
+            # Skip variables and logical operators
+            if term.islower() or term in ['and', 'or', 'not', 'implies', 'iff', 'exists', 'forall']:
+                continue
+                
+            # Case-insensitive check for BFO classes
+            term_lower = term.lower()
+            if term_lower in self.bfo_class_map:
+                class_info = self.bfo_class_map[term_lower]
+                original_id = class_info['id']
+                display_label = class_info['label']
+                
+                if display_label not in result["bfo_classes_used"]:
+                    result["bfo_classes_used"].append(display_label)
+                    if term != original_id:
+                        # Suggest proper instance_of notation
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{display_label}'. " +
+                                              f"Consider using the exact ID '{original_id}' in instance_of format: " + 
+                                              f"instance_of(x,{original_id},t)")
+            
+            # Case-insensitive check for BFO relations
+            elif term_lower in self.relation_map:
+                relation_info = self.relation_map[term_lower]
+                original_id = relation_info['id']
+                display_label = relation_info['label']
+                
+                if display_label not in result["bfo_relations_used"]:
+                    result["bfo_relations_used"].append(display_label)
+                    if term != original_id:
+                        # Suggest proper relation format
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{display_label}'. " +
+                                             f"Consider using the exact ID '{original_id}' in format: " +
+                                             f"{original_id}(x,y)")
+            
+            # Handle terms that might be in BFO but with different formatting
+            elif any(term_lower in label.lower() for label in self.bfo_classes):
+                # Find matching class by partial name match
+                matching_classes = [cls for cls in self.bfo_classes if term_lower in cls.lower()]
+                if matching_classes:
+                    closest_match = matching_classes[0]
+                    result["bfo_classes_used"].append(closest_match)
+                    result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{closest_match}'. This is a partial match.")
+            
+            # Handle terms that might be object properties with different formatting
+            elif any(term_lower in rel.lower() for rel in self.bfo_relations):
+                # Find matching relation by partial name match
+                matching_relations = [rel for rel in self.bfo_relations if term_lower in rel.lower()]
+                if matching_relations:
+                    closest_match = matching_relations[0]
+                    result["bfo_relations_used"].append(closest_match)
+                    result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{closest_match}'. This is a partial match.")
+            
+            else:
+                # Term not found even with case-insensitive matching
+                if not term.islower() and term not in result["non_bfo_terms"]:
+                    result["non_bfo_terms"].append(term)
+                    result["issues"].append(f"Term '{term}' is not recognized as a BFO class or relation.")
+    
+    def check_syntax_and_structure(self, expr_string, result):
+        """Check the syntax and structure of the expression."""
+        # Check for balanced parentheses
+        if expr_string.count('(') != expr_string.count(')'):
+            result["issues"].append("Unbalanced parentheses in the expression")
+        
+        # Check for common syntax issues
+        if re.search(r'\(\s*\)', expr_string):
+            result["issues"].append("Empty parentheses found")
+        
+        if re.search(r'[&|]\s*[&|]', expr_string):
+            result["issues"].append("Consecutive logical operators found")
+        
+        # Check for proper quantifier usage
+        quantifiers = re.findall(r'\b(exists|forall)\b\s*[a-zA-Z]+', expr_string)
+        if not quantifiers and ('exists' in expr_string or 'forall' in expr_string):
+            result["issues"].append("Quantifier used without a variable")
+
+    def get_bfo_classes(self):
+        """
+        Return all available BFO classes with their human-readable labels.
+        
+        Returns:
+            list: A list of dictionaries with id and label for each class
+        """
+        class_info = []
+        for cls_label in self.bfo_classes:
+            # Find the class ID from our map (if available)
+            cls_id = None
+            for key, value in self.bfo_class_map.items():
+                if value['label'] == cls_label:
+                    cls_id = value['id']
+                    break
+            
+            class_info.append({
+                'id': cls_id or cls_label,  # Fallback to label if ID not found
+                'label': cls_label
+            })
+        
+        # Sort by label for better readability
+        return sorted(class_info, key=lambda x: x['label'])
+    
+    def get_bfo_relations(self):
+        """
+        Return all available BFO relations with their human-readable labels.
+        
+        Returns:
+            list: A list of dictionaries with id and label for each relation
+        """
+        relation_info = []
+        for rel_label in self.bfo_relations:
+            # Find the relation ID from our map (if available)
+            rel_id = None
+            for key, value in self.relation_map.items():
+                if value['label'] == rel_label:
+                    rel_id = value['id']
+                    break
+            
+            relation_info.append({
+                'id': rel_id or rel_label,  # Fallback to label if ID not found
+                'label': rel_label
+            })
+        
+        # Sort by label for better readability
+        return sorted(relation_info, key=lambda x: x['label'])
+        
+    def get_data_properties(self):
+        """Return all available data properties."""
+        return sorted(self.data_properties)
+        
+    def get_annotation_properties(self):
+        """Return all available annotation properties."""
+        return sorted(self.annotation_properties)
+        
+    def get_individuals(self):
+        """Return all individuals in the ontology."""
+        return sorted(self.individuals)
+    
+    def generate_all_implications(self, num_implications_per_premise=1):
+        """
+        Generate real-world implications for all FOL premises systematically.
+        
+        Args:
+            num_implications_per_premise (int): Number of implications to generate per premise
+            
+        Returns:
+            list: A list of generated implications
+        """
+        all_implications = []
+        
+        try:
+            # Get the domain classes and FOL premises
+            domain_classes = self.bfo_classes
+            fol_premises = self.generate_fol_premises()
+            
+            # Use the existing ontology name or a default
+            ontology_name = getattr(self.onto, 'name', None) or "Ontology"
+            
+            # Group premises by type for more coherent implications
+            premises_by_type = {}
+            for premise in fol_premises:
+                premise_type = premise.get("type", "Unknown")
+                if premise_type not in premises_by_type:
+                    premises_by_type[premise_type] = []
+                premises_by_type[premise_type].append(premise)
+            
+            # Generate implications for each type of premise
+            for premise_type, premises in premises_by_type.items():
+                # Select a representative set of premises for this type
+                # (limit to 3-5 premises per type to avoid excessive API calls)
+                max_premises_per_type = min(5, len(premises))
+                selected_premises = premises[:max_premises_per_type]
+                
+                # Generate implications for this batch of premises
+                try:
+                    # Use the generate_real_world_implications function from openai_utils
+                    batch_implications = generate_real_world_implications(
+                        ontology_name=ontology_name,
+                        domain_classes=domain_classes,
+                        fol_premises=selected_premises,
+                        num_implications=num_implications_per_premise * len(selected_premises)
+                    )
+                    
+                    if batch_implications:
+                        all_implications.extend(batch_implications)
+                except Exception as e:
+                    print(f"Error generating implications for {premise_type}: {str(e)}")
+            
+        except Exception as e:
+            print(f"Error generating all implications: {str(e)}")
+            
+        return all_implications
+    
+    def analyze_ontology(self):
+        """
+        Analyze the loaded ontology for axioms, consistency and generate report.
+        
+        Returns:
+            dict: A report containing ontology statistics, axioms, consistency issues, 
+                 FOL premises, and completeness metrics
+        """
+        # Handle differently based on if we're using RDFLib or Owlready2
+        if self.is_rdflib_model:
+            return self._analyze_ontology_rdflib()
+        else:
+            return self._analyze_ontology_owlready()
+    
+    def _analyze_ontology_rdflib(self):
+        """
+        Analyze the loaded ontology using RDFLib's limited capabilities.
+        
+        Returns:
+            dict: A simplified report for RDFLib-parsed ontologies
+        """
+        # We can only do limited analysis with RDFLib
+        # Create a simplified report based on the extracted information
+        
+        # For ontology IRI, use the one extracted during loading or a placeholder
+        ontology_iri = self.ontology_iri or "Unknown (RDFLib parsing)"
+        
+        # Generate basic FOL premises from class and property info
+        fol_premises = []
+        
+        # Generate premises for class hierarchy
+        try:
+            if self.rdflib_graph:
+                # Extract subclass relationships if possible
+                from rdflib import RDFS
+                
+                # Find subclass relationships
+                for s, p, o in self.rdflib_graph.triples((None, RDFS.subClassOf, None)):
+                    subclass = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                    superclass = str(o).split('#')[-1] if '#' in str(o) else str(o).split('/')[-1]
+                    
+                    # Add a simple FOL premise for subclass
+                    fol_premises.append({
+                        "type": "subclass",
+                        "fol": f"forall x ({subclass}(x) -> {superclass}(x))",
+                        "description": f"{subclass} is a subclass of {superclass}"
+                    })
+        except Exception as e:
+            print(f"Error generating FOL premises for RDFLib model: {str(e)}")
+        
+        # Create report
+        report = {
+            "ontology_name": self.ontology_source,
+            "ontology_iri": ontology_iri,
+            "stats": {
+                "class_count": len(self.bfo_classes),
+                "object_property_count": len(self.bfo_relations),
+                "data_property_count": 0,  # We don't extract these separately in RDFLib mode
+                "individual_count": 0,     # We don't extract individuals in RDFLib mode
+                "annotation_property_count": 0  # We don't extract annotation properties in RDFLib mode
+            },
+            "axioms": [],  # No detailed axioms available in RDFLib mode
+            "consistency": {"consistent": True, "issues": ["Limited consistency checking in RDFLib mode"]},
+            "inferred": [],  # No inference in RDFLib mode
+            "fol_premises": fol_premises,
+            "real_world_implications": []
+        }
+        
+        # Add metrics
+        report["metrics"] = {
+            "expressivity": "Unknown (RDFLib parsing)",
+            "complexity": len(self.bfo_classes) + len(self.bfo_relations)
+        }
+        
+        return report
+    
+    def _analyze_ontology_owlready(self):
+        """
+        Analyze the loaded ontology using full Owlready2 capabilities,
+        including axiom extraction, consistency check, FOL premises,
+        completeness validation, and implication generation.
+        
+        Returns:
+            dict: A comprehensive report for Owlready2-parsed ontologies
+        """
+        # Extract data first to ensure proper conversion of generators to lists
+        axioms = self.extract_axioms()
+        consistency = self.check_consistency()
+        inferred_axioms = self.get_inferred_axioms()
+        expressivity = self.get_ontology_expressivity()
+        fol_premises = self.generate_fol_premises()
+        
+        # NEW: Add completeness validation
+        completeness = self.validate_completeness()
+        
+        # Ensure axioms and inferred_axioms are lists, not generators
+        if not isinstance(axioms, list):
+            axioms = list(axioms)
+        if not isinstance(inferred_axioms, list):
+            inferred_axioms = list(inferred_axioms)
+        
+        # Get the ontology IRI safely
+        try:
+            ontology_iri = str(self.onto.base_iri) if hasattr(self.onto, 'base_iri') else "Unknown"
+        except:
+            ontology_iri = "Unknown"
+        
+        # NEW: Generate a sample of real-world implications
+        sample_implications = []
+        try:
+            # Generate up to 5 implications to include in the report (limited to avoid delays)
+            # For comprehensive implications, users should call generate_all_implications separately
+            sample_implications = self.generate_all_implications(num_implications_per_premise=1)
+            # Limit to 5 to avoid overwhelming the report
+            sample_implications = sample_implications[:5] if sample_implications else []
+        except Exception as e:
+            print(f"Error generating sample implications: {str(e)}")
+            
+        report = {
+            "ontology_name": self.ontology_source,
+            "ontology_iri": ontology_iri,
+            "stats": {
+                "class_count": len(self.bfo_classes),
+                "object_property_count": len(self.bfo_relations),
+                "data_property_count": len(self.data_properties),
+                "individual_count": len(self.individuals),
+                "annotation_property_count": len(self.annotation_properties)
+            },
+            "axioms": axioms,
+            "consistency": consistency,
+            "inferred": inferred_axioms,
+            "fol_premises": fol_premises,
+            "completeness": completeness,  # NEW: Add completeness report
+            "real_world_implications": sample_implications,  # NEW: Include sample implications
+            "has_additional_implications": len(sample_implications) > 0  # Flag to indicate more are available
+        }
+        
+        # Add additional metrics
+        report["metrics"] = {
+            "expressivity": expressivity,
+            "complexity": len(axioms) + len(inferred_axioms),
+            "fol_coverage": completeness.get("coverage_percentage", 0)  # NEW: Add FOL coverage metric
+        }
+        
+        return report
+        
+    def generate_fol_premises(self):
+        """
+        Generate comprehensive First Order Logic (FOL) premises from the ontology axioms,
+        including class hierarchies, property characteristics, restrictions, cardinality constraints,
+        and complex class expressions.
+        
+        Returns:
+            list: A list of FOL premises with type, FOL expression, and human-readable description
+        """
+        fol_premises = []
+        
+        try:
+            # Convert class hierarchies to FOL
+            # SubClassOf(A, B) -> ∀x: A(x) → B(x)
+            classes_list = list(self.onto.classes())
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    # Process subclasses
+                    is_a_list = list(cls.is_a) if hasattr(cls, 'is_a') else []
+                    for parent in is_a_list:
+                        if hasattr(parent, 'name') and parent.name is not None:
+                            fol_premises.append({
+                                "type": "SubClassOf",
+                                "fol": f"∀x,t: instance_of(x,{cls.name},t) → instance_of(x,{parent.name},t)",
+                                "description": f"All instances of {cls.name} are also instances of {parent.name}"
+                            })
+                except Exception as e:
+                    print(f"Error processing class {cls.name}: {str(e)}")
+                
+            # Convert object properties to FOL
+            obj_properties = list(self.onto.object_properties())
+            for prop in obj_properties:
+                if prop.name is None:
+                    continue
+                
+                try:
+                    # Handle domain restrictions
+                    # Domain(prop, C) -> ∀x,y: prop(x,y) → C(x)
+                    if hasattr(prop, 'domain') and prop.domain:
+                        domain_list = list(prop.domain) if hasattr(prop.domain, '__iter__') else []
+                        for domain in domain_list:
+                            if hasattr(domain, 'name') and domain.name is not None:
+                                fol_premises.append({
+                                    "type": "PropertyDomain",
+                                    "fol": f"∀x,y: {prop.name}(x,y) → {domain.name}(x)",
+                                    "description": f"If x relates to y via {prop.name}, then x is a {domain.name}"
+                                })
+                    
+                    # Handle range restrictions
+                    # Range(prop, C) -> ∀x,y: prop(x,y) → C(y)
+                    if hasattr(prop, 'range') and prop.range:
+                        range_list = list(prop.range) if hasattr(prop.range, '__iter__') else []
+                        for range_cls in range_list:
+                            if hasattr(range_cls, 'name') and range_cls.name is not None:
+                                fol_premises.append({
+                                    "type": "PropertyRange",
+                                    "fol": f"∀x,y: {prop.name}(x,y) → {range_cls.name}(y)",
+                                    "description": f"If x relates to y via {prop.name}, then y is a {range_cls.name}"
+                                })
+                    
+                    # Handle property characteristics
+                    if hasattr(prop, 'transitive') and prop.transitive:
+                        fol_premises.append({
+                            "type": "Transitive",
+                            "fol": f"∀x,y,z: ({prop.name}(x,y) ∧ {prop.name}(y,z)) → {prop.name}(x,z)",
+                            "description": f"Property {prop.name} is transitive"
+                        })
+                    
+                    if hasattr(prop, 'symmetric') and prop.symmetric:
+                        fol_premises.append({
+                            "type": "Symmetric",
+                            "fol": f"∀x,y: {prop.name}(x,y) → {prop.name}(y,x)",
+                            "description": f"Property {prop.name} is symmetric"
+                        })
+                    
+                    if hasattr(prop, 'functional') and prop.functional:
+                        fol_premises.append({
+                            "type": "Functional",
+                            "fol": f"∀x,y,z: ({prop.name}(x,y) ∧ {prop.name}(x,z)) → y = z",
+                            "description": f"Property {prop.name} is functional"
+                        })
+                    
+                    # NEW: Handle property chains (SubPropertyOf chain axioms)
+                    if hasattr(prop, 'property_chain') and prop.property_chain:
+                        try:
+                            chain_list = list(prop.property_chain)
+                            if len(chain_list) >= 2:
+                                chain_props = []
+                                for chain_prop in chain_list:
+                                    if hasattr(chain_prop, 'name') and chain_prop.name is not None:
+                                        chain_props.append(chain_prop.name)
+                                
+                                if len(chain_props) >= 2:
+                                    # Create FOL expression for the property chain
+                                    chain_fol = f"∀x,z: ("
+                                    
+                                    # Build the chain of existential quantifiers
+                                    variables = ["x", "y1"]
+                                    for i in range(1, len(chain_props)):
+                                        if i < len(chain_props) - 1:
+                                            variables.append(f"y{i+1}")
+                                        else:
+                                            variables.append("z")
+                                    
+                                    # Create the conjunction of property assertions
+                                    conjuncts = []
+                                    for i, prop_name in enumerate(chain_props):
+                                        conjuncts.append(f"{prop_name}({variables[i]},{variables[i+1]})")
+                                    
+                                    chain_fol += " ∧ ".join(conjuncts)
+                                    chain_fol += f") → {prop.name}(x,z)"
+                                    
+                                    fol_premises.append({
+                                        "type": "PropertyChain",
+                                        "fol": chain_fol,
+                                        "description": f"Property {prop.name} is a chain of {' o '.join(chain_props)}"
+                                    })
+                        except Exception as e:
+                            print(f"Error processing property chain for {prop.name}: {str(e)}")
+                except Exception as e:
+                    print(f"Error processing property {prop.name}: {str(e)}")
+                    
+            # NEW: Process cardinality restrictions on classes
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    # Check for cardinality restrictions in subclass axioms
+                    if hasattr(cls, 'is_a'):
+                        for parent in list(cls.is_a):
+                            # Check if parent is a restriction
+                            if not hasattr(parent, 'name') and hasattr(parent, 'property') and hasattr(parent, 'type'):
+                                restriction_type = parent.type
+                                prop = parent.property
+                                prop_name = prop.name if hasattr(prop, 'name') else "UnnamedProperty"
+                                
+                                # Cardinality restrictions
+                                if restriction_type in [26, 27, 28]:  # MIN, MAX, EXACTLY
+                                    if hasattr(parent, 'cardinality'):
+                                        card_value = parent.cardinality
+                                        
+                                        # Minimum cardinality (≥ n)
+                                        if restriction_type == 26:  # MIN
+                                            # Create FOL for minimum cardinality
+                                            # ∀x: C(x) → ∃y1,...,yn: P(x,y1) ∧ ... ∧ P(x,yn) ∧ y1≠y2 ∧ ... ∧ yn-1≠yn
+                                            if card_value > 0:
+                                                variables = [f"y{i+1}" for i in range(card_value)]
+                                                conjuncts = [f"{prop_name}(x,{var})" for var in variables]
+                                                
+                                                # Add disequality constraints for distinct variables
+                                                for i in range(card_value):
+                                                    for j in range(i+1, card_value):
+                                                        conjuncts.append(f"{variables[i]} ≠ {variables[j]}")
+                                                
+                                                fol = f"∀x: {cls.name}(x) → ∃{','.join(variables)}: " + " ∧ ".join(conjuncts)
+                                                
+                                                fol_premises.append({
+                                                    "type": "MinCardinality",
+                                                    "fol": fol,
+                                                    "description": f"{cls.name} has at least {card_value} {prop_name} relationships"
+                                                })
+                                        
+                                        # Maximum cardinality (≤ n)
+                                        elif restriction_type == 27:  # MAX
+                                            if card_value == 0:
+                                                # Special case for cardinality 0
+                                                fol = f"∀x: {cls.name}(x) → ¬∃y: {prop_name}(x,y)"
+                                            else:
+                                                # ∀x: C(x) → ∀y1,...,yn+1: (P(x,y1) ∧ ... ∧ P(x,yn+1)) → (y1=y2 ∨ ... ∨ yn=yn+1)
+                                                variables = [f"y{i+1}" for i in range(card_value + 1)]
+                                                rel_conjuncts = [f"{prop_name}(x,{var})" for var in variables]
+                                                
+                                                # Create disjunction of equalities (at least two must be equal)
+                                                eqs = []
+                                                for i in range(card_value + 1):
+                                                    for j in range(i+1, card_value + 1):
+                                                        eqs.append(f"{variables[i]} = {variables[j]}")
+                                                
+                                                fol = f"∀x: {cls.name}(x) → ∀{','.join(variables)}: (" + " ∧ ".join(rel_conjuncts) + ") → (" + " ∨ ".join(eqs) + ")"
+                                            
+                                            fol_premises.append({
+                                                "type": "MaxCardinality",
+                                                "fol": fol,
+                                                "description": f"{cls.name} has at most {card_value} {prop_name} relationships"
+                                            })
+                                        
+                                        # Exact cardinality (= n)
+                                        elif restriction_type == 28:  # EXACTLY
+                                            # Combine min and max cardinality
+                                            if card_value == 0:
+                                                # Special case for cardinality 0
+                                                fol = f"∀x: {cls.name}(x) → ¬∃y: {prop_name}(x,y)"
+                                                
+                                                fol_premises.append({
+                                                    "type": "ExactCardinality",
+                                                    "fol": fol,
+                                                    "description": f"{cls.name} has exactly {card_value} {prop_name} relationships"
+                                                })
+                                            else:
+                                                # Min cardinality part
+                                                variables = [f"y{i+1}" for i in range(card_value)]
+                                                min_conjuncts = [f"{prop_name}(x,{var})" for var in variables]
+                                                
+                                                # Add disequality constraints for distinct variables
+                                                for i in range(card_value):
+                                                    for j in range(i+1, card_value):
+                                                        min_conjuncts.append(f"{variables[i]} ≠ {variables[j]}")
+                                                
+                                                min_fol = f"∃{','.join(variables)}: " + " ∧ ".join(min_conjuncts)
+                                                
+                                                # Max cardinality part
+                                                max_variables = [f"z{i+1}" for i in range(card_value + 1)]
+                                                max_conjuncts = [f"{prop_name}(x,{var})" for var in max_variables]
+                                                
+                                                # Create disjunction of equalities (at least two must be equal)
+                                                eqs = []
+                                                for i in range(card_value + 1):
+                                                    for j in range(i+1, card_value + 1):
+                                                        eqs.append(f"{max_variables[i]} = {max_variables[j]}")
+                                                
+                                                max_fol = f"∀{','.join(max_variables)}: (" + " ∧ ".join(max_conjuncts) + ") → (" + " ∨ ".join(eqs) + ")"
+                                                
+                                                # Combine both
+                                                fol = f"∀x: {cls.name}(x) → ({min_fol} ∧ {max_fol})"
+                                                
+                                                fol_premises.append({
+                                                    "type": "ExactCardinality",
+                                                    "fol": fol,
+                                                    "description": f"{cls.name} has exactly {card_value} {prop_name} relationships"
+                                                })
+                except Exception as e:
+                    print(f"Error processing cardinality restrictions for {cls.name}: {str(e)}")
+            
+            # Add disjoint class axioms
+            # DisjointClasses(A, B) -> ∀x: ¬(A(x) ∧ B(x))
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    if hasattr(cls, 'disjoints'):
+                        disjoints = list(cls.disjoints())
+                        for disjoint in disjoints:
+                            entities = list(disjoint.entities)
+                            for entity in entities:
+                                if entity != cls and hasattr(entity, 'name') and entity.name is not None:
+                                    fol_premises.append({
+                                        "type": "DisjointClasses",
+                                        "fol": f"∀x,t: ¬(instance_of(x,{cls.name},t) ∧ instance_of(x,{entity.name},t))",
+                                        "description": f"No instance can be both a {cls.name} and a {entity.name}"
+                                    })
+                except Exception as e:
+                    print(f"Error processing disjoints for {cls.name}: {str(e)}")
+            
+            # Handle equivalent classes
+            # EquivalentClasses(A, B) -> ∀x: A(x) ↔ B(x)
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                
+                try:
+                    if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
+                        equiv_list = list(cls.equivalent_to)
+                        for equiv in equiv_list:
+                            if hasattr(equiv, 'name') and equiv.name is not None:
+                                fol_premises.append({
+                                    "type": "EquivalentClasses",
+                                    "fol": f"∀x: {cls.name}(x) ↔ {equiv.name}(x)",
+                                    "description": f"A thing is a {cls.name} if and only if it is a {equiv.name}"
+                                })
+                except Exception as e:
+                    print(f"Error processing equivalents for {cls.name}: {str(e)}")
+                
+        except Exception as e:
+            fol_premises.append({
+                "type": "Error",
+                "fol": f"Error generating FOL premises: {str(e)}",
+                "description": "An error occurred during FOL generation"
+            })
+            
+        return fol_premises
+    
+    def extract_axioms(self):
+        """
+        Extract all axioms from the ontology.
+        
+        Returns:
+            list: A list of axioms as dictionaries with their properties
+        """
+        axioms = []
+        
+        try:
+            # Extract class axioms - convert to list first
+            classes_list = list(self.onto.classes())
+            for cls in classes_list:
+                if cls.name is None:
+                    continue
+                    
+                try:    
+                    # Get subclass relationships
+                    # Convert is_a to list in case it's a generator
+                    is_a_list = list(cls.is_a) if hasattr(cls, 'is_a') else []
+                    for parent in is_a_list:
+                        if hasattr(parent, 'name') and parent.name is not None:
+                            axioms.append({
+                                "type": "SubClassOf",
+                                "subject": cls.name,
+                                "object": parent.name,
+                                "description": f"{cls.name} is a subclass of {parent.name}"
+                            })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": cls.name,
+                        "description": f"Error processing subclass relationships: {str(e)}"
+                    })
+                
+                try:
+                    # Get equivalent classes
+                    if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
+                        # Convert equivalent_to to list in case it's a generator
+                        equiv_list = list(cls.equivalent_to)
+                        for equiv in equiv_list:
+                            if hasattr(equiv, 'name') and equiv.name is not None:
+                                axioms.append({
+                                    "type": "EquivalentClasses",
+                                    "subject": cls.name,
+                                    "object": equiv.name,
+                                    "description": f"{cls.name} is equivalent to {equiv.name}"
+                                })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": cls.name,
+                        "description": f"Error processing equivalent classes: {str(e)}"
+                    })
+                    
+                # Get disjoint classes
+                if hasattr(cls, 'disjoints'):
+                    try:
+                        # Convert to list in case disjoints() returns a generator
+                        disjoints = list(cls.disjoints())
+                        for disjoint in disjoints:
+                            for entity in disjoint.entities:
+                                if entity != cls and hasattr(entity, 'name') and entity.name is not None:
+                                    axioms.append({
+                                        "type": "DisjointClasses",
+                                        "subject": cls.name,
+                                        "object": entity.name,
+                                        "description": f"{cls.name} is disjoint with {entity.name}"
+                                    })
+                    except Exception as e:
+                        # In case of error, add information about what failed
+                        axioms.append({
+                            "type": "Error",
+                            "subject": cls.name if hasattr(cls, 'name') else "Unknown",
+                            "description": f"Error processing disjoints: {str(e)}"
+                        })
+                    
+        except Exception as e:
+            # Add error information for entire classes extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing classes: {str(e)}"
+            })
+            
+        try:
+            # Extract property axioms - convert to list first
+            object_properties = list(self.onto.object_properties())
+            for prop in object_properties:
+                if prop.name is None:
+                    continue
+                    
+                try:
+                    # Domain and range
+                    if hasattr(prop, 'domain') and prop.domain:
+                        # Convert domain to list in case it's a generator
+                        domain_list = list(prop.domain) if hasattr(prop.domain, '__iter__') else []
+                        for domain in domain_list:
+                            if hasattr(domain, 'name') and domain.name is not None:
+                                axioms.append({
+                                    "type": "ObjectPropertyDomain",
+                                    "subject": prop.name,
+                                    "object": domain.name,
+                                    "description": f"{prop.name} has domain {domain.name}"
+                                })
+                
+                    if hasattr(prop, 'range') and prop.range:
+                        # Convert range to list in case it's a generator
+                        range_list = list(prop.range) if hasattr(prop.range, '__iter__') else []
+                        for range_cls in range_list:
+                            if hasattr(range_cls, 'name') and range_cls.name is not None:
+                                axioms.append({
+                                    "type": "ObjectPropertyRange",
+                                    "subject": prop.name,
+                                    "object": range_cls.name,
+                                    "description": f"{prop.name} has range {range_cls.name}"
+                                })
+                
+                    # Property characteristics
+                    characteristics = []
+                    if hasattr(prop, 'transitive') and prop.transitive:
+                        characteristics.append("Transitive")
+                    if hasattr(prop, 'symmetric') and prop.symmetric:
+                        characteristics.append("Symmetric")
+                    if hasattr(prop, 'asymmetric') and prop.asymmetric:
+                        characteristics.append("Asymmetric")
+                    if hasattr(prop, 'functional') and prop.functional:
+                        characteristics.append("Functional")
+                    if hasattr(prop, 'inverse_functional') and prop.inverse_functional:
+                        characteristics.append("InverseFunctional")
+                    if hasattr(prop, 'reflexive') and prop.reflexive:
+                        characteristics.append("Reflexive")
+                    if hasattr(prop, 'irreflexive') and prop.irreflexive:
+                        characteristics.append("Irreflexive")
+                        
+                    for characteristic in characteristics:
+                        axioms.append({
+                            "type": characteristic,
+                            "subject": prop.name,
+                            "object": None,
+                            "description": f"{prop.name} is {characteristic.lower()}"
+                        })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": prop.name if hasattr(prop, 'name') else "Unknown property",
+                        "description": f"Error processing property: {str(e)}"
+                    })
+                    
+        except Exception as e:
+            # Add error information for property extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing object properties: {str(e)}"
+            })
+            
+        try:
+            # Extract data property axioms - convert to list first
+            data_properties = list(self.onto.data_properties())
+            for prop in data_properties:
+                if prop.name is None:
+                    continue
+                
+                try:
+                    # Domain
+                    if hasattr(prop, 'domain') and prop.domain:
+                        # Convert domain to list in case it's a generator
+                        domain_list = list(prop.domain) if hasattr(prop.domain, '__iter__') else []
+                        for domain in domain_list:
+                            if hasattr(domain, 'name') and domain.name is not None:
+                                axioms.append({
+                                    "type": "DataPropertyDomain",
+                                    "subject": prop.name,
+                                    "object": domain.name,
+                                    "description": f"{prop.name} has domain {domain.name}"
+                                })
+                
+                    # Range (data property ranges are different)
+                    if hasattr(prop, 'range') and prop.range:
+                        # Convert range to list in case it's a generator
+                        range_list = list(prop.range) if hasattr(prop.range, '__iter__') else []
+                        for range_item in range_list:
+                            range_name = str(range_item)
+                            axioms.append({
+                                "type": "DataPropertyRange",
+                                "subject": prop.name,
+                                "object": range_name,
+                                "description": f"{prop.name} has range {range_name}"
+                            })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": prop.name if hasattr(prop, 'name') else "Unknown data property",
+                        "description": f"Error processing data property: {str(e)}"
+                    })
+        except Exception as e:
+            # Add error information for data property extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing data properties: {str(e)}"
+            })
+        
+        try:
+            # Extract individual axioms - convert to list first
+            individuals = list(self.onto.individuals())
+            for ind in individuals:
+                if ind.name is None:
+                    continue
+                    
+                try:
+                    # Class assertions
+                    is_a_list = list(ind.is_a) if hasattr(ind.is_a, '__iter__') else []
+                    for cls in is_a_list:
+                        if hasattr(cls, 'name') and cls.name is not None:
+                            axioms.append({
+                                "type": "ClassAssertion",
+                                "subject": ind.name,
+                                "object": cls.name,
+                                "description": f"{ind.name} is an instance of {cls.name}"
+                            })
+                
+                    # Object property assertions
+                    obj_props = list(self.onto.object_properties())
+                    for prop in obj_props:
+                        if prop.name is None:
+                            continue
+                            
+                        if hasattr(ind, prop.name):
+                            values = getattr(ind, prop.name)
+                            if values:
+                                # Convert values to list in case it's a generator
+                                values_list = list(values) if hasattr(values, '__iter__') else [values]
+                                for val in values_list:
+                                    if hasattr(val, 'name') and val.name is not None:
+                                        axioms.append({
+                                            "type": "ObjectPropertyAssertion",
+                                            "subject": ind.name,
+                                            "property": prop.name,
+                                            "object": val.name,
+                                            "description": f"{ind.name} {prop.name} {val.name}"
+                                        })
+                
+                    # Data property assertions
+                    data_props = list(self.onto.data_properties())
+                    for prop in data_props:
+                        if prop.name is None:
+                            continue
+                            
+                        if hasattr(ind, prop.name):
+                            values = getattr(ind, prop.name)
+                            if values:
+                                # Convert values to list in case it's a generator
+                                values_list = list(values) if hasattr(values, '__iter__') else [values]
+                                for val in values_list:
+                                    axioms.append({
+                                        "type": "DataPropertyAssertion",
+                                        "subject": ind.name,
+                                        "property": prop.name,
+                                        "object": str(val),
+                                        "description": f"{ind.name} {prop.name} {val}"
+                                    })
+                except Exception as e:
+                    axioms.append({
+                        "type": "Error",
+                        "subject": ind.name if hasattr(ind, 'name') else "Unknown individual",
+                        "description": f"Error processing individual: {str(e)}"
+                    })
+        except Exception as e:
+            # Add error information for individual extraction
+            axioms.append({
+                "type": "Error",
+                "description": f"Error processing individuals: {str(e)}"
+            })
+        
+        return axioms
+    
+    def check_consistency(self):
+        """
+        Check ontology for consistency using multiple reasoners and provide detailed explanations.
+        
+        Returns:
+            dict: Enhanced consistency report with status, issues, and specific contradiction explanations
+        """
+        consistency_report = {
+            "consistent": True,
+            "issues": [],
+            "contradictions": [],
+            "reasoners_used": [],
+            "axioms_involved": []
+        }
+        
+        try:
+            # Check if Java is available
+            import shutil
+            java_path = shutil.which('java')
+            
+            if not java_path:
+                # Java is not available, provide a detailed message
+                consistency_report["consistent"] = None  # None means we can't determine
+                consistency_report["issues"].append(
+                    "Cannot check consistency: Java is not installed. " +
+                    "The Pellet reasoner requires Java to run consistency checks. " +
+                    "This doesn't mean the ontology is inconsistent, just that we can't verify it."
+                )
+                return consistency_report
+            
+            # First try with Pellet reasoner
+            consistency_report["reasoners_used"].append("Pellet")
+            
+            with self.onto:
+                try:
+                    # Try running the Pellet reasoner
+                    sync_reasoner_pellet(infer_property_values=True, 
+                                         infer_data_property_values=True)
+                    
+                    # If we get here, the ontology is consistent
+                    consistency_report["consistent"] = True
+                except owlready2.base.OwlReadyInconsistentOntologyError as e:
+                    # Ontology is inconsistent
+                    consistency_report["consistent"] = False
+                    consistency_report["issues"].append(f"Pellet found inconsistency: {str(e)}")
+                    
+                    # Try to extract more detailed inconsistency info
+                    try:
+                        # Convert to list in case inconsistency_explanations() returns a generator
+                        explanations = list(self.onto.inconsistency_explanations())
+                        for explanation in explanations:
+                            explanation_str = str(explanation)
+                            consistency_report["issues"].append(explanation_str)
+                            
+                            # Add to the contradictions list with more structured information
+                            contradiction = {
+                                "reasoner": "Pellet",
+                                "description": explanation_str,
+                                "axioms": self._extract_axioms_from_explanation(explanation_str)
+                            }
+                            consistency_report["contradictions"].append(contradiction)
+                    except Exception as e:
+                        consistency_report["issues"].append(f"Error getting explanations: {str(e)}")
+            
+            # If consistent with Pellet, try with HermiT for verification (if available)
+            if consistency_report["consistent"]:
+                try:
+                    consistency_report["reasoners_used"].append("HermiT")
+                    
+                    with self.onto:
+                        try:
+                            # Check if HermiT is available and use it
+                            sync_reasoner_hermit(infer_property_values=True)
+                            # Still consistent
+                        except owlready2.base.OwlReadyInconsistentOntologyError as e:
+                            # Inconsistency found by HermiT but not by Pellet
+                            consistency_report["consistent"] = False
+                            consistency_report["issues"].append(f"HermiT found inconsistency: {str(e)}")
+                            
+                            # Add to contradictions list
+                            contradiction = {
+                                "reasoner": "HermiT",
+                                "description": str(e),
+                                "axioms": self._extract_axioms_from_explanation(str(e))
+                            }
+                            consistency_report["contradictions"].append(contradiction)
+                except Exception as e:
+                    # HermiT might not be available, ignore this error
+                    pass
+            
+            # Collect involved axioms
+            if not consistency_report["consistent"]:
+                self._identify_problematic_axioms(consistency_report)
+                
+        except Exception as e:
+            # Handle the specific java not found error with a clearer message
+            if "No such file or directory: 'java'" in str(e):
+                consistency_report["consistent"] = None  # None means we can't determine
+                consistency_report["issues"].append(
+                    "Cannot check consistency: Java is not installed. " +
+                    "The Pellet reasoner requires Java to run consistency checks. " +
+                    "This doesn't mean the ontology is inconsistent, just that we can't verify it."
+                )
+            else:
+                consistency_report["consistent"] = False
+                consistency_report["issues"].append(f"Error during consistency check: {str(e)}")
+        
+        return consistency_report
+        
+    def _extract_axioms_from_explanation(self, explanation_str):
+        """
+        Extract axiom identifiers from inconsistency explanation strings.
+        
+        Args:
+            explanation_str (str): The explanation string from the reasoner
+            
+        Returns:
+            list: List of identified axiom references
+        """
+        axioms = []
+        
+        # Look for common patterns in explanations
+        class_pattern = r'\b([A-Z][a-zA-Z0-9_]*)\b'
+        property_pattern = r'\b([a-z][a-zA-Z0-9_]*)\b'
+        
+        # Extract class references
+        classes = re.findall(class_pattern, explanation_str)
+        if classes:
+            axioms.extend([f"Class:{cls}" for cls in classes])
+            
+        # Extract property references
+        properties = re.findall(property_pattern, explanation_str)
+        if properties:
+            axioms.extend([f"Property:{prop}" for prop in properties])
+            
+        return axioms
+        
+    def _identify_problematic_axioms(self, consistency_report):
+        """
+        Identify and add potentially problematic axioms to the consistency report.
+        
+        Args:
+            consistency_report (dict): The consistency report to enhance
+        """
+        try:
+            # Extract all axioms
+            all_axioms = self.extract_axioms()
+            
+            # Collect terms mentioned in contradiction explanations
+            contradiction_terms = set()
+            for contradiction in consistency_report.get("contradictions", []):
+                axioms = contradiction.get("axioms", [])
+                for axiom in axioms:
+                    if ":" in axiom:
+                        contradiction_terms.add(axiom.split(":", 1)[1])
+            
+            # Identify axioms that involve the contradicting terms
+            for axiom in all_axioms:
+                if axiom.get("type", "").startswith("Error"):
+                    continue
+                    
+                # Check if this axiom involves any of the terms in contradictions
+                if (
+                    axiom.get("subject") in contradiction_terms or 
+                    axiom.get("object") in contradiction_terms or
+                    axiom.get("property") in contradiction_terms
+                ):
+                    consistency_report["axioms_involved"].append(axiom)
+        except Exception as e:
+            consistency_report["issues"].append(f"Error identifying problematic axioms: {str(e)}")
+    
+    def get_inferred_axioms(self):
+        """
+        Get inferred axioms using a reasoner.
+        
+        Returns:
+            list: A list of inferred axioms
+        """
+        inferred_axioms = []
+        
+        try:
+            # Check if Java is available
+            import shutil
+            java_path = shutil.which('java')
+            
+            if not java_path:
+                # Java is not available, provide a detailed message
+                inferred_axioms.append({
+                    "type": "Info",
+                    "description": "Cannot infer axioms: Java is not installed. " +
+                                 "The Pellet reasoner requires Java to run inference. " +
+                                 "Basic axiom extraction will still work."
+                })
+                return inferred_axioms
+            
+            # Create a reasoner to infer axioms
+            with self.onto:
+                try:
+                    # Run the reasoner with inference
+                    sync_reasoner_pellet(infer_property_values=True,
+                                        infer_data_property_values=True)
+                    
+                    # Extract inferred class subsumptions
+                    classes_list = list(self.onto.classes())
+                    for cls in classes_list:
+                        if cls.name is None:
+                            continue
+                            
+                        # Get inferred subclass relationships
+                        if hasattr(cls, 'INDIRECT_is_a'):
+                            try:
+                                # Convert to list in case INDIRECT_is_a is a generator
+                                indirect_parents = list(cls.INDIRECT_is_a)
+                                for inf_parent in indirect_parents:
+                                    if (hasattr(inf_parent, 'name') and 
+                                        inf_parent.name is not None and 
+                                        inf_parent not in cls.is_a):
+                                        
+                                        inferred_axioms.append({
+                                            "type": "InferredSubClassOf",
+                                            "subject": cls.name,
+                                            "object": inf_parent.name,
+                                            "description": f"Inferred: {cls.name} is a subclass of {inf_parent.name}"
+                                        })
+                            except Exception as e:
+                                inferred_axioms.append({
+                                    "type": "Error",
+                                    "subject": cls.name,
+                                    "description": f"Error processing inferred parents: {str(e)}"
+                                })
+                except Exception as e:
+                    # If reasoning fails, provide more details
+                    inferred_axioms.append({
+                        "type": "Error",
+                        "description": f"Error during reasoning: {str(e)}"
+                    })
+        except Exception as e:
+            # Handle the specific java not found error with a clearer message
+            if "No such file or directory: 'java'" in str(e):
+                inferred_axioms.append({
+                    "type": "Info",
+                    "description": "Cannot infer axioms: Java is not installed. " +
+                                 "The Pellet reasoner requires Java to run inference. " +
+                                 "Basic axiom extraction will still work."
+                })
+            else:
+                # Add error information
+                inferred_axioms.append({
+                    "type": "Error",
+                    "description": f"Error inferring axioms: {str(e)}"
+                })
+        
+        return inferred_axioms
+    
+    def generate_real_world_implications(self, num_implications=5):
+        """
+        Generate real-world implications based on the ontology's FOL premises.
+        
+        Args:
+            num_implications (int): Number of implications to generate
+            
+        Returns:
+            list: A list of dictionaries containing the generated implications
+        """
+        try:
+            logging.info(f"Generating real-world implications for {self.ontology_source}")
+            
+            # Get FOL premises
+            fol_premises = self.generate_fol_premises()
+            
+            # Extract domain classes (non-BFO classes) with their descriptions
+            domain_classes = []
+            
+            try:
+                # Get all classes
+                classes_list = list(self.onto.classes())
+                for cls in classes_list:
+                    if cls.name is None:
+                        continue
+                        
+                    # Skip BFO classes (typically have URIs with purl.obolibrary.org/obo/BFO)
+                    if 'obo/BFO' in str(cls.iri):
+                        continue
+                    
+                    # Get class description from comments/annotations if available
+                    description = ""
+                    if hasattr(cls, 'comment') and cls.comment:
+                        try:
+                            comment_list = list(cls.comment)
+                            if comment_list:
+                                description = comment_list[0]
+                        except Exception:
+                            pass
+                    
+                    domain_classes.append({
+                        "name": cls.name,
+                        "description": description or f"A type of {cls.name}"
+                    })
+            except Exception as e:
+                logging.error(f"Error extracting domain classes: {str(e)}")
+            
+            # Generate implications using OpenAI
+            implications = generate_real_world_implications(
+                self.ontology_source, 
+                domain_classes, 
+                fol_premises,
+                num_implications
+            )
+            
+            return implications
+            
+        except Exception as e:
+            logging.error(f"Error generating real-world implications: {str(e)}")
+            return [{"error": str(e), "title": "Error generating implications"}]
+            
+    def get_ontology_expressivity(self):
+        """
+        Determine the ontology expressivity (ALC, SHOIN, etc.).
+        
+        Returns:
+            str: A string describing the ontology expressivity
+        """
+        # Default expressivity
+        expressivity = "AL"  # Attributive Language (basic)
+        
+        # Check for additional expressivity features
+        has_complement = False
+        has_union = False
+        has_full_existential = False
+        has_cardinality = False
+        has_inverse = False
+        has_role_hierarchy = False
+        has_nominals = False
+        has_transitive = False
+        has_datatype = False
+        
+        # Check classes for complex definitions
+        for cls in self.onto.classes():
+            if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
+                for equiv in cls.equivalent_to:
+                    # Check for constructs in the class expression
+                    expr_str = str(equiv)
+                    if "Complement" in expr_str:
+                        has_complement = True
+                    if "Or" in expr_str:
+                        has_union = True
+                    if "some" in expr_str:
+                        has_full_existential = True
+                    if "min" in expr_str or "max" in expr_str or "exactly" in expr_str:
+                        has_cardinality = True
+                    if "Inverse" in expr_str:
+                        has_inverse = True
+        
+        # Check for role hierarchy (subproperties)
+        for prop in self.onto.object_properties():
+            if hasattr(prop, 'is_a') and len(prop.is_a) > 1:
+                has_role_hierarchy = True
+                break
+        
+        # Check for nominals (enumerated classes or hasValue restrictions)
+        try:
+            # Convert individuals to list first
+            individuals = list(self.onto.individuals())
+            if len(individuals) > 0:
+                has_nominals = True
+        except Exception:
+            # Safely handle generator issues
+            pass
+        
+        # Check for transitive properties
+        for prop in self.onto.object_properties():
+            if hasattr(prop, 'transitive') and prop.transitive:
+                has_transitive = True
+                break
+        
+        # Check for data properties
+        try:
+            # Convert data_properties to list first
+            data_props = list(self.onto.data_properties())
+            if len(data_props) > 0:
+                has_datatype = True
+        except Exception:
+            # Safely handle generator issues
+            pass
+        
+        # Build expressivity string
+        if has_complement or has_union:
+            expressivity += "C"  # Complex concept negation
+        if has_full_existential:
+            expressivity += "E"  # Full existential qualification
+        if has_role_hierarchy:
+            expressivity += "H"  # Role hierarchy
+        if has_inverse:
+            expressivity += "I"  # Inverse roles
+        if has_nominals:
+            expressivity += "O"  # Nominals/enumerations
+        if has_cardinality:
+            expressivity += "N"  # Cardinality restrictions
+        if has_transitive:
+            expressivity += "R+"  # Transitive roles
+        if has_datatype:
+            expressivity += "(D)"  # Data properties
+        
+        return expressivity
+        
+    def load_ontology_from_file(self, file_path):
+        """
+        Load an ontology from a file path.
+        
+        Args:
+            file_path (str): Path to the OWL file
+            
+        Returns:
+            bool or tuple: True if loaded successfully, or (False, error_message) if failed
+        """
+        # Store the file extension for reference throughout the method
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        # Track errors for better debugging
+        all_errors = []
+        
+        # Method 1: Try loading with owlready2's standard mechanism
+        try:
+            # Determine file format based on extension
+            if file_ext in ['.owx', '.own', '.ofn', '.ttl', '.rdf', '.xml']:
+                # Special handling for OWL XML and other formats
+                from owlready2 import World, onto_path
+                
+                # Create a new world for this ontology
+                world = World()
+                
+                # Set the file path in the ontology search path
+                onto_path.append(os.path.dirname(file_path))
+                
+                # Map extensions to format names
+                format_map = {
+                    '.owx': 'owlxml',
+                    '.own': 'ntriples',
+                    '.ofn': 'functional',
+                    '.ttl': 'turtle',
+                    '.rdf': 'rdfxml',
+                    '.xml': 'rdfxml'
+                }
+                
+                format_name = format_map.get(file_ext, None)
+                
+                # Try with explicit format if we have a mapping
+                if format_name:
+                    try:
+                        self.onto = world.get_ontology(file_path).load(format=format_name)
+                        print(f"Successfully loaded with format {format_name}")
+                    except Exception as format_error:
+                        all_errors.append(f"Error loading with format {format_name}: {str(format_error)}")
+                        # If explicit format fails, try without specifying format
+                        self.onto = world.get_ontology(file_path).load()
+                        print("Successfully loaded without specifying format")
+                else:
+                    # Standard loading without format specification
+                    self.onto = world.get_ontology(file_path).load()
+                    print("Successfully loaded without format specification")
+            else:
+                # Standard loading for common formats
+                self.onto = get_ontology(file_path).load()
+                print("Successfully loaded with standard mechanism")
+                
+            self.ontology_source = os.path.basename(file_path)
+            
+            # Reset report data
+            self.axioms = []
+            self.inconsistencies = []
+            self.inferred_axioms = []
+            
+            # Re-prepare the ontology
+            self.prepare_ontology()
+            return True
+            
+        except Exception as e:
+            error_msg = f"Method 1 (owlready2) failed: {str(e)}"
+            print(error_msg)
+            all_errors.append(error_msg)
+        
+        # Method 2: Try using rdflib as an alternative for all file types
+        try:
+            import rdflib
+            g = rdflib.Graph()
+            
+            # Determine the parser format based on extension
+            rdflib_format_map = {
+                '.owx': 'xml',
+                '.own': 'nt',
+                '.ofn': 'xml',  # Functional syntax might need special handling
+                '.ttl': 'turtle',
+                '.rdf': 'xml',
+                '.xml': 'xml',
+                '.owl': 'xml'
+            }
+            
+            rdf_format = rdflib_format_map.get(file_ext, 'xml')
+            
+            # Try to parse the file
+            print(f"Attempting RDFLib parsing with format: {rdf_format}")
+            g.parse(file_path, format=rdf_format)
+            
+            # Extract basic ontology information
+            self.ontology_source = os.path.basename(file_path)
+            self.bfo_classes = []
+            self.bfo_relations = []
+            
+            # Extract classes
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.Class)):
+                class_name = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                self.bfo_classes.append(str(class_name))
+            
+            # Extract object properties
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.ObjectProperty)):
+                prop_name = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                self.bfo_relations.append(str(prop_name))
+            
+            # Extract data properties
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.DatatypeProperty)):
+                prop_name = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                # Store in relations for simplicity
+                self.bfo_relations.append(str(prop_name))
+                
+            # Get ontology IRI if possible
+            ontology_iri = None
+            for s, p, o in g.triples((None, rdflib.RDF.type, rdflib.OWL.Ontology)):
+                ontology_iri = str(s)
+                break
+                
+            # Reset report data
+            self.axioms = []
+            self.inconsistencies = []
+            self.inferred_axioms = []
+            
+            print(f"Successfully used RDFLib parsing for {file_path}")
+            print(f"Loaded {len(self.bfo_classes)} classes and {len(self.bfo_relations)} relations")
+            
+            # Store special flag to indicate this is a limited RDFLib-based model
+            self.is_rdflib_model = True
+            self.rdflib_graph = g
+            self.ontology_iri = ontology_iri
+            
+            return True
+                
+        except ImportError as ie:
+            error_msg = f"Method 2 (RDFLib) failed - not available: {str(ie)}"
+            print(error_msg)
+            all_errors.append(error_msg)
+        except Exception as alt_e:
+            error_msg = f"Method 2 (RDFLib) failed: {str(alt_e)}"
+            print(error_msg)
+            all_errors.append(error_msg)
+        
+        # Method 3: Try basic XML parsing as a last resort for XML-based formats
+        if file_ext in ['.owx', '.rdf', '.xml', '.owl']:
+            try:
+                import xml.etree.ElementTree as ET
+                
+                print(f"Attempting basic XML parsing as last resort for {file_path}")
+                
+                # Initialize empty lists for storing extracted data
+                self.ontology_source = os.path.basename(file_path)
+                self.bfo_classes = []
+                self.bfo_relations = []
+                self.data_properties = []
+                self.individuals = []
+                self.annotation_properties = []
+                
+                # First, try to handle RDF/XML format which has a different structure
+                try:
+                    # Method 3a: Try preprocessing and manual RDF/XML parsing
+                    with open(file_path, 'r') as file:
+                        content = file.read()
+                    
+                    # Check if it's RDF/XML format by looking for key indicators
+                    if '<rdf:RDF' in content and 'xmlns:' in content:
+                        print("Detected RDF/XML format, using specialized preprocessing and parsing")
+                        
+                        # Extract namespace mappings from the file
+                        namespace_mappings = {}
+                        
+                        # Find the RDF root element which contains namespace declarations
+                        rdf_start = content.find('<rdf:RDF')
+                        if rdf_start >= 0:
+                            rdf_end = content.find('>', rdf_start)
+                            rdf_tag = content[rdf_start:rdf_end+1]
+                            
+                            # Extract all namespace declarations
+                            xmlns_pattern = r'xmlns:([^=]+)="([^"]+)"'
+                            xmlns_matches = re.findall(xmlns_pattern, rdf_tag)
+                            
+                            for prefix, uri in xmlns_matches:
+                                namespace_mappings[prefix] = uri
+                                print(f"Found namespace: {prefix} -> {uri}")
+                        
+                        # Check if there's an issue with prefixed references in attribute values
+                        # Example: rdf:about="bfo:MaterialEntity" - this is not valid RDF/XML
+                        
+                        # Create a fixed copy of the content for parsing
+                        fixed_content = content
+                        
+                        # Look for attribute values that use prefixes but aren't proper URIs
+                        prefixed_uri_pattern = r'(rdf:about|rdf:resource)="([^:]+):([^"]+)"'
+                        prefixed_uri_matches = list(re.finditer(prefixed_uri_pattern, content))
+                        
+                        if prefixed_uri_matches:
+                            print(f"Found {len(prefixed_uri_matches)} prefixed URI references that need fixing")
+                            
+                            # Process from end to start to avoid offset changes affecting positions
+                            for match in reversed(prefixed_uri_matches):
+                                attr_name = match.group(1)
+                                prefix = match.group(2)
+                                local_name = match.group(3)
+                                
+                                if prefix in namespace_mappings:
+                                    # Replace with proper URI
+                                    full_uri = f"{namespace_mappings[prefix]}{local_name}"
+                                    start, end = match.span()
+                                    fixed_content = fixed_content[:start] + f'{attr_name}="{full_uri}"' + fixed_content[end:]
+                                    print(f"Fixed: {attr_name}=\"{prefix}:{local_name}\" -> {attr_name}=\"{full_uri}\"")
+                        
+                        # Save the fixed content to a temporary file
+                        fixed_file_path = file_path + ".fixed.xml"
+                        with open(fixed_file_path, 'w') as fixed_file:
+                            fixed_file.write(fixed_content)
+                        
+                        print(f"Saved fixed content to {fixed_file_path}")
+                        
+                        # Process the fixed content using regex extraction
+                        
+                        # Extract all class definitions from rdf:about attributes
+                        class_pattern = r'<owl:Class[^>]*rdf:about="([^"]+)"'
+                        class_matches = re.findall(class_pattern, fixed_content)
+                        for class_uri in class_matches:
+                            class_name = class_uri.split('#')[-1] if '#' in class_uri else class_uri.split('/')[-1]
+                            if class_name and class_name not in self.bfo_classes:
+                                self.bfo_classes.append(class_name)
+                        
+                        # Extract object properties
+                        obj_prop_pattern = r'<owl:ObjectProperty[^>]*rdf:about="([^"]+)"'
+                        obj_prop_matches = re.findall(obj_prop_pattern, fixed_content)
+                        for prop_uri in obj_prop_matches:
+                            prop_name = prop_uri.split('#')[-1] if '#' in prop_uri else prop_uri.split('/')[-1]
+                            if prop_name and prop_name not in self.bfo_relations:
+                                self.bfo_relations.append(prop_name)
+                        
+                        # Extract individuals
+                        individual_pattern = r'<owl:NamedIndividual[^>]*rdf:about="([^"]+)"'
+                        individual_matches = re.findall(individual_pattern, fixed_content)
+                        for indiv_uri in individual_matches:
+                            indiv_name = indiv_uri.split('#')[-1] if '#' in indiv_uri else indiv_uri.split('/')[-1]
+                            if indiv_name and indiv_name not in self.individuals:
+                                self.individuals.append(indiv_name)
+                        
+                        # Extract ontology IRI
+                        ontology_pattern = r'<owl:Ontology[^>]*rdf:about="([^"]+)"'
+                        ontology_matches = re.findall(ontology_pattern, fixed_content)
+                        if ontology_matches:
+                            self.ontology_iri = ontology_matches[0]
+                        
+                        # Extract subclass relationships for hierarchy
+                        subclass_pattern = r'<rdfs:subClassOf[^>]*rdf:resource="([^"]+)"'
+                        subclass_matches = re.finditer(subclass_pattern, fixed_content)
+                        subclass_relations = []
+                        
+                        for match in subclass_matches:
+                            # Try to find the containing class element
+                            pos = match.start()
+                            class_start = fixed_content.rfind('<owl:Class', 0, pos)
+                            class_end = fixed_content.find('>', class_start)
+                            
+                            if class_start >= 0 and class_end > class_start:
+                                class_content = fixed_content[class_start:class_end+1]
+                                # Extract the subclass (child)
+                                about_match = re.search(r'rdf:about="([^"]+)"', class_content)
+                                if about_match:
+                                    child_uri = about_match.group(1)
+                                    child_name = child_uri.split('#')[-1] if '#' in child_uri else child_uri.split('/')[-1]
+                                    
+                                    # Extract the superclass (parent)
+                                    parent_uri = match.group(1)
+                                    parent_name = parent_uri.split('#')[-1] if '#' in parent_uri else parent_uri.split('/')[-1]
+                                    
+                                    subclass_relations.append((child_name, parent_name))
+                        
+                        # Store subclass relationships for later use
+                        self.subclass_relations = subclass_relations
+                        
+                        # Reset report data
+                        self.axioms = []
+                        self.inconsistencies = []
+                        self.inferred_axioms = []
+                        
+                        print(f"Successfully used preprocessed manual RDF/XML parsing for {file_path}")
+                        print(f"Loaded {len(self.bfo_classes)} classes, {len(self.bfo_relations)} relations, and {len(self.individuals)} individuals")
+                        
+                        # Set flags for specialized RDF/XML parsing
+                        self.is_rdflib_model = True  # We'll use the RDFLib model methods
+                        self.is_xml_fallback = True
+                        self.is_rdf_xml_manual = True
+                        
+                        return True
+                
+                except Exception as rdf_e:
+                    print(f"Manual RDF/XML parsing failed, falling back to general XML parsing: {str(rdf_e)}")
+                
+                # Method 3b: Try general XML parsing if RDF/XML parsing failed
+                # Parse the XML
+                tree = ET.parse(file_path)
+                root = tree.getroot()
+                
+                # Extract namespaces from root element attributes
+                namespaces = {}
+                for key, value in root.attrib.items():
+                    if key.startswith('{http://www.w3.org/2000/xmlns/}') or key.startswith('xmlns:'):
+                        prefix = key.split('}')[-1] if '}' in key else key.split(':')[-1]
+                        namespaces[prefix] = value
+                
+                # Add known namespaces if not present
+                if 'owl' not in namespaces:
+                    namespaces['owl'] = 'http://www.w3.org/2002/07/owl#'
+                if 'rdf' not in namespaces:
+                    namespaces['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
+                if 'rdfs' not in namespaces:
+                    namespaces['rdfs'] = 'http://www.w3.org/2000/01/rdf-schema#'
+                
+                # Helper function to handle namespaces in tags
+                def find_elements_with_namespace(element, tag_name, ns=None):
+                    # Try with namespace first
+                    if ns:
+                        elements = element.findall(f".//{{{ns}}}{tag_name}")
+                        if elements:
+                            return elements
+                    
+                    # Try without namespace
+                    elements = element.findall(f".//{tag_name}")
+                    if elements:
+                        return elements
+                    
+                    # Try every possible namespace in our map
+                    for prefix, ns_uri in namespaces.items():
+                        elements = element.findall(f".//{{{ns_uri}}}{tag_name}")
+                        if elements:
+                            return elements
+                    
+                    # Try every possible namespace combination in the document
+                    for prefix in root.attrib.keys():
+                        if prefix.startswith('{') and prefix.endswith('}'):
+                            ns_uri = prefix[1:-1]
+                            elements = element.findall(f".//{{{ns_uri}}}{tag_name}")
+                            if elements:
+                                return elements
+                    
+                    return []
+                
+                # Extract classes
+                class_elements = find_elements_with_namespace(root, "Class", namespaces.get('owl'))
+                for cls in class_elements:
+                    # Try to get the IRI attribute
+                    iri = cls.get('IRI') or cls.get('rdf:about') or cls.get(f"{{{namespaces.get('rdf')}}}about")
+                    if iri:
+                        class_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                        if class_name not in self.bfo_classes:
+                            self.bfo_classes.append(class_name)
+                
+                # Extract object properties
+                obj_prop_elements = find_elements_with_namespace(root, "ObjectProperty", namespaces.get('owl'))
+                for prop in obj_prop_elements:
+                    iri = prop.get('IRI') or prop.get('rdf:about') or prop.get(f"{{{namespaces.get('rdf')}}}about")
+                    if iri:
+                        prop_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                        if prop_name not in self.bfo_relations:
+                            self.bfo_relations.append(prop_name)
+                
+                # Extract individuals
+                indiv_elements = find_elements_with_namespace(root, "NamedIndividual", namespaces.get('owl'))
+                for indiv in indiv_elements:
+                    iri = indiv.get('IRI') or indiv.get('rdf:about') or indiv.get(f"{{{namespaces.get('rdf')}}}about")
+                    if iri:
+                        indiv_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                        if indiv_name not in self.individuals:
+                            self.individuals.append(indiv_name)
+                
+                # Handle declarations - these might contain nested class definitions
+                decl_elements = find_elements_with_namespace(root, "Declaration", namespaces.get('owl'))
+                for decl in decl_elements:
+                    # Look for Class declarations
+                    cls_elements = find_elements_with_namespace(decl, "Class", namespaces.get('owl'))
+                    for cls in cls_elements:
+                        iri = cls.get('IRI') or cls.get('rdf:about') or cls.get(f"{{{namespaces.get('rdf')}}}about")
+                        if iri:
+                            class_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                            if class_name not in self.bfo_classes:
+                                self.bfo_classes.append(class_name)
+                    
+                    # Look for ObjectProperty declarations
+                    prop_elements = find_elements_with_namespace(decl, "ObjectProperty", namespaces.get('owl'))
+                    for prop in prop_elements:
+                        iri = prop.get('IRI') or prop.get('rdf:about') or prop.get(f"{{{namespaces.get('rdf')}}}about")
+                        if iri:
+                            prop_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                            if prop_name not in self.bfo_relations:
+                                self.bfo_relations.append(prop_name)
+                                
+                    # Look for NamedIndividual declarations
+                    indiv_elements = find_elements_with_namespace(decl, "NamedIndividual", namespaces.get('owl'))
+                    for indiv in indiv_elements:
+                        iri = indiv.get('IRI') or indiv.get('rdf:about') or indiv.get(f"{{{namespaces.get('rdf')}}}about")
+                        if iri:
+                            indiv_name = iri.split('#')[-1] if '#' in iri else iri.split('/')[-1]
+                            if indiv_name not in self.individuals:
+                                self.individuals.append(indiv_name)
+                
+                # Get ontology IRI if possible
+                self.ontology_iri = None
+                # Try to get the base attribute from the root Ontology element
+                base = root.get('{http://www.w3.org/XML/1998/namespace}base')
+                if base:
+                    self.ontology_iri = base
+                
+                # Also check for Ontology elements
+                ontology_elements = find_elements_with_namespace(root, "Ontology", namespaces.get('owl'))
+                for onto in ontology_elements:
+                    iri = onto.get('rdf:about') or onto.get(f"{{{namespaces.get('rdf')}}}about")
+                    if iri:
+                        self.ontology_iri = iri
+                        break
+                
+                # Reset report data
+                self.axioms = []
+                self.inconsistencies = []
+                self.inferred_axioms = []
+                
+                print(f"Successfully used XML fallback parsing for {file_path}")
+                print(f"Loaded {len(self.bfo_classes)} classes, {len(self.bfo_relations)} relations, and {len(self.individuals)} individuals")
+                
+                # Set flag for XML fallback mode
+                self.is_rdflib_model = True  # We'll use the RDFLib model methods since the capabilities are similar
+                self.is_xml_fallback = True
+                
+                return True
+                
+            except ImportError as ie:
+                error_msg = f"Method 3 (XML fallback) failed - XML parser not available: {str(ie)}"
+                print(error_msg)
+                all_errors.append(error_msg)
+            except Exception as xml_e:
+                error_msg = f"Method 3 (XML fallback) failed: {str(xml_e)}"
+                print(error_msg)
+                all_errors.append(error_msg)
+        
+        # If all methods failed, return False with error details
+        return False, f"Failed to load ontology. Errors: {'; '.join(all_errors)}"
+            
+    def validate_completeness(self):
+        """
+        Cross-check all ontology elements to ensure they are included in the generated FOL premises.
+        
+        Returns:
+            dict: A report with missing elements and completeness metrics
+        """
+        report = {
+            "complete": False,
+            "missing_classes": [],
+            "missing_object_properties": [],
+            "missing_data_properties": [],
+            "missing_individuals": [],
+            "coverage_percentage": 0.0
+        }
+        
+        try:
+            # Skip validation for RDFLib parsed ontologies
+            if self.is_rdflib_model:
+                report["complete"] = False
+                report["message"] = "Completeness validation is not supported for RDFLib-parsed ontologies"
+                return report
+                
+            # Generate FOL premises if not already done
+            fol_premises = self.generate_fol_premises()
+            
+            # Extract all terms mentioned in FOL premises
+            fol_terms = set()
+            for premise in fol_premises:
+                if "fol" in premise:
+                    # Extract terms from FOL (this is a simplified approach)
+                    # Look for terms that are capitalized (classes) or followed by parentheses (predicates)
+                    fol_text = premise["fol"]
+                    
+                    # Extract class terms (capitalized words)
+                    class_terms = re.findall(r'\b[A-Z][a-zA-Z0-9_]*\b', fol_text)
+                    fol_terms.update(class_terms)
+                    
+                    # Extract property/relation terms (words followed by parentheses)
+                    property_terms = re.findall(r'([a-zA-Z][a-zA-Z0-9_]*)\s*\(', fol_text)
+                    fol_terms.update(property_terms)
+                    
+                    # Also extract terms that might be part of logical expressions
+                    logic_terms = re.findall(r'[→∧∨¬]\s*([a-zA-Z][a-zA-Z0-9_]*)', fol_text)
+                    fol_terms.update(logic_terms)
+                    
+                    # Extract property terms (words followed by parentheses)
+                    property_terms = re.findall(r'\b([a-zA-Z0-9_]+)\([^)]*\)', fol_text)
+                    fol_terms.update(property_terms)
+            
+            # Get all elements from the ontology
+            all_classes = self.bfo_classes
+            all_object_properties = self.bfo_relations
+            all_data_properties = self.data_properties
+            all_individuals = self.individuals
+            
+            # Check for missing classes
+            missing_classes = []
+            for cls in all_classes:
+                # Perform case-insensitive check to handle varied capitalization
+                found = False
+                for term in fol_terms:
+                    if cls.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_classes.append(cls)
+            
+            # Check for missing object properties
+            missing_object_properties = []
+            for prop in all_object_properties:
+                # Perform case-insensitive check
+                found = False
+                for term in fol_terms:
+                    if prop.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_object_properties.append(prop)
+            
+            # Check for missing data properties
+            missing_data_properties = []
+            for prop in all_data_properties:
+                # Perform case-insensitive check
+                found = False
+                for term in fol_terms:
+                    if prop.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_data_properties.append(prop)
+            
+            # Check for missing individuals
+            missing_individuals = []
+            for indiv in all_individuals:
+                # Perform case-insensitive check
+                found = False
+                for term in fol_terms:
+                    if indiv.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_individuals.append(indiv)
+            
+            # Update the report
+            report["missing_classes"] = missing_classes
+            report["missing_object_properties"] = missing_object_properties
+            report["missing_data_properties"] = missing_data_properties
+            report["missing_individuals"] = missing_individuals
+            
+            # Calculate completeness metrics
+            total_elements = len(all_classes) + len(all_object_properties) + \
+                            len(all_data_properties) + len(all_individuals)
+            
+            missing_count = len(missing_classes) + len(missing_object_properties) + \
+                           len(missing_data_properties) + len(missing_individuals)
+            
+            if total_elements > 0:
+                coverage_percentage = ((total_elements - missing_count) / total_elements) * 100
+                report["coverage_percentage"] = round(coverage_percentage, 2)
+            else:
+                report["coverage_percentage"] = 100.0
+            
+            # Set completeness flag
+            report["complete"] = missing_count == 0
+            
+            # Add detailed metrics
+            report["metrics"] = {
+                "total_elements": total_elements,
+                "covered_elements": total_elements - missing_count,
+                "missing_elements": missing_count,
+                "fol_premises_count": len(fol_premises),
+                "terms_extracted": len(fol_terms)
+            }
+            
+        except Exception as e:
+            report["complete"] = False
+            report["error"] = f"Error validating completeness: {str(e)}"
+            report["coverage_percentage"] = 0.0
+            
+        return report
+    
+    def generate_uml_diagram(self, include_individuals=False, 
+                           include_data_properties=True, include_annotation_properties=False,
+                           max_classes=1000):
+        """
+        Generate PlantUML code for the loaded ontology.
+        
+        Args:
+            include_individuals (bool): Whether to include individuals in the diagram
+            include_data_properties (bool): Whether to include data properties
+            include_annotation_properties (bool): Whether to include annotation properties
+            max_classes (int): Maximum number of classes to include in the diagram (default: 1000)
+            
+        Returns:
+            dict: PlantUML code generation result
+        """
+        # Handle differently based on if we're using RDFLib or Owlready2
+        if self.is_rdflib_model:
+            return self._generate_uml_diagram_rdflib(
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+        else:
+            return self._generate_uml_diagram_owlready(
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+            
+    def _generate_uml_diagram_owlready(self, include_individuals=False,
+                                      include_data_properties=True, 
+                                      include_annotation_properties=False,
+                                      max_classes=1000):
+        """
+        Generate PlantUML code for an Owlready2-loaded ontology.
+        
+        Returns:
+            dict: PlantUML code generation result
+        """
+        try:
+            # Initialize the PlantUML generator
+            generator = PlantUMLGenerator()
+            
+            # Generate only the PlantUML code
+            plantuml_code = generator._generate_plantuml_code(
+                self.onto,
+                include_individuals=include_individuals,
+                include_data_properties=include_data_properties,
+                include_annotation_properties=include_annotation_properties,
+                max_classes=max_classes
+            )
+            
+            # Return just the PlantUML code in a success response
+            return {
+                "plantuml_code": plantuml_code,
+                "success": True
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "plantuml_code": None
+            }
+            
+    def _generate_uml_diagram_rdflib(self, include_individuals=False,
+                                    include_data_properties=True, 
+                                    include_annotation_properties=False,
+                                    max_classes=1000):
+        """
+        Generate a simple PlantUML diagram for an RDFLib-parsed ontology.
+        
+        Returns:
+            dict: PlantUML code generation result
+        """
+        try:
+            # We'll generate a simple PlantUML diagram directly from the extracted RDFLib data
+            from rdflib import RDFS, RDF, OWL
+            
+            # Start the PlantUML code
+            plantuml_code = "@startuml\n\n"
+            plantuml_code += "' PlantUML diagram generated from RDFLib parsing\n"
+            plantuml_code += "' Limited representation based on extracted classes and properties\n\n"
+            plantuml_code += "skinparam class {\n"
+            plantuml_code += "    BackgroundColor white\n"
+            plantuml_code += "    ArrowColor black\n"
+            plantuml_code += "    BorderColor black\n"
+            plantuml_code += "}\n\n"
+            
+            # Add classes
+            class_count = 0
+            added_classes = set()
+            for cls_name in self.bfo_classes:
+                if class_count >= max_classes:
+                    break
+                
+                # Clean the class name for PlantUML
+                clean_name = cls_name.replace(' ', '_').replace('-', '_')
+                if clean_name in added_classes:
+                    continue
+                    
+                plantuml_code += f"class \"{cls_name}\" as {clean_name}\n"
+                added_classes.add(clean_name)
+                class_count += 1
+            
+            # Add class hierarchy
+            if self.rdflib_graph:
+                for s, p, o in self.rdflib_graph.triples((None, RDFS.subClassOf, None)):
+                    if isinstance(o, str) or not o.startswith(str(OWL.NS)):  # Skip OWL built-ins
+                        subclass = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
+                        superclass = str(o).split('#')[-1] if '#' in str(o) else str(o).split('/')[-1]
+                        
+                        # Clean names for PlantUML
+                        clean_subclass = subclass.replace(' ', '_').replace('-', '_')
+                        clean_superclass = superclass.replace(' ', '_').replace('-', '_')
+                        
+                        if clean_subclass in added_classes and clean_superclass in added_classes:
+                            plantuml_code += f"{clean_subclass} --|> {clean_superclass}\n"
+            
+            # Add object properties as associations
+            for prop_name in self.bfo_relations:
+                # Clean the property name for PlantUML
+                clean_name = prop_name.replace(' ', '_').replace('-', '_')
+                
+                # Try to find domain and range if available
+                found_domain_range = False
+                if self.rdflib_graph:
+                    for s, p, o in self.rdflib_graph.triples((None, RDF.type, OWL.ObjectProperty)):
+                        prop_uri = str(s)
+                        prop_local = prop_uri.split('#')[-1] if '#' in prop_uri else prop_uri.split('/')[-1]
+                        
+                        if prop_local == prop_name:
+                            # Find domain
+                            domain_class = None
+                            for _, _, d in self.rdflib_graph.triples((s, RDFS.domain, None)):
+                                domain_uri = str(d)
+                                domain_local = domain_uri.split('#')[-1] if '#' in domain_uri else domain_uri.split('/')[-1]
+                                domain_class = domain_local.replace(' ', '_').replace('-', '_')
+                                if domain_class not in added_classes:
+                                    domain_class = None
+                                break
+                            
+                            # Find range
+                            range_class = None
+                            for _, _, r in self.rdflib_graph.triples((s, RDFS.range, None)):
+                                range_uri = str(r)
+                                range_local = range_uri.split('#')[-1] if '#' in range_uri else range_uri.split('/')[-1]
+                                range_class = range_local.replace(' ', '_').replace('-', '_')
+                                if range_class not in added_classes:
+                                    range_class = None
+                                break
+                            
+                            # Add the relationship if domain and range were found
+                            if domain_class and range_class:
+                                plantuml_code += f"{domain_class} --> {range_class} : {prop_name}\n"
+                                found_domain_range = True
+                
+                # If we couldn't find domain/range, just list the property
+                if not found_domain_range:
+                    plantuml_code += f"note \"Object Property: {prop_name}\" as note_{clean_name}\n"
+            
+            # Close the diagram
+            plantuml_code += "\n@enduml"
+            
+            return {
+                "plantuml_code": plantuml_code,
+                "success": True
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error generating RDFLib diagram: {str(e)}",
+                "plantuml_code": None
+            }

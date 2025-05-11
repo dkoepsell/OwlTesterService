@@ -1,0 +1,59 @@
+Test Your FOL Expression
+Enter your First-Order Logic expression:
+forall x,t (instance_of(x, continuant, t) -> exists y,t2 (instance_of(y, process, t2) & participates_in(x, y, t2)))
+Use BFO standard syntax with instance_of(x,Class,t) format for class membership. Note: Both formats are supported: instance_of(x,Class,t) and traditional Class(x).
+Analyze Ontology
+Want to analyze a complete OWL file instead? Upload your ontology to:
+
+Extract all axioms
+Check for consistency
+Identify contradictions
+Generate a complete report
+Test Results
+
+                    Expression: forall x,t (instance_of(x, continuant, t) -> exists y,t2 (instance_of(y, process, t2) & participates_in(x, y, t2)))
+
+                
+
+                    
+Preprocessed Expression:
+
+                    
+forall x forall t (instance_of(x, continuant, t) -> exists y exists t2 (instance_of(y, process, t2) & participates_in(x, y, t2)))
+
+                    Multi-variable quantifiers were converted to nested quantifiers for processing.
+                
+
+            
+
+                
+Format detected:
+BFO Standard Notation
+ Invalid Expression: The expression has issues that need to be addressed.
+Issues:
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Term '(' is not recognized as a BFO class or relation.
+Term '_' is not recognized as a BFO class or relation.
+Term ',' is not recognized as a BFO class or relation.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Term ')' is not recognized as a BFO class or relation.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: '-' was interpreted as BFO class 'two-dimensional spatial region'. This is a partial match.
+Term '>' is not recognized as a BFO class or relation.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Term '2' is not recognized as a BFO class or relation.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Term '&' is not recognized as a BFO class or relation.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
+Note: ' ' was interpreted as BFO class 'independent continuant'. This is a partial match.
