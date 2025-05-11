@@ -676,10 +676,22 @@ def generate_implications(analysis_id):
             # Generate implications using OpenAI
             try:
                 # Extract domain classes from analysis class_list if available
-                domain_classes = analysis.class_list if analysis.class_list else []
+                domain_classes = []
+                if analysis.class_list:
+                    # Check if class_list contains dictionaries with 'name' field
+                    if isinstance(analysis.class_list, list) and len(analysis.class_list) > 0:
+                        if isinstance(analysis.class_list[0], dict) and 'name' in analysis.class_list[0]:
+                            domain_classes = [cls['name'] for cls in analysis.class_list if 'name' in cls]
+                        else:
+                            domain_classes = analysis.class_list  # Assume it's already a list of class names
                 
                 # Get the ontology name
                 ontology_name = analysis.ontology_name if analysis.ontology_name else "Unknown Ontology"
+                
+                # Log what we're passing to the implications generator
+                app.logger.info(f"Generating implications for ontology '{ontology_name}'")
+                app.logger.info(f"Domain classes: {domain_classes}")
+                app.logger.info(f"FOL premises count: {len(fol_premises) if fol_premises else 0}")
                 
                 # Call the function with the correct parameters
                 implications = generate_real_world_implications(
