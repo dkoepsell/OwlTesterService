@@ -503,30 +503,42 @@ def analyze_owl(filename):
                         app.logger.info(f"★★★ Found 'classes' key: {rdflib_class_count} ★★★")
                         if isinstance(rdflib_class_count, int) and rdflib_class_count > 0:
                             class_count = rdflib_class_count
+                            # Explicitly add the standardized key for saving to DB
+                            analysis['class_count'] = class_count
+                            app.logger.info(f"★★★ Setting class_count to {class_count} ★★★")
                     
                     if 'object_properties' in analysis:
                         rdflib_obj_count = analysis.get('object_properties')
                         app.logger.info(f"★★★ Found 'object_properties' key: {rdflib_obj_count} ★★★")
                         if isinstance(rdflib_obj_count, int) and rdflib_obj_count > 0:
                             obj_prop_count = rdflib_obj_count
+                            # Explicitly add the standardized key for saving to DB
+                            analysis['object_property_count'] = obj_prop_count
+                            app.logger.info(f"★★★ Setting object_property_count to {obj_prop_count} ★★★")
                             
                     if 'data_properties' in analysis:
                         rdflib_data_count = analysis.get('data_properties')
                         app.logger.info(f"★★★ Found 'data_properties' key: {rdflib_data_count} ★★★")
                         if isinstance(rdflib_data_count, int) and rdflib_data_count > 0:
                             data_prop_count = rdflib_data_count
+                            analysis['data_property_count'] = data_prop_count
+                            app.logger.info(f"★★★ Setting data_property_count to {data_prop_count} ★★★")
                             
                     if 'individuals' in analysis:
                         rdflib_indiv_count = analysis.get('individuals')
                         app.logger.info(f"★★★ Found 'individuals' key: {rdflib_indiv_count} ★★★")
                         if isinstance(rdflib_indiv_count, int) and rdflib_indiv_count > 0:
                             indiv_count = rdflib_indiv_count
+                            analysis['individual_count'] = indiv_count
+                            app.logger.info(f"★★★ Setting individual_count to {indiv_count} ★★★")
                             
                     if 'annotation_properties' in analysis:
                         rdflib_annot_count = analysis.get('annotation_properties')
                         app.logger.info(f"★★★ Found 'annotation_properties' key: {rdflib_annot_count} ★★★")
                         if isinstance(rdflib_annot_count, int) and rdflib_annot_count > 0:
                             annot_prop_count = rdflib_annot_count
+                            analysis['annotation_property_count'] = annot_prop_count
+                            app.logger.info(f"★★★ Setting annotation_property_count to {annot_prop_count} ★★★")
                     
                     ontology_analysis.class_count = class_count
                     ontology_analysis.object_property_count = obj_prop_count
@@ -556,6 +568,7 @@ def analyze_owl(filename):
                     ontology_analysis.fol_premises = analysis.get('fol_premises', [])
                     db.session.add(ontology_analysis)
                     db.session.commit()
+                    logger.info(f"★★★ COMMITTED TO DATABASE - Classes: {ontology_analysis.class_count}, Object Props: {ontology_analysis.object_property_count} ★★★")
                     logger.info(f"Saved analysis to database with ID {ontology_analysis.id}")
             except Exception as e:
                 logger.error(f"Error saving analysis to database: {str(e)}")
@@ -590,10 +603,11 @@ def analyze_owl(filename):
             
         # Debug log to show what fields are now in the analysis
         logger.info(f"Updated analysis keys: {list(analysis.keys())}")
-        logger.info(f"Class count: {analysis.get('class_count')}")
-        logger.info(f"Object property count: {analysis.get('object_property_count')}")
-        logger.info(f"Data property count: {analysis.get('data_property_count')}")
-        logger.info(f"Individual count: {analysis.get('individual_count')}")
+        logger.info(f"★★★ ANALYSIS VALUES BEFORE RENDERING TEMPLATE ★★★")
+        logger.info(f"Class count: {analysis.get('class_count')} or {analysis.get('classes')}")
+        logger.info(f"Object property count: {analysis.get('object_property_count')} or {analysis.get('object_properties')}")
+        logger.info(f"Data property count: {analysis.get('data_property_count')} or {analysis.get('data_properties')}")
+        logger.info(f"Individual count: {analysis.get('individual_count')} or {analysis.get('individuals')}")
         logger.info(f"Axiom count: {analysis.get('axiom_count')}")
         
         # Update analysis with completeness validation if available
