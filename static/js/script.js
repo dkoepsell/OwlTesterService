@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsContainer.classList.remove('d-none');
         
         // Make API request
-        fetch('/api/test', {
+        fetch('/api/test-expression', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

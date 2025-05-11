@@ -430,11 +430,17 @@ class OwlTester:
             for cls in classes_list:
                 # Count subclass relationships
                 if hasattr(cls, 'is_a') and cls.is_a:
-                    axiom_count += len(cls.is_a)
+                    if isinstance(cls.is_a, list) or hasattr(cls.is_a, '__len__'):
+                        axiom_count += len(cls.is_a)
+                    else:
+                        axiom_count += 1  # Count as single axiom if it's not a collection
                 
                 # Count class restrictions
                 if hasattr(cls, 'equivalent_to') and cls.equivalent_to:
-                    axiom_count += len(cls.equivalent_to)
+                    if isinstance(cls.equivalent_to, list) or hasattr(cls.equivalent_to, '__len__'):
+                        axiom_count += len(cls.equivalent_to)
+                    else:
+                        axiom_count += 1  # Count as single axiom if it's not a collection
                 
                 # Count disjoint class relationships
                 if hasattr(cls, 'disjoints') and cls.disjoints():
@@ -444,9 +450,16 @@ class OwlTester:
             for prop in object_properties_list + data_properties_list:
                 # Domain and range axioms
                 if hasattr(prop, 'domain') and prop.domain:
-                    axiom_count += len(prop.domain)
+                    if isinstance(prop.domain, list) or hasattr(prop.domain, '__len__'):
+                        axiom_count += len(prop.domain)
+                    else:
+                        axiom_count += 1  # Count as single axiom if it's not a collection
+                        
                 if hasattr(prop, 'range') and prop.range:
-                    axiom_count += len(prop.range)
+                    if isinstance(prop.range, list) or hasattr(prop.range, '__len__'):
+                        axiom_count += len(prop.range)
+                    else:
+                        axiom_count += 1  # Count as single axiom if it's not a collection
                 
                 # Property characteristics
                 for characteristic in ['functional', 'inverse_functional', 'transitive', 
