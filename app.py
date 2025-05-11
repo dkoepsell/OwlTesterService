@@ -484,8 +484,14 @@ def api_analyze_owl(filename):
         # Create an OwlTester instance
         tester = OwlTester()
         
-        # Run the analysis
-        analysis_result = tester.analyze_ontology(file_record.file_path)
+        # First load the ontology
+        load_result = tester.load_ontology_from_file(file_record.file_path)
+        
+        if not load_result.get('loaded', False) or not load_result.get('ontology'):
+            raise Exception(f"Failed to load ontology: {load_result.get('error', 'Unknown error')}")
+        
+        # Then analyze the loaded ontology
+        analysis_result = tester.analyze_ontology(load_result.get('ontology'))
         
         if not analysis_result or not isinstance(analysis_result, dict):
             raise Exception("Invalid analysis result")
