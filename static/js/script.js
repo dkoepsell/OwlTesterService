@@ -31,52 +31,67 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission
     if (expressionForm) {
         expressionForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const expression = expressionInput.value.trim();
+            e.preventDefault();
+            const expression = expressionInput.value.trim();
+            
+            if (!expression) {
+                showError('Please enter a FOL expression');
+                return;
+            }
+            
+            testExpression(expression);
+        });
         
-        if (!expression) {
-            showError('Please enter a FOL expression');
-            return;
+        // Clear button functionality if it exists
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                expressionInput.value = '';
+                if (resultsContainer) {
+                    resultsContainer.classList.add('d-none');
+                }
+                expressionInput.focus();
+            });
         }
-        
-        testExpression(expression);
-    });
-    
-    // Clear button functionality
-    clearBtn.addEventListener('click', function() {
-        expressionInput.value = '';
-        resultsContainer.classList.add('d-none');
-        expressionInput.focus();
-    });
+    }
     
     // Use example buttons
-    useExampleBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const example = this.getAttribute('data-example');
-            expressionInput.value = example;
-            expressionInput.focus();
-            // Optionally auto-submit the example
-            // testExpression(example);
+    if (useExampleBtns && useExampleBtns.length > 0 && expressionInput) {
+        useExampleBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const example = this.getAttribute('data-example');
+                if (expressionInput && example) {
+                    expressionInput.value = example;
+                    expressionInput.focus();
+                    // Optionally auto-submit the example
+                    // testExpression(example);
+                }
+            });
         });
-    });
+    }
     
     // Copy buttons for BFO terms
-    copyBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const term = this.getAttribute('data-term');
-            
-            // Get current cursor position
-            const cursorPos = expressionInput.selectionStart;
-            const currentValue = expressionInput.value;
-            
-            // Insert the term at cursor position
-            expressionInput.value = 
-                currentValue.substring(0, cursorPos) + 
-                term + 
-                currentValue.substring(cursorPos);
-            
-            // Set focus back to the input and place cursor after inserted term
-            expressionInput.focus();
+    if (copyBtns && copyBtns.length > 0 && expressionInput) {
+        copyBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const term = this.getAttribute('data-term');
+                
+                if (expressionInput && term) {
+                    // Get current cursor position
+                    const cursorPos = expressionInput.selectionStart;
+                    const currentValue = expressionInput.value;
+                    
+                    // Insert the term at cursor position
+                    expressionInput.value = 
+                        currentValue.substring(0, cursorPos) + 
+                        term + 
+                        currentValue.substring(cursorPos);
+                    
+                    // Set focus back to the input and place cursor after inserted term
+                    expressionInput.focus();
+                }
+            });
+        });
+    }
             expressionInput.setSelectionRange(cursorPos + term.length, cursorPos + term.length);
             
             // Show feedback (temporary visual indication)
