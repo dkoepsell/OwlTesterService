@@ -346,8 +346,60 @@ def generate_real_world_implications(ontology_name, domain_classes, fol_premises
     Returns:
         list: A list of dictionaries containing generated implications
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         client = get_openai_client()
+        
+        # If no FOL premises provided or empty list, generate simple defaults based on classes
+        if not fol_premises or len(fol_premises) == 0:
+            logger.warning("No FOL premises provided, generating defaults from classes")
+            fol_premises = []
+            
+            # Get class names from domain_classes
+            class_names = []
+            if domain_classes:
+                for cls in domain_classes:
+                    if isinstance(cls, dict) and 'name' in cls:
+                        class_names.append(cls['name'])
+                    elif isinstance(cls, str):
+                        class_names.append(cls)
+            
+            # If no class names found, use some defaults from analysis
+            if not class_names:
+                # Try to use classes from the ontology analysis
+                try:
+                    from app import app
+                    # Look for recent analysis in the database
+                    with app.app_context():
+                        from models import OntologyAnalysis
+                        recent_analysis = OntologyAnalysis.query.order_by(OntologyAnalysis.id.desc()).first()
+                        if recent_analysis and recent_analysis.class_list:
+                            class_names = recent_analysis.class_list[:10]  # Use up to 10 classes
+                except Exception as e:
+                    logger.error(f"Error fetching classes from database: {str(e)}")
+                    
+                # If still no classes, use default placeholder
+                if not class_names:
+                    class_names = ["LegalFact", "LegalDomain", "LegalEntity", "Regulation"]
+            
+            # Generate basic premises for each class
+            for cls in class_names[:10]:  # Limit to 10 classes
+                fol_premises.append({
+                    'type': 'class',
+                    'fol': f"instance_of(x, {cls}, t)",
+                    'description': f"Entities that are instances of {cls}"
+                })
+                
+                # Add some relationship premises if we have multiple classes
+                if len(class_names) > 1 and class_names.index(cls) < len(class_names) - 1:
+                    next_cls = class_names[class_names.index(cls) + 1]
+                    fol_premises.append({
+                        'type': 'property',
+                        'fol': f"related_to(x, y, t) & instance_of(x, {cls}, t) & instance_of(y, {next_cls}, t)",
+                        'description': f"Relation between {cls} and {next_cls}"
+                    })
         
         # Extract class names and descriptions for context
         class_info = []
@@ -356,12 +408,42 @@ def generate_real_world_implications(ontology_name, domain_classes, fol_premises
                 class_info.append(f"{cls['name']}: {cls['description']}")
             elif isinstance(cls, str):
                 class_info.append(cls)
-                
+        
+        # If no class info, use class names from FOL premises
+        if not class_info and fol_premises:
+            for premise in fol_premises:
+                if premise.get('type') == 'class' and 'instance_of' in premise.get('fol', ''):
+                    fol_expr = premise.get('fol', '')
+                    try:
+                        class_name = fol_expr.split(',')[1].strip()
+                        if class_name and class_name not in class_info:
+                            class_info.append(class_name)
+                    except:
+                        pass
+        
         # Extract FOL formulas and descriptions
         fol_info = []
         for premise in fol_premises:
             if isinstance(premise, dict) and 'fol' in premise and 'description' in premise:
                 fol_info.append(f"Formula: {premise['fol']}\nExplanation: {premise['description']}")
+        
+        # If no domain name provided, use a placeholder
+        if not ontology_name or ontology_name == "Unknown":
+            ontology_name = "LegalFacts Ontology"
+        
+        # Ensure we have some class info
+        if not class_info:
+            class_info = ["UnknownClass"]
+            
+        # Ensure we have FOL info
+        if not fol_info or (isinstance(fol_info, list) and len(fol_info) == 0):
+            logger.warning("No FOL info for implications generation, using defaults")
+            # These should have been generated in the earlier code
+            fol_info = [
+                "Formula: instance_of(x, LegalFact, t)\nExplanation: Entities that are instances of LegalFact",
+                "Formula: instance_of(x, LegalEntity, t)\nExplanation: Entities that are instances of LegalEntity",
+                "Formula: related_to(x, y, t)\nExplanation: Relation between entities"
+            ]
         
         # Prepare the prompt
         system_prompt = """You are an expert in ontology analysis and first-order logic. 
@@ -370,6 +452,9 @@ Focus on practical, concrete scenarios that demonstrate how the logical rules in
 Provide specific examples that domain experts would find valuable in understanding the ontology's practical applications.
 Each example should clearly connect to one or more FOL premises and explain which rules it demonstrates.
 Format your response as a JSON array of objects with 'title', 'scenario', 'premises_used', and 'explanation' fields.
+
+Important: If you received auto-generated FOL premises (which will be indicated by simple instance_of formulas), 
+create implications that would be meaningful for the domain area mentioned in the ontology name.
 """
 
         user_prompt = f"""Ontology Name: {ontology_name}
@@ -385,10 +470,12 @@ Each example should show how these logical structures would manifest in concrete
 Provide your response as a JSON array with objects containing:
 - "title": A short descriptive title for the implication
 - "scenario": A concrete real-world example demonstrating the logical rule in action (1-2 paragraphs)
-- "premises_used": List of the specific premises being demonstrated (can be indices of the FOL premises list)
+- "premises_used": List of the specific premises being demonstrated (can be indices of the FOL premises list or the actual formulas)
 - "explanation": Clear explanation of how the scenario demonstrates the logical rules (1 paragraph)
 
 Ensure your examples are domain-appropriate, concrete, and clearly connected to the ontology's logical structure.
+If the premises seem auto-generated (simple instance_of formulas), create meaningful implications that would be relevant
+for a {ontology_name.replace("Ontology", "").strip()} domain.
 """
 
         # Make the API call
@@ -447,7 +534,10 @@ Ensure your examples are domain-appropriate, concrete, and clearly connected to 
             logger.error(f"Error parsing OpenAI response: {str(e)}")
             implications = []
         
-        logger.info(f"Successfully generated {len(implications)} real-world implications")
+        if implications and isinstance(implications, list):
+            logger.info(f"Successfully generated {len(implications)} real-world implications")
+        else:
+            logger.warning("No implications generated or implications not in list format")
         
         # If we still have no implications, create a default one for debugging
         if not implications:
