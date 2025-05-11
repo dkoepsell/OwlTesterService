@@ -55,13 +55,13 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/ontology-visualizer.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM fully loaded");
         
         // Create loading indicator
-        document.getElementById('ontology-visualization-container').innerHTML = 
+        let container = document.getElementById('ontology-visualization-container');
+        container.innerHTML = 
             '<div class="d-flex justify-content-center my-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><div class="ms-3">Loading visualization data...</div></div>';
         
         // Fetch the ontology data from the server
@@ -80,31 +80,271 @@
                     throw new Error("Invalid or empty visualization data received");
                 }
                 
-                // Clear loading indicator
-                document.getElementById('ontology-visualization-container').innerHTML = '';
-                
-                // Initialize the visualization with the data
-                try {
-                    initializeOntologyVisualization('ontology-visualization-container', data);
-                } catch (vizError) {
-                    console.error("Error initializing visualization:", vizError);
-                    document.getElementById('ontology-visualization-container').innerHTML = 
-                        '<div class="alert alert-danger">Error initializing visualization: ' + vizError.message + '</div>';
-                }
+                // Create direct visualization
+                createSimpleVisualization(container, data);
             })
             .catch(error => {
                 console.error('Error fetching ontology data:', error);
-                document.getElementById('ontology-visualization-container').innerHTML = 
+                container.innerHTML = 
                     '<div class="alert alert-danger">Error loading visualization data: ' + error.message + '</div>' +
                     '<div class="mt-3">' +
-                    '<button onclick="retryVisualization()" class="btn btn-primary">Retry Visualization</button>' +
+                    '<button onclick="window.location.reload()" class="btn btn-primary">Retry Visualization</button>' +
                     '</div>';
             });
     });
     
-    // Function to retry loading the visualization
-    function retryVisualization() {
-        window.location.reload();
+    function createSimpleVisualization(container, data) {
+        // Clear the container
+        container.innerHTML = '';
+        
+        // Set up the SVG
+        const width = container.clientWidth;
+        const height = 600;
+        
+        // Create the SVG element
+        const svg = d3.select(container)
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("class", "border rounded bg-dark");
+        
+        // Add zoom functionality
+        const g = svg.append("g");
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 3])
+            .on("zoom", (event) => g.attr("transform", event.transform));
+        svg.call(zoom);
+        
+        // Add controls
+        const controls = d3.select(container)
+            .append("div")
+            .attr("class", "my-3")
+            .html(`
+                <button id="reset-zoom" class="btn btn-sm btn-secondary me-2">Reset View</button>
+                <button id="zoom-in" class="btn btn-sm btn-secondary me-2">Zoom In</button>
+                <button id="zoom-out" class="btn btn-sm btn-secondary me-2">Zoom Out</button>
+            `);
+        
+        // Set up the simulation
+        const simulation = d3.forceSimulation()
+            .force("link", d3.forceLink().id(d => d.id).distance(150))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collide", d3.forceCollide(60));
+        
+        // Process the data
+        const nodes = data.classes.map(cls => ({
+            id: cls.id,
+            name: cls.name || cls.id,
+            bfo: cls.bfo || false
+        }));
+        
+        const links = [];
+        
+        // Add inheritance links if they exist
+        if (data.inheritance && Array.isArray(data.inheritance)) {
+            data.inheritance.forEach(rel => {
+                if (rel.source && rel.target) {
+                    links.push({
+                        source: rel.source,
+                        target: rel.target,
+                        type: 'inheritance'
+                    });
+                }
+            });
+        }
+        
+        // Add property links if they exist
+        if (data.properties && Array.isArray(data.properties)) {
+            data.properties.forEach(prop => {
+                if (prop.source && prop.target) {
+                    links.push({
+                        source: prop.source,
+                        target: prop.target,
+                        type: 'property',
+                        label: prop.label || prop.name || 'has_relation'
+                    });
+                }
+            });
+        }
+        
+        // Add markers for arrows
+        svg.append("defs").selectAll("marker")
+            .data(["inheritance-arrow", "property-arrow"])
+            .enter().append("marker")
+            .attr("id", d => d)
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 25)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("class", d => d);
+        
+        // Create links
+        const link = g.append("g")
+            .selectAll("line")
+            .data(links)
+            .enter()
+            .append("line")
+            .attr("class", d => "link " + d.type)
+            .attr("marker-end", d => d.type === "inheritance" ? "url(#inheritance-arrow)" : "url(#property-arrow)")
+            .style("stroke", d => d.type === "inheritance" ? "#95a5a6" : "#e74c3c")
+            .style("stroke-width", 2)
+            .style("stroke-dasharray", d => d.type === "inheritance" ? "5,5" : "none");
+        
+        // Create link labels for properties
+        const linkLabel = g.append("g")
+            .selectAll("text")
+            .data(links.filter(d => d.type === "property"))
+            .enter()
+            .append("text")
+            .attr("class", "link-label")
+            .text(d => d.label)
+            .style("font-size", "10px")
+            .style("fill", "#f1c40f")
+            .attr("text-anchor", "middle")
+            .attr("dy", -5);
+        
+        // Create nodes
+        const node = g.append("g")
+            .selectAll("g")
+            .data(nodes)
+            .enter()
+            .append("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+        
+        // Add rectangles for class nodes
+        node.append("rect")
+            .attr("width", d => Math.max(100, d.name.length * 8))
+            .attr("height", 40)
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr("x", d => -(Math.max(100, d.name.length * 8)) / 2)
+            .attr("y", -20)
+            .style("fill", d => d.bfo ? "#34495e" : "#2c3e50")
+            .style("stroke", d => d.bfo ? "#9b59b6" : "#3498db")
+            .style("stroke-width", 2);
+        
+        // Add node labels
+        node.append("text")
+            .text(d => d.name)
+            .attr("text-anchor", "middle")
+            .attr("dy", 5)
+            .style("fill", "#fff")
+            .style("font-size", "12px");
+        
+        // Add simple legend
+        const legend = svg.append("g")
+            .attr("transform", "translate(20, 20)");
+        
+        const legendData = [
+            { label: "Domain Class", color: "#2c3e50", stroke: "#3498db", type: "rect" },
+            { label: "BFO Class", color: "#34495e", stroke: "#9b59b6", type: "rect" },
+            { label: "Inheritance", color: "#95a5a6", type: "line" },
+            { label: "Property", color: "#e74c3c", type: "line" }
+        ];
+        
+        legendData.forEach((item, i) => {
+            const g = legend.append("g")
+                .attr("transform", `translate(0, ${i * 25})`);
+            
+            if (item.type === "rect") {
+                g.append("rect")
+                    .attr("width", 20)
+                    .attr("height", 20)
+                    .attr("rx", 3)
+                    .attr("ry", 3)
+                    .style("fill", item.color)
+                    .style("stroke", item.stroke)
+                    .style("stroke-width", 2);
+            } else {
+                g.append("line")
+                    .attr("x1", 0)
+                    .attr("y1", 10)
+                    .attr("x2", 20)
+                    .attr("y2", 10)
+                    .style("stroke", item.color)
+                    .style("stroke-width", 2)
+                    .style("stroke-dasharray", item.label === "Inheritance" ? "5,5" : "none");
+            }
+            
+            g.append("text")
+                .attr("x", 30)
+                .attr("y", 15)
+                .text(item.label)
+                .style("fill", "#ecf0f1")
+                .style("font-size", "12px");
+        });
+        
+        // Make simulation work
+        simulation
+            .nodes(nodes)
+            .on("tick", ticked);
+        
+        simulation.force("link")
+            .links(links);
+        
+        // Control buttons
+        d3.select("#reset-zoom").on("click", () => {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+        });
+        
+        d3.select("#zoom-in").on("click", () => {
+            svg.transition().duration(300).call(
+                zoom.scaleBy,
+                1.2
+            );
+        });
+        
+        d3.select("#zoom-out").on("click", () => {
+            svg.transition().duration(300).call(
+                zoom.scaleBy,
+                0.8
+            );
+        });
+        
+        // Helper functions
+        function ticked() {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+            
+            linkLabel
+                .attr("x", d => (d.source.x + d.target.x) / 2)
+                .attr("y", d => (d.source.y + d.target.y) / 2);
+            
+            node
+                .attr("transform", d => `translate(${d.x}, ${d.y})`);
+        }
+        
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
     }
 </script>
 {% endblock %}
