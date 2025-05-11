@@ -7,29 +7,29 @@ from app import app, db
 
 def add_transparency_fields():
     """Add transparency fields to the OntologyAnalysis table."""
-    app.logger.info("Starting database migration to add transparency fields")
-    
-    try:
-        inspector = inspect(db.engine)
-        columns = [col['name'] for col in inspector.get_columns('ontology_analysis')]
+    with app.app_context():
+        app.logger.info("Starting database migration to add transparency fields")
         
-        with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('ontology_analysis')]
+            
             # Add reasoning_methodology field if it doesn't exist
             if 'reasoning_methodology' not in columns:
                 app.logger.info("Adding reasoning_methodology field")
-                db.session.execute(text("ALTER TABLE ontology_analysis ADD COLUMN reasoning_methodology JSONB"))
+                db.session.execute(text("ALTER TABLE ontology_analysis ADD COLUMN reasoning_methodology JSON"))
             
             # Add derivation_steps field if it doesn't exist
             if 'derivation_steps' not in columns:
                 app.logger.info("Adding derivation_steps field")
-                db.session.execute(text("ALTER TABLE ontology_analysis ADD COLUMN derivation_steps JSONB"))
+                db.session.execute(text("ALTER TABLE ontology_analysis ADD COLUMN derivation_steps JSON"))
                 
             db.session.commit()
             app.logger.info("Migration successful")
             return True
-    except Exception as e:
-        app.logger.error(f"Error during migration: {str(e)}")
-        return False
+        except Exception as e:
+            app.logger.error(f"Error during migration: {str(e)}")
+            return False
 
 if __name__ == "__main__":
     app.logger.info("Running database migration for transparency fields")
