@@ -834,8 +834,11 @@ def api_analyze_owl(filename):
             logger.info(f"API endpoint updated keys: {list(analysis.keys())}")
             
         # Add total axiom count if not present
-        if 'axioms' in analysis and isinstance(analysis['axioms'], list):
-            analysis['axiom_count'] = len(analysis['axioms'])
+        if 'axioms' in analysis:
+            if isinstance(analysis['axioms'], list):
+                analysis['axiom_count'] = len(analysis['axioms'])
+            elif isinstance(analysis['axioms'], int):
+                analysis['axiom_count'] = analysis['axioms']
         
         # Add expressivity and complexity from metrics if available
         if 'metrics' in analysis:
