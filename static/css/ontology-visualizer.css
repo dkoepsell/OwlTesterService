@@ -1,0 +1,72 @@
+/* Styles for the ontology visualization */
+
+.ontology-diagram {
+    border: 1px solid #444;
+    background-color: #2a2a2a;
+    margin-bottom: 15px;
+    border-radius: 4px;
+}
+
+/* Node styles */
+.node-shape {
+    stroke-width: 2px;
+}
+
+.domain-class {
+    fill: #2c3e50;
+    stroke: #3498db;
+}
+
+.bfo-class {
+    fill: #34495e;
+    stroke: #9b59b6;
+}
+
+.node-label {
+    fill: #fff;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+/* Link styles */
+.link {
+    stroke-width: 2px;
+}
+
+.inheritance {
+    stroke: #95a5a6;
+    stroke-dasharray: 5, 5;
+}
+
+.property {
+    stroke: #e74c3c;
+}
+
+.link-label {
+    fill: #f1c40f;
+    font-size: 10px;
+    pointer-events: none;
+}
+
+/* Arrow markers */
+.inheritance-arrow {
+    fill: #95a5a6;
+}
+
+.property-arrow {
+    fill: #e74c3c;
+}
+
+/* Controls */
+.visualization-controls {
+    margin-top: 10px;
+    margin-bottom: 15px;
+    display: flex;
+    gap: 5px;
+}
+
+/* Legend */
+.legend text {
+    fill: #ecf0f1;
+    font-size: 12px;
+}

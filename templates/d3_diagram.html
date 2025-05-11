@@ -1,0 +1,75 @@
+{% extends "layout.html" %}
+
+{% block title %}Ontology Diagram - {{ filename }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ontology-visualizer.css') }}">
+<!-- D3.js v7 -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1>Ontology Diagram</h1>
+                <a href="{{ url_for('analyze_owl', filename=filename) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Analysis
+                </a>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Interactive Class Diagram</h5>
+                    <span class="badge bg-info">Drag nodes to reposition them</span>
+                </div>
+                <div class="card-body">
+                    <div id="ontology-visualization-container"></div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Diagram Information</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>Ontology Name:</strong> {{ ontology_name }}</li>
+                        <li class="list-group-item"><strong>Classes:</strong> {{ class_count }}</li>
+                        <li class="list-group-item"><strong>Object Properties:</strong> {{ property_count }}</li>
+                        <li class="list-group-item">
+                            <strong>Visualization Type:</strong> Interactive D3.js Force-Directed Graph
+                            <ul class="mt-2">
+                                <li>Drag nodes to reposition them</li>
+                                <li>Use the controls to zoom in/out and reset the view</li>
+                                <li>Hover over elements to see additional details</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ontology-visualizer.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fetch the ontology data from the server
+        fetch('{{ url_for("api_get_diagram_data", filename=filename) }}')
+            .then(response => response.json())
+            .then(data => {
+                // Initialize the visualization with the data
+                initializeOntologyVisualization('ontology-visualization-container', data);
+            })
+            .catch(error => {
+                console.error('Error fetching ontology data:', error);
+                document.getElementById('ontology-visualization-container').innerHTML = 
+                    '<div class="alert alert-danger">Error loading visualization data. Please try again.</div>';
+            });
+    });
+</script>
+{% endblock %}

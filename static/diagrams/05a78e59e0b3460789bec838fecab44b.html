@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark">
+<head>
+    <title>Ontology Diagram - 05a78e59e0b3460789bec838fecab44b</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <style>
+        pre { padding: 15px; border-radius: 5px; max-height: 400px; overflow-y: auto; }
+        .diagram-container { text-align: center; margin: 20px 0; }
+        .diagram-container iframe { width: 100%; height: 500px; border: 1px solid #444; }
+        .tab-content { padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Ontology Diagram - 05a78e59e0b3460789bec838fecab44b</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">UML Class Diagram</h5>
+                <span class="badge bg-info">Multiple display options available</span>
+            </div>
+            <div class="card-body">
+                <!-- Tabs for different diagram formats -->
+                <ul class="nav nav-tabs" id="diagramTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="text-tab" data-bs-toggle="tab" data-bs-target="#text" type="button" role="tab">Text Diagram</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="svg-tab" data-bs-toggle="tab" data-bs-target="#svg" type="button" role="tab">SVG Diagram</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="code-tab" data-bs-toggle="tab" data-bs-target="#code" type="button" role="tab">PlantUML Code</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="diagramTabContent">
+                    <!-- Text Diagram Tab -->
+                    <div class="tab-pane fade show active" id="text" role="tabpanel">
+                        <div class="diagram-container">
+                            <iframe src="https://www.plantuml.com/plantuml/txt/%40startuml%0A%27%20Ontology%20Class%20Diagram%0A%27%20Ontology%3A%2005a78e59e0b3460789bec838fecab44b%0A%27%20Generated%20by%20FOL-BFO-OWL%20Tester%0A%0A%27%20Simple%20styling%0Askinparam%20monochrome%20false%0Askinparam%20shadowing%20false%0Askinparam%20defaultFontName%20Arial%0Askinparam%20defaultFontSize%2012%0A%0A%0A%27%20Class%20definitions%0Aclass%20Evidence%0AEvidence%20%3A%20%2Blabel%20%3A%20string%0AEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20Fact%0AFact%20%3A%20%2Blabel%20%3A%20string%0AFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalActor%0ALegalActor%20%3A%20%2Blabel%20%3A%20string%0ALegalActor%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalFact%0ALegalFact%20%3A%20%2Blabel%20%3A%20string%0ALegalFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalClaim%0ALegalClaim%20%3A%20%2Blabel%20%3A%20string%0ALegalClaim%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20RealWorld%0ARealWorld%20%3A%20%2Blabel%20%3A%20string%0ARealWorld%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalArgument%0ALegalArgument%20%3A%20%2Blabel%20%3A%20string%0ALegalArgument%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalCase%0ALegalCase%20%3A%20%2Blabel%20%3A%20string%0ALegalCase%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRule%0ALegalRule%20%3A%20%2Blabel%20%3A%20string%0ALegalRule%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalProcess%0ALegalProcess%20%3A%20%2Blabel%20%3A%20string%0ALegalProcess%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRole%0ALegalRole%20%3A%20%2Blabel%20%3A%20string%0ALegalRole%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalEvidence%0ALegalEvidence%20%3A%20%2Blabel%20%3A%20string%0ALegalEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20DocumentaryAct%0ADocumentaryAct%20%3A%20%2Blabel%20%3A%20string%0ADocumentaryAct%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalOutcome%0ALegalOutcome%20%3A%20%2Blabel%20%3A%20string%0ALegalOutcome%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20SocialReality%0ASocialReality%20%3A%20%2Blabel%20%3A%20string%0ASocialReality%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalReality%0ALegalReality%20%3A%20%2Blabel%20%3A%20string%0ALegalReality%20%3A%20%2Bcomment%20%3A%20string%0A%0A%27%20Object%20properties%0AEvidence%20--%3E%20Fact%20%3A%20is_about%0ALegalActor%20--%3E%20LegalFact%20%3A%20determines%0AEvidence%20--%3E%20LegalClaim%20%3A%20supports%0AFact%20--%3E%20LegalCase%20%3A%20influences%0ALegalRule%20--%3E%20LegalFact%20%3A%20applies_to%0ALegalActor%20--%3E%20LegalProcess%20%3A%20participates_in%0ALegalFact%20--%3E%20Fact%20%3A%20corresponds_to%0ALegalActor%20--%3E%20LegalEvidence%20%3A%20presents%0ALegalCase%20--%3E%20LegalFact%20%3A%20has_part%0ADocumentaryAct%20--%3E%20LegalFact%20%3A%20constitutes%0ALegalCase%20--%3E%20LegalActor%20%3A%20involves%0ALegalProcess%20--%3E%20LegalOutcome%20%3A%20produces%0A%0A%40enduml" title="Text UML Diagram"></iframe>
+                            <div class="mt-2">
+                                <a href="https://www.plantuml.com/plantuml/txt/%40startuml%0A%27%20Ontology%20Class%20Diagram%0A%27%20Ontology%3A%2005a78e59e0b3460789bec838fecab44b%0A%27%20Generated%20by%20FOL-BFO-OWL%20Tester%0A%0A%27%20Simple%20styling%0Askinparam%20monochrome%20false%0Askinparam%20shadowing%20false%0Askinparam%20defaultFontName%20Arial%0Askinparam%20defaultFontSize%2012%0A%0A%0A%27%20Class%20definitions%0Aclass%20Evidence%0AEvidence%20%3A%20%2Blabel%20%3A%20string%0AEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20Fact%0AFact%20%3A%20%2Blabel%20%3A%20string%0AFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalActor%0ALegalActor%20%3A%20%2Blabel%20%3A%20string%0ALegalActor%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalFact%0ALegalFact%20%3A%20%2Blabel%20%3A%20string%0ALegalFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalClaim%0ALegalClaim%20%3A%20%2Blabel%20%3A%20string%0ALegalClaim%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20RealWorld%0ARealWorld%20%3A%20%2Blabel%20%3A%20string%0ARealWorld%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalArgument%0ALegalArgument%20%3A%20%2Blabel%20%3A%20string%0ALegalArgument%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalCase%0ALegalCase%20%3A%20%2Blabel%20%3A%20string%0ALegalCase%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRule%0ALegalRule%20%3A%20%2Blabel%20%3A%20string%0ALegalRule%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalProcess%0ALegalProcess%20%3A%20%2Blabel%20%3A%20string%0ALegalProcess%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRole%0ALegalRole%20%3A%20%2Blabel%20%3A%20string%0ALegalRole%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalEvidence%0ALegalEvidence%20%3A%20%2Blabel%20%3A%20string%0ALegalEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20DocumentaryAct%0ADocumentaryAct%20%3A%20%2Blabel%20%3A%20string%0ADocumentaryAct%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalOutcome%0ALegalOutcome%20%3A%20%2Blabel%20%3A%20string%0ALegalOutcome%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20SocialReality%0ASocialReality%20%3A%20%2Blabel%20%3A%20string%0ASocialReality%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalReality%0ALegalReality%20%3A%20%2Blabel%20%3A%20string%0ALegalReality%20%3A%20%2Bcomment%20%3A%20string%0A%0A%27%20Object%20properties%0AEvidence%20--%3E%20Fact%20%3A%20is_about%0ALegalActor%20--%3E%20LegalFact%20%3A%20determines%0AEvidence%20--%3E%20LegalClaim%20%3A%20supports%0AFact%20--%3E%20LegalCase%20%3A%20influences%0ALegalRule%20--%3E%20LegalFact%20%3A%20applies_to%0ALegalActor%20--%3E%20LegalProcess%20%3A%20participates_in%0ALegalFact%20--%3E%20Fact%20%3A%20corresponds_to%0ALegalActor%20--%3E%20LegalEvidence%20%3A%20presents%0ALegalCase%20--%3E%20LegalFact%20%3A%20has_part%0ADocumentaryAct%20--%3E%20LegalFact%20%3A%20constitutes%0ALegalCase%20--%3E%20LegalActor%20%3A%20involves%0ALegalProcess%20--%3E%20LegalOutcome%20%3A%20produces%0A%0A%40enduml" target="_blank" class="btn btn-primary btn-sm">Open in New Window</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SVG Diagram Tab -->
+                    <div class="tab-pane fade" id="svg" role="tabpanel">
+                        <div class="diagram-container">
+                            <iframe src="https://www.plantuml.com/plantuml/svg/%40startuml%0A%27%20Ontology%20Class%20Diagram%0A%27%20Ontology%3A%2005a78e59e0b3460789bec838fecab44b%0A%27%20Generated%20by%20FOL-BFO-OWL%20Tester%0A%0A%27%20Simple%20styling%0Askinparam%20monochrome%20false%0Askinparam%20shadowing%20false%0Askinparam%20defaultFontName%20Arial%0Askinparam%20defaultFontSize%2012%0A%0A%0A%27%20Class%20definitions%0Aclass%20Evidence%0AEvidence%20%3A%20%2Blabel%20%3A%20string%0AEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20Fact%0AFact%20%3A%20%2Blabel%20%3A%20string%0AFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalActor%0ALegalActor%20%3A%20%2Blabel%20%3A%20string%0ALegalActor%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalFact%0ALegalFact%20%3A%20%2Blabel%20%3A%20string%0ALegalFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalClaim%0ALegalClaim%20%3A%20%2Blabel%20%3A%20string%0ALegalClaim%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20RealWorld%0ARealWorld%20%3A%20%2Blabel%20%3A%20string%0ARealWorld%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalArgument%0ALegalArgument%20%3A%20%2Blabel%20%3A%20string%0ALegalArgument%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalCase%0ALegalCase%20%3A%20%2Blabel%20%3A%20string%0ALegalCase%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRule%0ALegalRule%20%3A%20%2Blabel%20%3A%20string%0ALegalRule%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalProcess%0ALegalProcess%20%3A%20%2Blabel%20%3A%20string%0ALegalProcess%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRole%0ALegalRole%20%3A%20%2Blabel%20%3A%20string%0ALegalRole%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalEvidence%0ALegalEvidence%20%3A%20%2Blabel%20%3A%20string%0ALegalEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20DocumentaryAct%0ADocumentaryAct%20%3A%20%2Blabel%20%3A%20string%0ADocumentaryAct%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalOutcome%0ALegalOutcome%20%3A%20%2Blabel%20%3A%20string%0ALegalOutcome%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20SocialReality%0ASocialReality%20%3A%20%2Blabel%20%3A%20string%0ASocialReality%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalReality%0ALegalReality%20%3A%20%2Blabel%20%3A%20string%0ALegalReality%20%3A%20%2Bcomment%20%3A%20string%0A%0A%27%20Object%20properties%0AEvidence%20--%3E%20Fact%20%3A%20is_about%0ALegalActor%20--%3E%20LegalFact%20%3A%20determines%0AEvidence%20--%3E%20LegalClaim%20%3A%20supports%0AFact%20--%3E%20LegalCase%20%3A%20influences%0ALegalRule%20--%3E%20LegalFact%20%3A%20applies_to%0ALegalActor%20--%3E%20LegalProcess%20%3A%20participates_in%0ALegalFact%20--%3E%20Fact%20%3A%20corresponds_to%0ALegalActor%20--%3E%20LegalEvidence%20%3A%20presents%0ALegalCase%20--%3E%20LegalFact%20%3A%20has_part%0ADocumentaryAct%20--%3E%20LegalFact%20%3A%20constitutes%0ALegalCase%20--%3E%20LegalActor%20%3A%20involves%0ALegalProcess%20--%3E%20LegalOutcome%20%3A%20produces%0A%0A%40enduml" title="SVG UML Diagram"></iframe>
+                            <div class="mt-2">
+                                <a href="https://www.plantuml.com/plantuml/svg/%40startuml%0A%27%20Ontology%20Class%20Diagram%0A%27%20Ontology%3A%2005a78e59e0b3460789bec838fecab44b%0A%27%20Generated%20by%20FOL-BFO-OWL%20Tester%0A%0A%27%20Simple%20styling%0Askinparam%20monochrome%20false%0Askinparam%20shadowing%20false%0Askinparam%20defaultFontName%20Arial%0Askinparam%20defaultFontSize%2012%0A%0A%0A%27%20Class%20definitions%0Aclass%20Evidence%0AEvidence%20%3A%20%2Blabel%20%3A%20string%0AEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20Fact%0AFact%20%3A%20%2Blabel%20%3A%20string%0AFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalActor%0ALegalActor%20%3A%20%2Blabel%20%3A%20string%0ALegalActor%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalFact%0ALegalFact%20%3A%20%2Blabel%20%3A%20string%0ALegalFact%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalClaim%0ALegalClaim%20%3A%20%2Blabel%20%3A%20string%0ALegalClaim%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20RealWorld%0ARealWorld%20%3A%20%2Blabel%20%3A%20string%0ARealWorld%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalArgument%0ALegalArgument%20%3A%20%2Blabel%20%3A%20string%0ALegalArgument%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalCase%0ALegalCase%20%3A%20%2Blabel%20%3A%20string%0ALegalCase%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRule%0ALegalRule%20%3A%20%2Blabel%20%3A%20string%0ALegalRule%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalProcess%0ALegalProcess%20%3A%20%2Blabel%20%3A%20string%0ALegalProcess%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalRole%0ALegalRole%20%3A%20%2Blabel%20%3A%20string%0ALegalRole%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalEvidence%0ALegalEvidence%20%3A%20%2Blabel%20%3A%20string%0ALegalEvidence%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20DocumentaryAct%0ADocumentaryAct%20%3A%20%2Blabel%20%3A%20string%0ADocumentaryAct%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalOutcome%0ALegalOutcome%20%3A%20%2Blabel%20%3A%20string%0ALegalOutcome%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20SocialReality%0ASocialReality%20%3A%20%2Blabel%20%3A%20string%0ASocialReality%20%3A%20%2Bcomment%20%3A%20string%0Aclass%20LegalReality%0ALegalReality%20%3A%20%2Blabel%20%3A%20string%0ALegalReality%20%3A%20%2Bcomment%20%3A%20string%0A%0A%27%20Object%20properties%0AEvidence%20--%3E%20Fact%20%3A%20is_about%0ALegalActor%20--%3E%20LegalFact%20%3A%20determines%0AEvidence%20--%3E%20LegalClaim%20%3A%20supports%0AFact%20--%3E%20LegalCase%20%3A%20influences%0ALegalRule%20--%3E%20LegalFact%20%3A%20applies_to%0ALegalActor%20--%3E%20LegalProcess%20%3A%20participates_in%0ALegalFact%20--%3E%20Fact%20%3A%20corresponds_to%0ALegalActor%20--%3E%20LegalEvidence%20%3A%20presents%0ALegalCase%20--%3E%20LegalFact%20%3A%20has_part%0ADocumentaryAct%20--%3E%20LegalFact%20%3A%20constitutes%0ALegalCase%20--%3E%20LegalActor%20%3A%20involves%0ALegalProcess%20--%3E%20LegalOutcome%20%3A%20produces%0A%0A%40enduml" target="_blank" class="btn btn-primary btn-sm">Open in New Window</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PlantUML Code Tab -->
+                    <div class="tab-pane fade" id="code" role="tabpanel">
+                        <div class="d-flex justify-content-end mb-2">
+                            <a href="https://www.plantuml.com/plantuml/uml/" target="_blank" class="btn btn-primary btn-sm">
+                                Open in PlantUML Editor
+                            </a>
+                        </div>
+                        <pre><code>@startuml
+' Ontology Class Diagram
+' Ontology: 05a78e59e0b3460789bec838fecab44b
+' Generated by FOL-BFO-OWL Tester
+
+' Simple styling
+skinparam monochrome false
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+
+' Class definitions
+class Evidence
+Evidence : +label : string
+Evidence : +comment : string
+class Fact
+Fact : +label : string
+Fact : +comment : string
+class LegalActor
+LegalActor : +label : string
+LegalActor : +comment : string
+class LegalFact
+LegalFact : +label : string
+LegalFact : +comment : string
+class LegalClaim
+LegalClaim : +label : string
+LegalClaim : +comment : string
+class RealWorld
+RealWorld : +label : string
+RealWorld : +comment : string
+class LegalArgument
+LegalArgument : +label : string
+LegalArgument : +comment : string
+class LegalCase
+LegalCase : +label : string
+LegalCase : +comment : string
+class LegalRule
+LegalRule : +label : string
+LegalRule : +comment : string
+class LegalProcess
+LegalProcess : +label : string
+LegalProcess : +comment : string
+class LegalRole
+LegalRole : +label : string
+LegalRole : +comment : string
+class LegalEvidence
+LegalEvidence : +label : string
+LegalEvidence : +comment : string
+class DocumentaryAct
+DocumentaryAct : +label : string
+DocumentaryAct : +comment : string
+class LegalOutcome
+LegalOutcome : +label : string
+LegalOutcome : +comment : string
+class SocialReality
+SocialReality : +label : string
+SocialReality : +comment : string
+class LegalReality
+LegalReality : +label : string
+LegalReality : +comment : string
+
+' Object properties
+Evidence --> Fact : is_about
+LegalActor --> LegalFact : determines
+Evidence --> LegalClaim : supports
+Fact --> LegalCase : influences
+LegalRule --> LegalFact : applies_to
+LegalActor --> LegalProcess : participates_in
+LegalFact --> Fact : corresponds_to
+LegalActor --> LegalEvidence : presents
+LegalCase --> LegalFact : has_part
+DocumentaryAct --> LegalFact : constitutes
+LegalCase --> LegalActor : involves
+LegalProcess --> LegalOutcome : produces
+
+@enduml</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Diagram Information</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item"><strong>Ontology Name:</strong> 05a78e59e0b3460789bec838fecab44b</li>
+                    <li class="list-group-item"><strong>Classes:</strong> 16</li>
+                    <li class="list-group-item"><strong>Shown in Diagram:</strong> 16</li>
+                    <li class="list-group-item"><strong>Diagram Format:</strong> Simple class diagram without stereotypes for maximum compatibility</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS for tabs -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
