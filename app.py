@@ -592,6 +592,7 @@ def api_analyze_owl(filename):
                     app.logger.info(f"★★★ FOUND {class_count} CLASSES AND {object_property_count} PROPERTIES FOR DEFAULT PREMISES ★★★")
                     
                     # Generate default premises for classes
+                    structured_premises = []
                     for cls in onto.classes():
                         if hasattr(cls, 'name') and cls.name:
                             # Skip some common base classes that might create noise
@@ -599,17 +600,37 @@ def api_analyze_owl(filename):
                                 continue
                                 
                             # Create a premise in BFO format: instance_of(x, ClassName, t)
-                            premise = f"instance_of(x, {cls.name}, t)"
-                            premises.append(premise)
+                            fol_expr = f"instance_of(x, {cls.name}, t)"
+                            
+                            # Create a structured premise with type, fol, and description
+                            structured_premise = {
+                                'type': 'class',
+                                'fol': fol_expr,
+                                'description': f"Entities that are instances of {cls.name}",
+                                'entity_name': cls.name
+                            }
+                            
+                            structured_premises.append(structured_premise)
                             app.logger.info(f"★★★ Added default class FOL premise for: {cls.name} ★★★")
                     
                     # Generate default premises for object properties
                     for prop in onto.object_properties():
                         if hasattr(prop, 'name') and prop.name:
                             # Create a premise in BFO format: PropertyName(x, y, t)
-                            premise = f"{prop.name}(x, y, t)"
-                            premises.append(premise)
+                            fol_expr = f"{prop.name}(x, y, t)"
+                            
+                            # Create a structured premise with type, fol, and description
+                            structured_premise = {
+                                'type': 'property',
+                                'fol': fol_expr,
+                                'description': f"Relation {prop.name} between entities",
+                                'entity_name': prop.name
+                            }
+                            
+                            structured_premises.append(structured_premise)
                             app.logger.info(f"★★★ Added default property FOL premise for: {prop.name} ★★★")
+                    
+                    premises = structured_premises
                         
                     app.logger.info(f"★★★ GENERATED {len(premises)} DEFAULT FOL PREMISES ★★★")
                     
