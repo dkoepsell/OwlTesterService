@@ -567,11 +567,66 @@ def analyze_owl(filename):
                     ontology_analysis.inferred_axioms = analysis.get('inferred', [])
                     # Make sure FOL premises are correctly extracted from the analysis
                     fol_premises = analysis.get('fol_premises', [])
+                    
+                    # If no premises were found, generate default ones
+                    if not fol_premises:
+                        app.logger.warning("★★★ NO FOL PREMISES FOUND, GENERATING DEFAULTS ★★★")
+                        
+                        # Access class and property lists from the analysis
+                        classes_list = analysis.get('class_list', [])
+                        obj_properties_list = analysis.get('object_property_list', [])
+                        
+                        app.logger.info(f"★★★ FOUND {len(classes_list)} CLASSES AND {len(obj_properties_list)} PROPERTIES FOR DEFAULT PREMISES ★★★")
+                        
+                        # Generate basic premises for all classes
+                        for cls_info in classes_list:
+                            try:
+                                if isinstance(cls_info, dict) and 'name' in cls_info:
+                                    cls_label = cls_info['name']
+                                elif isinstance(cls_info, str):
+                                    cls_label = cls_info
+                                else:
+                                    continue
+                                    
+                                # Skip external ontology classes like owl:Thing
+                                if cls_label.startswith("owl:") or cls_label == "Thing":
+                                    continue
+                                    
+                                fol_premises.append({
+                                    'type': 'class',
+                                    'fol': f"instance_of(x, {cls_label}, t)",
+                                    'description': f"Entities that are instances of {cls_label}"
+                                })
+                                app.logger.info(f"★★★ Added default class FOL premise for: {cls_label} ★★★")
+                            except Exception as e:
+                                app.logger.error(f"★★★ Error generating default FOL premise for class: {str(e)} ★★★")
+                        
+                        # Generate basic premises for object properties
+                        for prop_info in obj_properties_list:
+                            try:
+                                if isinstance(prop_info, dict) and 'name' in prop_info:
+                                    prop_label = prop_info['name']
+                                elif isinstance(prop_info, str):
+                                    prop_label = prop_info
+                                else:
+                                    continue
+                                    
+                                fol_premises.append({
+                                    'type': 'property',
+                                    'fol': f"{prop_label}(x, y, t)",
+                                    'description': f"Relation {prop_label} between entities"
+                                })
+                                app.logger.info(f"★★★ Added default property FOL premise for: {prop_label} ★★★")
+                            except Exception as e:
+                                app.logger.error(f"★★★ Error generating default FOL premise for property: {str(e)} ★★★")
+                    
                     app.logger.info(f"★★★ SAVING FOL PREMISES TO DATABASE: COUNT = {len(fol_premises)} ★★★")
                     if fol_premises:
                         app.logger.info(f"★★★ SAMPLE FOL PREMISES BEING SAVED: {fol_premises[:2]} ★★★")
                     else:
                         app.logger.warning("★★★ NO FOL PREMISES FOUND TO SAVE TO DATABASE ★★★")
+                    
+                    # Save to database
                     ontology_analysis.fol_premises = fol_premises
                     db.session.add(ontology_analysis)
                     db.session.commit()
