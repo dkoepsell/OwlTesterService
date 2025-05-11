@@ -173,8 +173,13 @@ def test_expression():
         if not expression or not expression.strip():
             return jsonify({'error': 'No expression provided'}), 400
         
-        # Preprocess the expression
-        expression, detected_format = preprocess_expression(expression)
+        # Preprocess the expression and get the detected format
+        try:
+            expression, detected_format = preprocess_expression(expression)
+        except Exception as e:
+            app.logger.error(f"Error preprocessing expression: {str(e)}")
+            # If there's an error, just use the original expression and no format
+            detected_format = None
         
         # Store the expression in session
         session['last_expression'] = expression
@@ -182,6 +187,10 @@ def test_expression():
         
         # Test the expression
         result = owl_tester.test_expression(expression)
+        
+        # Add the detected format to the result if available
+        if detected_format and 'format_detected' not in result:
+            result['format_detected'] = detected_format
         
         # Log the expression and result for debugging
         app.logger.info(f"Tested expression: {expression}")
@@ -535,14 +544,11 @@ def api_analyze_owl(filename):
         # Attempt to extract FOL premises from the ontology
         try:
             app.logger.info("Attempting to extract FOL premises...")
-            # Load the ontology
-            load_result = tester.load_ontology_from_file(file_record.file_path)
+            # We've already loaded the ontology earlier in this function
+            # Reuse it instead of loading it again
+            onto = load_result.get('ontology')
             
-            # Check if loading was successful
-            if isinstance(load_result, dict) and load_result.get('loaded', False):
-                onto = load_result.get('ontology')
-                
-                if onto:
+            if onto:
                     premises = []
                     found_premises = False
                     
