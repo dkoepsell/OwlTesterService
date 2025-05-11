@@ -693,7 +693,62 @@ def analyze_owl(filename):
                     except:
                         logger.error("★★★ Failed to convert FOL premises from string ★★★")
         else:
-            logger.warning(f"★★★ NO FOL PREMISES FOUND IN ANALYSIS DICT ★★★")
+            logger.warning(f"★★★ NO FOL PREMISES FOUND IN ANALYSIS DICT, GENERATING DEFAULT PREMISES ★★★")
+            
+            # Generate default FOL premises
+            fol_premises = []
+            
+            # Get class and property lists
+            class_list = analysis.get('class_list', [])
+            obj_property_list = analysis.get('object_property_list', [])
+            
+            logger.info(f"★★★ FOUND {len(class_list)} CLASSES AND {len(obj_property_list)} PROPERTIES FOR DEFAULT PREMISES ★★★")
+            
+            # Generate basic premises for all classes
+            for cls_info in class_list:
+                try:
+                    if isinstance(cls_info, dict) and 'name' in cls_info:
+                        cls_label = cls_info['name']
+                    elif isinstance(cls_info, str):
+                        cls_label = cls_info
+                    else:
+                        continue
+                        
+                    # Skip external ontology classes like owl:Thing
+                    if cls_label.startswith("owl:") or cls_label == "Thing":
+                        continue
+                        
+                    fol_premises.append({
+                        'type': 'class',
+                        'fol': f"instance_of(x, {cls_label}, t)",
+                        'description': f"Entities that are instances of {cls_label}"
+                    })
+                    logger.info(f"★★★ Added default class FOL premise for: {cls_label} ★★★")
+                except Exception as e:
+                    logger.error(f"★★★ Error generating default FOL premise for class: {str(e)} ★★★")
+            
+            # Generate basic premises for object properties
+            for prop_info in obj_property_list:
+                try:
+                    if isinstance(prop_info, dict) and 'name' in prop_info:
+                        prop_label = prop_info['name']
+                    elif isinstance(prop_info, str):
+                        prop_label = prop_info
+                    else:
+                        continue
+                        
+                    fol_premises.append({
+                        'type': 'property',
+                        'fol': f"{prop_label}(x, y, t)",
+                        'description': f"Relation {prop_label} between entities"
+                    })
+                    logger.info(f"★★★ Added default property FOL premise for: {prop_label} ★★★")
+                except Exception as e:
+                    logger.error(f"★★★ Error generating default FOL premise for property: {str(e)} ★★★")
+            
+            # Update the analysis with the generated premises
+            analysis['fol_premises'] = fol_premises
+            logger.info(f"★★★ GENERATED {len(fol_premises)} DEFAULT FOL PREMISES ★★★")
         
         # Update analysis with completeness validation if available
         if 'completeness' in analysis:
