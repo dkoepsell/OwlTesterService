@@ -5,7 +5,7 @@
     <div class="col-md-12">
         <h1 class="mb-4">Real-World Implications</h1>
         <h4 class="text-secondary">
-            <i class="fas fa-file-alt me-2"></i>{{ original_filename }}
+            <i class="fas fa-file-alt me-2"></i>{{ file.original_filename }}
         </h4>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -98,7 +98,7 @@
         </div>
         
         <div class="d-flex justify-content-between">
-            <a href="{{ url_for('analyze_owl', filename=ontology_file.filename, original_name=ontology_file.original_filename, file_id=ontology_file.id) }}" class="btn btn-outline-secondary">
+            <a href="{{ url_for('analyze_owl', filename=file.filename) }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-2"></i>Back to Analysis
             </a>
             <a href="{{ url_for('view_history') }}" class="btn btn-outline-secondary">
