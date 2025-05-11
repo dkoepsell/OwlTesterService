@@ -182,7 +182,8 @@ class OwlTester:
             "expression": input_expr,
             "bfo_classes_used": [],
             "bfo_relations_used": [],
-            "non_bfo_terms": []
+            "non_bfo_terms": [],
+            "format_detected": None  # Will be set to "instance_of" or "traditional"
         }
         
         # Check if input is empty
@@ -222,13 +223,28 @@ class OwlTester:
         instance_patterns = [
             r'instance_of\s*\(\s*\w+\s*,\s*(\w+)\s*,',  # instance_of(x,Class,t)
             r'exists_at\s*\(\s*(\w+)\s*,',              # exists_at(x,t)
-            r'located_in\s*\(\s*\w+\s*,\s*(\w+)\s*'     # located_in(x,y)
+            r'located_in\s*\(\s*\w+\s*,\s*(\w+)\s*',    # located_in(x,y)
+            r'occurs_in\s*\(\s*\w+\s*,\s*(\w+)\s*',     # occurs_in(p,t)
+            r'part_of\s*\(\s*\w+\s*,\s*(\w+)\s*',       # part_of(x,y)
+            r'has_part\s*\(\s*\w+\s*,\s*(\w+)\s*',      # has_part(x,y)
+            r'participates_in\s*\(\s*\w+\s*,\s*(\w+)\s*', # participates_in(x,p)
+            r'has_participant\s*\(\s*\w+\s*,\s*(\w+)\s*'  # has_participant(p,x)
         ]
+        
+        # Extract relation names as well
+        relation_names = ['instance_of', 'exists_at', 'located_in', 'occurs_in', 
+                         'part_of', 'has_part', 'participates_in', 'has_participant']
         
         instance_terms = []
         for pattern in instance_patterns:
             matches = re.findall(pattern, expr_string, re.IGNORECASE)
             instance_terms.extend(matches)
+            
+        # Add relation names themselves to be matched
+        relations_in_expr = []
+        for relation in relation_names:
+            if re.search(r'\b' + relation + r'\b', expr_string, re.IGNORECASE):
+                relations_in_expr.append(relation)
         
         # Then extract traditional format Class(x)
         class_pattern = r'(\w+)\s*\([a-z][a-z0-9_]*\)'  # Class(x)
@@ -236,16 +252,16 @@ class OwlTester:
         
         # Remove logical operators and separators for remaining terms
         cleaned = re.sub(r'[&|~()<>.-]', ' ', expr_string)
-        # Remove logical words
-        for word in ['exists', 'forall', 'implies', 'iff', 'lambda', 'if', 'then', 'and', 'or', 'not', 
-                    'instance_of', 'exists_at', 'located_in', 'temporal_region', 'continuant']:
+        # Remove logical words and relation words
+        logical_words = ['exists', 'forall', 'implies', 'iff', 'lambda', 'if', 'then', 'and', 'or', 'not']
+        for word in logical_words + relation_names + ['temporal_region', 'continuant']:
             cleaned = re.sub(r'\b' + word + r'\b', ' ', cleaned, flags=re.IGNORECASE)
         
         # Split by spaces and filter out empty strings
         remaining_terms = [term.strip() for term in cleaned.split() if term.strip()]
         
         # Combine all terms and filter out variables (single lowercase letters)
-        all_terms = instance_terms + class_terms + remaining_terms
+        all_terms = instance_terms + class_terms + remaining_terms + relations_in_expr
         filtered_terms = [term for term in all_terms if term and not (len(term) == 1 and term.islower())]
         
         return filtered_terms
@@ -268,7 +284,10 @@ class OwlTester:
                 if display_label not in result["bfo_classes_used"]:
                     result["bfo_classes_used"].append(display_label)
                     if term != original_id:
-                        result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{display_label}'. Consider using the exact ID '{original_id}'.")
+                        # Suggest proper instance_of notation
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO class '{display_label}'. " +
+                                              f"Consider using the exact ID '{original_id}' in instance_of format: " + 
+                                              f"instance_of(x,{original_id},t)")
             
             # Case-insensitive check for BFO relations
             elif term_lower in self.relation_map:
@@ -279,7 +298,10 @@ class OwlTester:
                 if display_label not in result["bfo_relations_used"]:
                     result["bfo_relations_used"].append(display_label)
                     if term != original_id:
-                        result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{display_label}'. Consider using the exact ID '{original_id}'.")
+                        # Suggest proper relation format
+                        result["issues"].append(f"Note: '{term}' was interpreted as BFO relation '{display_label}'. " +
+                                             f"Consider using the exact ID '{original_id}' in format: " +
+                                             f"{original_id}(x,y)")
             
             # Handle terms that might be in BFO but with different formatting
             elif any(term_lower in label.lower() for label in self.bfo_classes):
