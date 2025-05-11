@@ -23,17 +23,17 @@
                 <div class="row">
                     <div class="col-md-6">
                         <h6><i class="fas fa-tag me-2"></i>File: </h6>
-                        <p class="ms-4">{{ original_filename }}</p>
+                        <p class="ms-4">{{ file.original_filename }}</p>
                         
                         <h6><i class="fas fa-link me-2"></i>IRI: </h6>
-                        <p class="ms-4">{{ analysis.ontology_iri }}</p>
+                        <p class="ms-4">{{ analysis.ontology_iri if analysis.ontology_iri else 'Not available' }}</p>
                     </div>
                     <div class="col-md-6">
                         <h6><i class="fas fa-project-diagram me-2"></i>Expressivity: </h6>
-                        <p class="ms-4">{{ analysis.expressivity or 'Not available' }}</p>
+                        <p class="ms-4">{{ analysis.expressivity if analysis.expressivity else 'Not available' }}</p>
                         
                         <h6><i class="fas fa-chart-line me-2"></i>Complexity: </h6>
-                        <p class="ms-4">{{ analysis.complexity }} axioms</p>
+                        <p class="ms-4">{{ analysis.axiom_count if analysis.axiom_count is not none else 0 }} axioms</p>
                     </div>
                 </div>
             </div>
