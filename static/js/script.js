@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearBtn = document.getElementById('clear-btn');
     const resultsContainer = document.getElementById('results-container');
     const expressionText = document.getElementById('expression-text');
+    const formatDetected = document.getElementById('format-detected');
+    const formatBadge = document.getElementById('format-badge');
     const validityResult = document.getElementById('validity-result');
     const issuesContainer = document.getElementById('issues-container');
     const issuesList = document.getElementById('issues-list');
@@ -146,6 +148,33 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayResults(data) {
         // Set expression text
         expressionText.textContent = data.expression;
+        
+        // Display format detected if available
+        if (data.format_detected) {
+            formatDetected.classList.remove('d-none');
+            
+            // Set appropriate badge color and text based on format
+            let badgeClass, badgeText;
+            
+            switch (data.format_detected) {
+                case 'instance_of':
+                    badgeClass = 'bg-success';
+                    badgeText = 'BFO Standard Notation';
+                    break;
+                case 'traditional':
+                    badgeClass = 'bg-warning text-dark';
+                    badgeText = 'Traditional Notation';
+                    break;
+                default:
+                    badgeClass = 'bg-secondary';
+                    badgeText = 'Unknown Notation';
+            }
+            
+            formatBadge.className = `badge rounded-pill ${badgeClass}`;
+            formatBadge.textContent = badgeText;
+        } else {
+            formatDetected.classList.add('d-none');
+        }
         
         // Show validity result
         if (data.valid) {

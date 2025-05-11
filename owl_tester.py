@@ -191,12 +191,19 @@ class OwlTester:
             result["issues"].append("Empty expression provided")
             return result
             
-        # Parse the expression
+        # Preprocess the expression to handle BFO-style multi-variable quantifiers
+        preprocessed_expr = self.preprocess_expression(input_expr)
+        result["preprocessed_expr"] = preprocessed_expr
+        
+        # Parse the preprocessed expression
         try:
-            expr = self.read_expr(input_expr)
+            expr = self.read_expr(preprocessed_expr)
             result["parsed_expr"] = str(expr)
         except LogicalExpressionException as e:
             result["issues"].append(f"Parsing error: {str(e)}")
+            # Include info about the original and preprocessed expressions
+            if preprocessed_expr != input_expr:
+                result["issues"].append(f"Note: The system attempted to preprocess your expression to handle multiple variables in quantifiers. If using the instance_of notation with temporal variables, try using multiple nested quantifiers instead of comma-separated variables.")
             return result
         
         # Detect the format used in the expression
