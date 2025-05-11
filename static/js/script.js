@@ -88,32 +88,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     // Set focus back to the input and place cursor after inserted term
                     expressionInput.focus();
+                    expressionInput.setSelectionRange(cursorPos + term.length, cursorPos + term.length);
+                    
+                    // Show feedback (temporary visual indication)
+                    this.innerHTML = '<i class="fas fa-check"></i>';
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="fas fa-copy"></i>';
+                    }, 1000);
                 }
             });
         });
     }
-            expressionInput.setSelectionRange(cursorPos + term.length, cursorPos + term.length);
-            
-            // Show feedback (temporary visual indication)
-            this.innerHTML = '<i class="fas fa-check"></i>';
-            setTimeout(() => {
-                this.innerHTML = '<i class="fas fa-copy"></i>';
-            }, 1000);
-        });
-    });
     
     // Search functionality for BFO classes
-    searchClassesInput.addEventListener('input', function() {
-        filterList(bfoClassesList, '.bfo-class-item', this.value);
-    });
+    if (searchClassesInput && bfoClassesList) {
+        searchClassesInput.addEventListener('input', function() {
+            filterList(bfoClassesList, '.bfo-class-item', this.value);
+        });
+    }
     
     // Search functionality for BFO relations
-    searchRelationsInput.addEventListener('input', function() {
-        filterList(bfoRelationsList, '.bfo-relation-item', this.value);
-    });
+    if (searchRelationsInput && bfoRelationsList) {
+        searchRelationsInput.addEventListener('input', function() {
+            filterList(bfoRelationsList, '.bfo-relation-item', this.value);
+        });
+    }
     
     // Filter a list based on search input
     function filterList(listElement, itemSelector, searchText) {
+        if (!listElement || !searchText) return;
+        
         const items = listElement.querySelectorAll(itemSelector);
         const searchLower = searchText.toLowerCase();
         
