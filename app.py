@@ -180,16 +180,15 @@ def test_expression():
         # Associate expression with current user if logged in
         user_id = current_user.id if current_user.is_authenticated else None
         
-        fol_expression = FOLExpression(
-            expression=expression,
-            is_valid=result.get('valid', False),
-            test_results=result,
-            issues=result.get('issues', []),
-            bfo_classes_used=result.get('bfo_classes_used', []),
-            bfo_relations_used=result.get('bfo_relations_used', []),
-            non_bfo_terms=result.get('non_bfo_terms', []),
-            user_id=user_id
-        )
+        fol_expression = FOLExpression()
+        fol_expression.expression = expression
+        fol_expression.is_valid = result.get('valid', False)
+        fol_expression.test_results = result
+        fol_expression.issues = result.get('issues', [])
+        fol_expression.bfo_classes_used = result.get('bfo_classes_used', [])
+        fol_expression.bfo_relations_used = result.get('bfo_relations_used', []) 
+        fol_expression.non_bfo_terms = result.get('non_bfo_terms', [])
+        fol_expression.user_id = user_id
         db.session.add(fol_expression)
         db.session.commit()
         logger.info(f"Saved FOL expression test results to database with ID {fol_expression.id}")
@@ -366,14 +365,13 @@ def upload_owl():
             # Associate file with current user if logged in
             user_id = current_user.id if current_user.is_authenticated else None
             
-            ontology_file = OntologyFile(
-                filename=unique_filename,
-                original_filename=original_filename,
-                file_path=file_path,
-                file_size=file_size,
-                mime_type=mime_type,
-                user_id=user_id
-            )
+            ontology_file = OntologyFile()
+            ontology_file.filename = unique_filename
+            ontology_file.original_filename = original_filename
+            ontology_file.file_path = file_path
+            ontology_file.file_size = file_size
+            ontology_file.mime_type = mime_type
+            ontology_file.user_id = user_id
             db.session.add(ontology_file)
             db.session.commit()
             
@@ -448,24 +446,23 @@ def analyze_owl(filename):
                 ontology_file = OntologyFile.query.get(int(file_id))
                 if ontology_file:
                     # Create analysis record
-                    ontology_analysis = OntologyAnalysis(
-                        ontology_file_id=ontology_file.id,
-                        ontology_name=analysis.get('ontology_name', 'Unknown'),
-                        ontology_iri=analysis.get('ontology_iri', ''),
-                        is_consistent=analysis.get('consistency', {}).get('consistent', True),
-                        class_count=analysis.get('class_count', 0),
-                        object_property_count=analysis.get('object_property_count', 0),
-                        data_property_count=analysis.get('data_property_count', 0),
-                        individual_count=analysis.get('individual_count', 0),
-                        annotation_property_count=analysis.get('annotation_property_count', 0),
-                        axiom_count=analysis.get('axiom_count', 0),
-                        expressivity=analysis.get('expressivity', ''),
-                        complexity=analysis.get('complexity', 0),
-                        axioms=analysis.get('axioms', []),
-                        consistency_issues=analysis.get('consistency', {}).get('issues', []),
-                        inferred_axioms=analysis.get('inferred', []),
-                        fol_premises=analysis.get('fol_premises', [])
-                    )
+                    ontology_analysis = OntologyAnalysis()
+                    ontology_analysis.ontology_file_id = ontology_file.id
+                    ontology_analysis.ontology_name = analysis.get('ontology_name', 'Unknown')
+                    ontology_analysis.ontology_iri = analysis.get('ontology_iri', '')
+                    ontology_analysis.is_consistent = analysis.get('consistency', {}).get('consistent', True)
+                    ontology_analysis.class_count = analysis.get('class_count', 0)
+                    ontology_analysis.object_property_count = analysis.get('object_property_count', 0)
+                    ontology_analysis.data_property_count = analysis.get('data_property_count', 0)
+                    ontology_analysis.individual_count = analysis.get('individual_count', 0)
+                    ontology_analysis.annotation_property_count = analysis.get('annotation_property_count', 0)
+                    ontology_analysis.axiom_count = analysis.get('axiom_count', 0)
+                    ontology_analysis.expressivity = analysis.get('expressivity', '')
+                    ontology_analysis.complexity = analysis.get('complexity', 0)
+                    ontology_analysis.axioms = analysis.get('axioms', [])
+                    ontology_analysis.consistency_issues = analysis.get('consistency', {}).get('issues', [])
+                    ontology_analysis.inferred_axioms = analysis.get('inferred', [])
+                    ontology_analysis.fol_premises = analysis.get('fol_premises', [])
                     db.session.add(ontology_analysis)
                     db.session.commit()
                     logger.info(f"Saved analysis to database with ID {ontology_analysis.id}")
@@ -912,7 +909,9 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         # Create a new user
-        user = User(username=form.username.data, email=form.email.data)
+        user = User()
+        user.username = form.username.data
+        user.email = form.email.data
         user.set_password(form.password.data)
         
         # Save the user to the database
@@ -1003,16 +1002,15 @@ def sandbox_new():
         user_id = current_user.id if current_user.is_authenticated else None
         
         # Create a new sandbox ontology
-        ontology = SandboxOntology(
-            title=form.title.data,
-            domain=form.domain.data,
-            subject=form.subject.data,
-            description=form.description.data,
-            user_id=user_id,
-            classes=[],
-            properties=[],
-            individuals=[]
-        )
+        ontology = SandboxOntology()
+        ontology.title = form.title.data
+        ontology.domain = form.domain.data
+        ontology.subject = form.subject.data
+        ontology.description = form.description.data
+        ontology.user_id = user_id
+        ontology.classes = []
+        ontology.properties = []
+        ontology.individuals = []
         
         db.session.add(ontology)
         db.session.commit()
