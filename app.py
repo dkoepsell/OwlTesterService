@@ -579,12 +579,25 @@ def api_analyze_owl(filename):
                 found_premises = False
                 
                 # Try to extract annotations if available
+                structured_premises = []
                 for cls in onto.classes():
                     if hasattr(cls, 'comment'):
                         for comment in cls.comment:
                             if "FOL:" in comment:
-                                premises.append(comment.split("FOL:")[1].strip())
+                                fol_expr = comment.split("FOL:")[1].strip()
+                                
+                                # Create a structured premise with type, fol, and description
+                                structured_premise = {
+                                    'type': 'annotation',
+                                    'fol': fol_expr,
+                                    'description': f"Extracted from annotation on {cls.name}",
+                                    'entity_name': cls.name
+                                }
+                                
+                                structured_premises.append(structured_premise)
                                 found_premises = True
+                                
+                premises = structured_premises
                 
                 # If no premises were found in annotations, generate default ones
                 if not found_premises:
