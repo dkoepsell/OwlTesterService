@@ -481,6 +481,18 @@ class OwlTester:
                     else:
                         axiom_count += 1  # Count as single axiom if it's not a collection
             
+            # Build the detailed axioms list
+            axioms_list = []
+            # Add class hierarchy axioms
+            for cls in classes_list:
+                if hasattr(cls, 'is_a') and cls.is_a:
+                    for parent in cls.is_a:
+                        if hasattr(parent, 'name') and hasattr(cls, 'name'):
+                            axioms_list.append({
+                                'type': 'SubClassOf',
+                                'description': f"{cls.name} ⊑ {parent.name}"
+                            })
+            
             # Build the result dictionary
             result = {
                 'classes': len(classes_list),
@@ -489,7 +501,8 @@ class OwlTester:
                 'individuals': len(individuals_list),
                 'annotation_properties': len(annotation_properties_list),
                 'imported_ontologies': [o.base_iri for o in onto.imported_ontologies],
-                'axioms': axiom_count,
+                'axiom_count': axiom_count,
+                'axioms': axioms_list,  # List of axioms with type and description
                 'class_list': [cls.name for cls in classes_list if hasattr(cls, 'name')],
                 'object_property_list': [prop.name for prop in object_properties_list if hasattr(prop, 'name')],
                 'data_property_list': [prop.name for prop in data_properties_list if hasattr(prop, 'name')],
@@ -521,7 +534,8 @@ class OwlTester:
                 'individuals': 0,
                 'annotation_properties': 0,
                 'imported_ontologies': [],
-                'axioms': 0,
+                'axiom_count': 0,
+                'axioms': [],
                 'consistency': 'Unknown',
                 'expressivity': 'Unknown',
                 'error': str(e)

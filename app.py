@@ -522,7 +522,7 @@ def api_analyze_owl(filename):
         expressivity = analysis_result.get('expressivity', '')
         complexity = analysis_result.get('complexity', 0)
         
-        axioms = analysis_result.get('axioms', {})
+        axioms = analysis_result.get('axioms', [])
         consistency_issues = analysis_result.get('consistency_issues', [])
         
         # Create a new analysis record
