@@ -654,11 +654,29 @@ def api_analyze_owl(filename):
         except Exception as e:
             app.logger.error(f"Error extracting FOL premises: {str(e)}")
         
+        # Make sure we have non-zero values for statistics if they're missing or zero
+        # This prevents empty white boxes in the UI
+        if analysis.class_count == 0 and len(class_list) > 0:
+            analysis.class_count = len(class_list)
+            
+        if analysis.object_property_count == 0 and len(object_property_list) > 0:
+            analysis.object_property_count = len(object_property_list)
+            
+        if analysis.data_property_count == 0 and len(data_property_list) > 0:
+            analysis.data_property_count = len(data_property_list)
+            
+        if analysis.individual_count == 0 and len(individual_list) > 0:
+            analysis.individual_count = len(individual_list)
+            
+        if analysis.axiom_count == 0 and len(axioms) > 0:
+            analysis.axiom_count = len(axioms)
+        
         # Save the analysis to the database
         db.session.add(analysis)
         db.session.commit()
         
         app.logger.info(f"Using analysis ID {analysis.id} for API calls")
+        app.logger.info(f"Statistics: Classes={analysis.class_count}, Object Props={analysis.object_property_count}, Data Props={analysis.data_property_count}, Individuals={analysis.individual_count}")
         
         # Redirect to the analysis page
         return redirect(url_for('analyze_owl', filename=filename))
