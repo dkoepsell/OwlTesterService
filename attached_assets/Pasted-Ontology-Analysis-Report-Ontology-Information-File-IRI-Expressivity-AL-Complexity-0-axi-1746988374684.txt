@@ -1,0 +1,73 @@
+Ontology Analysis Report
+Ontology Information
+File:
+IRI:
+Expressivity:
+AL
+
+Complexity:
+0 axioms
+
+Ontology Statistics
+0
+Classes
+
+0
+Object Properties
+
+0
+Data Properties
+
+0
+Individuals
+
+Consistency Check
+Consistent
+ The ontology is logically consistent. No contradictions were found.
+Axioms
+All Axioms ([{'type': 'SubClassOf', 'description': 'Evidence ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'Fact ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalActor ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalFact ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalClaim ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'RealWorld ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalArgument ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalCase ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalRule ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalProcess ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalRole ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalEvidence ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'DocumentaryAct ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalOutcome ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'SocialReality ⊑ Thing'}, {'type': 'SubClassOf', 'description': 'LegalReality ⊑ Thing'}])
+Class Axioms
+Property Axioms
+Individual Axioms
+Search axioms...
+Type	Description
+SubClassOf	Evidence ⊑ Thing
+SubClassOf	Fact ⊑ Thing
+SubClassOf	LegalActor ⊑ Thing
+SubClassOf	LegalFact ⊑ Thing
+SubClassOf	LegalClaim ⊑ Thing
+SubClassOf	RealWorld ⊑ Thing
+SubClassOf	LegalArgument ⊑ Thing
+SubClassOf	LegalCase ⊑ Thing
+SubClassOf	LegalRule ⊑ Thing
+SubClassOf	LegalProcess ⊑ Thing
+SubClassOf	LegalRole ⊑ Thing
+SubClassOf	LegalEvidence ⊑ Thing
+SubClassOf	DocumentaryAct ⊑ Thing
+SubClassOf	LegalOutcome ⊑ Thing
+SubClassOf	SocialReality ⊑ Thing
+SubClassOf	LegalReality ⊑ Thing
+Inferred Axioms
+Search inferred axioms...
+Type	Description
+No inferred axioms available
+No inferred axioms found.
+First-Order Logic Premises
+The following FOL premises have been generated from the ontology axioms:
+
+Search FOL premises...
+Type	FOL Formula	Description
+Ontology Entities
+Classes (0)
+Object Properties (0)
+Data Properties (0)
+Individuals (0)
+Search classes...
+No classes found.
+Discover Real-World Implications
+Generate concrete real-world examples that demonstrate how your ontology's logical rules apply in practical situations.
+
+Using AI, we'll analyze your ontology's First-Order Logic premises and create meaningful scenarios that illustrate the implications of your ontological structures.
+
+ 
+ 

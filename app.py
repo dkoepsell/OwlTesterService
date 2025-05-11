@@ -471,9 +471,19 @@ def analyze_owl(filename):
         
         if analysis:
             # Use the existing analysis
+            # Extract class list and other entities from the analysis data
+            class_list = analysis.class_list if analysis.class_list else []
+            object_properties = analysis.object_property_list if hasattr(analysis, 'object_property_list') and analysis.object_property_list else []
+            data_properties = analysis.data_property_list if hasattr(analysis, 'data_property_list') and analysis.data_property_list else []
+            individuals = analysis.individual_list if hasattr(analysis, 'individual_list') and analysis.individual_list else []
+            
             return render_template('analysis.html', 
                                  file=file_record, 
-                                 analysis=analysis)
+                                 analysis=analysis,
+                                 classes=class_list,
+                                 relations=object_properties,
+                                 data_properties=data_properties,
+                                 individuals=individuals)
         else:
             # Create a new analysis
             return redirect(url_for('api_analyze_owl', filename=filename))

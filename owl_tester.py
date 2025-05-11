@@ -495,12 +495,22 @@ class OwlTester:
             
             # Also create a list for inferred axioms
             inferred_axioms_list = []
-            # For now, add some placeholder inferred axioms (would be populated in a real reasoner)
-            # You can remove this in production or replace with actual inference logic
+            
+            # Extract class names - this will help show the correct class count
+            # We'll use the names from our auto-generated axioms since direct loading failed
+            extracted_classes = set()
+            for axiom in axioms_list:
+                if axiom['type'] == 'SubClassOf':
+                    desc = axiom['description']
+                    if '⊑' in desc:
+                        class_name = desc.split('⊑')[0].strip()
+                        if class_name != 'Thing':
+                            extracted_classes.add(class_name)
             
             # Build the result dictionary
             result = {
-                'classes': len(classes_list),
+                # Use the extracted classes if we have any, otherwise fallback to the classes_list
+                'classes': len(extracted_classes) if extracted_classes else len(classes_list),
                 'object_properties': len(object_properties_list),
                 'data_properties': len(data_properties_list),
                 'individuals': len(individuals_list),
@@ -509,7 +519,8 @@ class OwlTester:
                 'axiom_count': axiom_count,
                 'axioms': axioms_list,  # List of axioms with type and description
                 'inferred_axioms': inferred_axioms_list,  # List of inferred axioms
-                'class_list': [cls.name for cls in classes_list if hasattr(cls, 'name')],
+                # Add extracted class list if available, otherwise use the original
+                'class_list': list(extracted_classes) if extracted_classes else [cls.name for cls in classes_list if hasattr(cls, 'name')],
                 'object_property_list': [prop.name for prop in object_properties_list if hasattr(prop, 'name')],
                 'data_property_list': [prop.name for prop in data_properties_list if hasattr(prop, 'name')],
                 'individual_list': [ind.name for ind in individuals_list if hasattr(ind, 'name')]
@@ -532,9 +543,18 @@ class OwlTester:
             return result
         except Exception as e:
             logging.error(f"Error analyzing ontology: {e}")
-            # Return empty values on error
+            # Extract class names from any premises we might have auto-generated
+            extracted_classes = []
+            if hasattr(self, 'fol_premises'):
+                for premise in self.fol_premises:
+                    if premise.get('type') == 'class':
+                        class_name = premise.get('entity_name')
+                        if class_name:
+                            extracted_classes.append(class_name)
+            
+            # Return empty values on error but with any classes we've extracted
             return {
-                'classes': 0,
+                'classes': len(extracted_classes),
                 'object_properties': 0,
                 'data_properties': 0,
                 'individuals': 0,
@@ -543,6 +563,10 @@ class OwlTester:
                 'axiom_count': 0,
                 'axioms': [],
                 'inferred_axioms': [],
+                'class_list': extracted_classes,
+                'object_property_list': [],
+                'data_property_list': [],
+                'individual_list': [],
                 'consistency': 'Unknown',
                 'expressivity': 'Unknown',
                 'error': str(e)
