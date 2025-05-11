@@ -550,19 +550,24 @@ def api_analyze_owl(filename):
         ontology_iri = analysis_result.get('ontology_iri', '')
         is_consistent = analysis_result.get('is_consistent', True)
         
-        # Get counts
-        class_count = analysis_result.get('classes', 0)  # Using 'classes' as the key
-        object_property_count = analysis_result.get('object_properties', 0)
-        data_property_count = analysis_result.get('data_properties', 0)
-        individual_count = analysis_result.get('individuals', 0)
-        annotation_property_count = analysis_result.get('annotation_properties', 0)
-        axiom_count = analysis_result.get('axiom_count', 0)
-        
-        # Get details lists
+        # Get counts - ensure we have non-zero values when we have list data
         class_list = analysis_result.get('class_list', [])
         object_property_list = analysis_result.get('object_property_list', [])
         data_property_list = analysis_result.get('data_property_list', [])
         individual_list = analysis_result.get('individual_list', [])
+        
+        # Now set the counts, using the list lengths if available
+        class_count = analysis_result.get('classes', 0) or len(class_list)
+        object_property_count = analysis_result.get('object_properties', 0) or len(object_property_list)
+        data_property_count = analysis_result.get('data_properties', 0) or len(data_property_list)
+        individual_count = analysis_result.get('individuals', 0) or len(individual_list)
+        annotation_property_count = analysis_result.get('annotation_properties', 0)
+        
+        # For axioms, make sure we have a count
+        axioms = analysis_result.get('axioms', [])
+        axiom_count = analysis_result.get('axiom_count', 0) or len(axioms)
+        
+        # We already loaded the lists above, no need to do it again
         
         expressivity = analysis_result.get('expressivity', '')
         complexity = analysis_result.get('complexity', 0)

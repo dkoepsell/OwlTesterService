@@ -35,6 +35,21 @@ code {
     background-color: var(--bs-secondary) !important;
 }
 
+/* Styling for statistics cards */
+.card.bg-light {
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background-color: rgba(var(--bs-light-rgb), 0.8) !important;
+}
+
+.card.bg-light .display-4 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--bs-primary);
+}
+
 /* Styling for list items */
 .bfo-class-item, .bfo-relation-item {
     transition: background-color 0.2s;
