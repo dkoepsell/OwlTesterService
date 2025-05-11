@@ -635,7 +635,18 @@ def generate_implications(analysis_id):
             
             # Generate implications using OpenAI
             try:
-                implications = generate_real_world_implications(fol_premises)
+                # Extract domain classes if available, otherwise use an empty list
+                domain_classes = []
+                
+                # Get the ontology name
+                ontology_name = analysis.ontology_name if analysis.ontology_name else "Unknown Ontology"
+                
+                # Call the function with the correct parameters
+                implications = generate_real_world_implications(
+                    ontology_name=ontology_name,
+                    domain_classes=domain_classes,
+                    fol_premises=fol_premises
+                )
                 
                 # Update the analysis record
                 analysis.real_world_implications = implications
