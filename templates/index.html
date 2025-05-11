@@ -21,10 +21,11 @@
                         <form id="expression-form">
                             <div class="mb-3">
                                 <label for="expression-input" class="form-label">Enter your First-Order Logic expression:</label>
-                                <textarea class="form-control" id="expression-input" rows="3" placeholder="e.g., forall x (Continuant(x) -> exists t (temporal_region(t) & exists_at(x,t)))"
+                                <textarea class="form-control" id="expression-input" rows="3" placeholder="e.g., forall x,t (instance_of(x,continuant,t) -> exists_at(x,t))"
                                          required></textarea>
                                 <div class="form-text">
-                                    Use standard FOL syntax with BFO classes and relations.
+                                    Use BFO standard syntax with instance_of(x,Class,t) format for class membership.
+                                    <span class="fw-bold">Note</span>: Both formats are supported: instance_of(x,Class,t) and traditional Class(x).
                                 </div>
                             </div>
                             <div class="d-flex justify-content-between">
@@ -144,10 +145,26 @@
                             <ul id="bfo-classes-list" class="list-group">
                                 {% for class in bfo_classes %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
-                                    {{ class }}
-                                    <button class="btn btn-sm btn-outline-primary copy-btn" data-term="{{ class }}">
-                                        <i class="fas fa-copy"></i>
-                                    </button>
+                                    <div>
+                                        <span class="class-label">{{ class.label }}</span>
+                                        {% if class.id and class.id != class.label %}
+                                        <small class="text-muted d-block">ID: {{ class.id }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="{{ class.id }}" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Copy ID (for instance_of format)">
+                                            <i class="fas fa-copy"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="{{ class.label }}" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Copy Label (for display)">
+                                            <i class="fas fa-tag"></i> Label
+                                        </button>
+                                    </div>
                                 </li>
                                 {% endfor %}
                             </ul>
@@ -173,10 +190,26 @@
                             <ul id="bfo-relations-list" class="list-group">
                                 {% for relation in bfo_relations %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
-                                    {{ relation }}
-                                    <button class="btn btn-sm btn-outline-primary copy-btn" data-term="{{ relation }}">
-                                        <i class="fas fa-copy"></i>
-                                    </button>
+                                    <div>
+                                        <span class="relation-label">{{ relation.label }}</span>
+                                        {% if relation.id and relation.id != relation.label %}
+                                        <small class="text-muted d-block">ID: {{ relation.id }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="{{ relation.id }}" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Copy ID (for coding)">
+                                            <i class="fas fa-copy"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="{{ relation.label }}" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Copy Label (for display)">
+                                            <i class="fas fa-tag"></i> Label
+                                        </button>
+                                    </div>
                                 </li>
                                 {% endfor %}
                             </ul>
@@ -202,7 +235,7 @@
                             <div class="accordion-body">
                                 <code>forall x (Continuant(x) -> exists t (temporal_region(t) & exists_at(x,t)))</code>
                                 <button class="btn btn-sm btn-outline-primary float-end use-example" 
-                                        data-example="forall x (Continuant(x) -> exists t (temporal_region(t) & exists_at(x,t)))">
+                                        data-example="forall x,t (instance_of(x,continuant,t) -> exists_at(x,t))">
                                     Use This Example
                                 </button>
                             </div>
