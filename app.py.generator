@@ -1,0 +1,42 @@
+@app.route('/analyze/<filename>/diagram')
+def generate_diagram(filename):
+    """Generate an interactive diagram for an ontology file using D3.js."""
+    try:
+        # Find the file in the database
+        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        
+        # Create an OwlTester instance
+        tester = OwlTester()
+        
+        # Load the ontology file
+        result = tester.load_ontology_from_file(file_record.file_path)
+        
+        if isinstance(result, dict) and not result.get('loaded', False):
+            # If load_ontology_from_file returns a dictionary with loaded=False
+            error_msg = result.get('error', 'Unknown error')
+            raise Exception(f"Failed to load ontology for diagram: {error_msg}")
+        
+        # Get the ontology object from the result
+        onto = None
+        if isinstance(result, dict) and 'ontology' in result:
+            onto = result.get('ontology')
+        
+        if not onto:
+            raise Exception("Loaded ontology object not found in result")
+        
+        # Get ontology information for display
+        ontology_name = getattr(onto, 'name', os.path.basename(file_record.original_filename))
+        class_count = len(list(onto.classes()))
+        property_count = len(list(onto.object_properties()))
+        
+        # Render the D3.js visualization template
+        return render_template('d3_diagram.html', 
+                             filename=filename,
+                             ontology_name=ontology_name,
+                             class_count=class_count,
+                             property_count=property_count)
+            
+    except Exception as e:
+        logger.error(f"Error generating D3.js diagram: {str(e)}")
+        flash(f"Error generating diagram: {str(e)}", 'error')
+        return redirect(url_for('analyze_owl', filename=filename))
