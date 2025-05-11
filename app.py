@@ -407,29 +407,32 @@ def analyze_owl(filename):
             flash('File not found', 'error')
             return redirect(url_for('upload_owl'))
         
-        # Create a new OwlTester instance with the uploaded file
-        try:
-            # First try to create a custom tester with the uploaded file
-            custom_tester = OwlTester(ontology_path=file_path)
-            
-            # Generate analysis report
-            analysis = custom_tester.analyze_ontology()
-        except Exception as e:
-            # If the constructor approach fails, try with explicit load_ontology_from_file
-            logger.error(f"Error creating OwlTester: {str(e)}")
-            
-            custom_tester = OwlTester()  # Create with default BFO ontology
-            result = custom_tester.load_ontology_from_file(file_path)
-            
-            if isinstance(result, tuple) and not result[0]:
-                # If load_ontology_from_file returns False with an error message
-                raise Exception(f"Failed to load ontology: {result[1]}")
-            
-            # Generate analysis report
-            analysis = custom_tester.analyze_ontology()
+        # Create a new OwlTester instance
+        custom_tester = OwlTester()
+        
+        # Load the ontology file
+        result = custom_tester.load_ontology_from_file(file_path)
+        
+        if isinstance(result, dict) and not result.get('loaded', False):
+            # If load_ontology_from_file returns a dictionary with loaded=False
+            error_msg = result.get('error', 'Unknown error')
+            flash(f"Failed to load ontology: {error_msg}", 'error')
+            return redirect(url_for('upload_owl'))
+        
+        # Get the ontology object from the result
+        onto = None
+        if isinstance(result, dict) and 'ontology' in result:
+            onto = result.get('ontology')
+        
+        if not onto:
+            flash("Loaded ontology object not found in result", 'error')
+            return redirect(url_for('upload_owl'))
+        
+        # Generate analysis report with the ontology object
+        analysis = custom_tester.analyze_ontology(onto)
         
         # Generate PlantUML diagram code with increased max_classes
-        diagram_result = custom_tester.generate_uml_diagram(
+        diagram_result = custom_tester.generate_uml_diagram(onto, 
             include_individuals=False,
             include_data_properties=True,
             include_annotation_properties=False,
