@@ -174,16 +174,41 @@ class OwlTester:
         return result
     
     def extract_terms(self, expr_string):
-        """Extract all terms from the expression string."""
-        # Remove logical operators and separators
+        """
+        Extract all terms from the expression string.
+        Handles both traditional notation (Class(x)) and BFO-style (instance_of(x,Class,t)) formats.
+        """
+        # First extract instance_of and similar predicates with their arguments
+        instance_patterns = [
+            r'instance_of\s*\(\s*\w+\s*,\s*(\w+)\s*,',  # instance_of(x,Class,t)
+            r'exists_at\s*\(\s*(\w+)\s*,',              # exists_at(x,t)
+            r'located_in\s*\(\s*\w+\s*,\s*(\w+)\s*'     # located_in(x,y)
+        ]
+        
+        instance_terms = []
+        for pattern in instance_patterns:
+            matches = re.findall(pattern, expr_string, re.IGNORECASE)
+            instance_terms.extend(matches)
+        
+        # Then extract traditional format Class(x)
+        class_pattern = r'(\w+)\s*\([a-z][a-z0-9_]*\)'  # Class(x)
+        class_terms = re.findall(class_pattern, expr_string)
+        
+        # Remove logical operators and separators for remaining terms
         cleaned = re.sub(r'[&|~()<>.-]', ' ', expr_string)
         # Remove logical words
-        for word in ['exists', 'forall', 'implies', 'iff', 'lambda', 'if', 'then', 'and', 'or', 'not']:
+        for word in ['exists', 'forall', 'implies', 'iff', 'lambda', 'if', 'then', 'and', 'or', 'not', 
+                    'instance_of', 'exists_at', 'located_in', 'temporal_region', 'continuant']:
             cleaned = re.sub(r'\b' + word + r'\b', ' ', cleaned, flags=re.IGNORECASE)
         
         # Split by spaces and filter out empty strings
-        terms = [term.strip() for term in cleaned.split() if term.strip()]
-        return terms
+        remaining_terms = [term.strip() for term in cleaned.split() if term.strip()]
+        
+        # Combine all terms and filter out variables (single lowercase letters)
+        all_terms = instance_terms + class_terms + remaining_terms
+        filtered_terms = [term for term in all_terms if term and not (len(term) == 1 and term.islower())]
+        
+        return filtered_terms
     
     def check_terms_against_bfo(self, terms, result):
         """Check terms against BFO classes and relations."""
@@ -481,7 +506,7 @@ class OwlTester:
                         if hasattr(parent, 'name') and parent.name is not None:
                             fol_premises.append({
                                 "type": "SubClassOf",
-                                "fol": f"∀x: {cls.name}(x) → {parent.name}(x)",
+                                "fol": f"∀x,t: instance_of(x,{cls.name},t) → instance_of(x,{parent.name},t)",
                                 "description": f"All instances of {cls.name} are also instances of {parent.name}"
                             })
                 except Exception as e:
@@ -707,7 +732,7 @@ class OwlTester:
                                 if entity != cls and hasattr(entity, 'name') and entity.name is not None:
                                     fol_premises.append({
                                         "type": "DisjointClasses",
-                                        "fol": f"∀x: ¬({cls.name}(x) ∧ {entity.name}(x))",
+                                        "fol": f"∀x,t: ¬(instance_of(x,{cls.name},t) ∧ instance_of(x,{entity.name},t))",
                                         "description": f"No instance can be both a {cls.name} and a {entity.name}"
                                     })
                 except Exception as e:
