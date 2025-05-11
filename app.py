@@ -675,8 +675,8 @@ def generate_implications(analysis_id):
             
             # Generate implications using OpenAI
             try:
-                # Extract domain classes if available, otherwise use an empty list
-                domain_classes = []
+                # Extract domain classes from analysis class_list if available
+                domain_classes = analysis.class_list if analysis.class_list else []
                 
                 # Get the ontology name
                 ontology_name = analysis.ontology_name if analysis.ontology_name else "Unknown Ontology"
@@ -867,8 +867,9 @@ def api_diagram_data(filename):
                 for cls in classes:
                     if cls['name'] != 'Thing':
                         inheritance.append({
-                            'parent': 'Thing',
-                            'child': cls['name']
+                            'source': cls['name'],
+                            'target': 'Thing',
+                            'type': 'subClassOf'
                         })
             
             # Create sample property connections if we have object properties
@@ -881,9 +882,10 @@ def api_diagram_data(filename):
                         target_idx = (i + 1) % len(classes_names)
                         
                         properties.append({
-                            'domain': classes_names[source_idx],
-                            'range': classes_names[target_idx],
-                            'name': prop_name
+                            'source': classes_names[source_idx],
+                            'target': classes_names[target_idx],
+                            'label': prop_name,
+                            'type': 'objectProperty'
                         })
         elif onto is not None:  # Only run this if we have a valid ontology object
             # Process classes from the fully loaded ontology
@@ -904,8 +906,9 @@ def api_diagram_data(filename):
                     for parent in cls.is_a:
                         if hasattr(parent, 'name') and parent.name:
                             inheritance.append({
-                                'parent': parent.name,
-                                'child': cls.name
+                                'source': cls.name,
+                                'target': parent.name,
+                                'type': 'subClassOf'
                             })
             
             # Process object properties
