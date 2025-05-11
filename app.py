@@ -1121,7 +1121,14 @@ def api_analyze_owl(filename):
                         'domain_range_assertions': domain_range_count,
                         'annotations': annotation_count
                     },
-                    'fol_premises': fol_premises
+                    'fol_premises': fol_premises,
+                    # Add duplicate keys with standardized names for database compatibility
+                    'class_count': len(classes),
+                    'object_property_count': len(obj_properties),
+                    'data_property_count': len(data_properties),
+                    'individual_count': len(individuals),
+                    'annotation_property_count': len(annot_properties),
+                    'axiom_count': axiom_count
                 }
                 
                 app.logger.info(f"Analysis with rdflib successful: {len(classes)} classes, {len(obj_properties)} object properties, {len(fol_premises)} FOL premises")
