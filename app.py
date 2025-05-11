@@ -121,11 +121,36 @@ def index():
     
     detected_format = session.pop('detected_format', None)
     
+    # Get BFO classes and relations for display
+    bfo_class_dict = owl_tester.get_bfo_classes()
+    bfo_relation_dict = owl_tester.get_bfo_relations()
+    
+    # Convert dictionaries to lists of objects with label and id properties
+    bfo_classes = []
+    for key, value in bfo_class_dict.items():
+        # If value is already a dict with 'label', use it; otherwise, create a dict
+        if isinstance(value, dict) and 'label' in value:
+            class_obj = {'label': value['label'], 'id': key}
+            bfo_classes.append(class_obj)
+        else:
+            bfo_classes.append({'label': key, 'id': key})
+    
+    bfo_relations = []
+    for key, value in bfo_relation_dict.items():
+        # If value is already a dict with 'label', use it; otherwise, create a dict
+        if isinstance(value, dict) and 'label' in value:
+            relation_obj = {'label': value['label'], 'id': key}
+            bfo_relations.append(relation_obj)
+        else:
+            bfo_relations.append({'label': key, 'id': key})
+    
     return render_template('index.html', 
                           expression=last_expression, 
                           message=message, 
                           error=error,
-                          detected_format=detected_format)
+                          detected_format=detected_format,
+                          bfo_classes=bfo_classes,
+                          bfo_relations=bfo_relations)
 
 # About page
 @app.route('/about')
