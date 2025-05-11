@@ -83,6 +83,12 @@ class OntologyAnalysis(db.Model):
     implications_generated = db.Column(db.Boolean, default=False)
     implications_generation_date = db.Column(db.DateTime, nullable=True)
     
+    # Entity lists for direct display
+    class_list = db.Column(db.JSON, nullable=True)
+    object_property_list = db.Column(db.JSON, nullable=True)
+    data_property_list = db.Column(db.JSON, nullable=True)
+    individual_list = db.Column(db.JSON, nullable=True)
+    
     def __repr__(self):
         return f"<OntologyAnalysis {self.id} for {self.ontology_file_id}>"
 

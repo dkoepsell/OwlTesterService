@@ -42,6 +42,7 @@ class OwlTester:
         self.bfo_classes = {}
         self.bfo_relations = {}
         self.read_parser = LogicParser()
+        self.fol_premises = []  # Initialize to empty list for auto-generated premises
         
         # Load BFO classes and relations
         self.load_bfo_classes()
@@ -545,12 +546,12 @@ class OwlTester:
             logging.error(f"Error analyzing ontology: {e}")
             # Extract class names from any premises we might have auto-generated
             extracted_classes = []
-            if hasattr(self, 'fol_premises'):
-                for premise in self.fol_premises:
-                    if premise.get('type') == 'class':
-                        class_name = premise.get('entity_name')
-                        if class_name:
-                            extracted_classes.append(class_name)
+            # self.fol_premises is initialized in __init__, so we can access it directly
+            for premise in self.fol_premises:
+                if isinstance(premise, dict) and premise.get('type') == 'class':
+                    class_name = premise.get('entity_name')
+                    if class_name:
+                        extracted_classes.append(class_name)
             
             # Return empty values on error but with any classes we've extracted
             return {

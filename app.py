@@ -522,12 +522,19 @@ def api_analyze_owl(filename):
         ontology_iri = analysis_result.get('ontology_iri', '')
         is_consistent = analysis_result.get('is_consistent', True)
         
-        class_count = analysis_result.get('class_count', 0)
-        object_property_count = analysis_result.get('object_property_count', 0)
-        data_property_count = analysis_result.get('data_property_count', 0)
-        individual_count = analysis_result.get('individual_count', 0)
-        annotation_property_count = analysis_result.get('annotation_property_count', 0)
+        # Get counts
+        class_count = analysis_result.get('classes', 0)  # Using 'classes' as the key
+        object_property_count = analysis_result.get('object_properties', 0)
+        data_property_count = analysis_result.get('data_properties', 0)
+        individual_count = analysis_result.get('individuals', 0)
+        annotation_property_count = analysis_result.get('annotation_properties', 0)
         axiom_count = analysis_result.get('axiom_count', 0)
+        
+        # Get details lists
+        class_list = analysis_result.get('class_list', [])
+        object_property_list = analysis_result.get('object_property_list', [])
+        data_property_list = analysis_result.get('data_property_list', [])
+        individual_list = analysis_result.get('individual_list', [])
         
         expressivity = analysis_result.get('expressivity', '')
         complexity = analysis_result.get('complexity', 0)
@@ -552,7 +559,11 @@ def api_analyze_owl(filename):
             complexity=complexity,
             axioms=axioms,
             consistency_issues=consistency_issues,
-            inferred_axioms=inferred_axioms
+            inferred_axioms=inferred_axioms,
+            class_list=class_list,
+            object_property_list=object_property_list,
+            data_property_list=data_property_list,
+            individual_list=individual_list
         )
         
         # Attempt to extract FOL premises from the ontology
