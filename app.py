@@ -479,7 +479,9 @@ def analyze_owl(filename):
             return redirect(url_for('api_analyze_owl', filename=filename))
             
     except Exception as e:
-        app.logger.error(f"Error analyzing OWL file: {str(e)}")
+        import traceback
+        trace = traceback.format_exc()
+        app.logger.error(f"Error analyzing OWL file: {str(e)}\nTraceback: {trace}")
         flash(f"Error analyzing OWL file: {str(e)}", 'error')
         return redirect(url_for('index'))
 
@@ -604,7 +606,9 @@ def api_analyze_owl(filename):
         return redirect(url_for('analyze_owl', filename=filename))
         
     except Exception as e:
-        app.logger.error(f"Error in API analyze_owl: {str(e)}")
+        import traceback
+        trace = traceback.format_exc()
+        app.logger.error(f"Error in API analyze_owl: {str(e)}\nTraceback: {trace}")
         flash(f"Error analyzing OWL file: {str(e)}", 'error')
         return redirect(url_for('index'))
 
