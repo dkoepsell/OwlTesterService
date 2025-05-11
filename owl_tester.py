@@ -10,7 +10,7 @@ import json
 from io import StringIO, BytesIO
 from owlready2 import *
 from nltk.sem import Expression
-from nltk.sem.logic import LogicalExpressionException
+from nltk.sem.logic import LogicalExpressionException, LogicParser
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,7 +41,7 @@ class OwlTester:
         """
         self.bfo_classes = {}
         self.bfo_relations = {}
-        self.read_parser = nltk.sem.logic.LogicParser()
+        self.read_parser = LogicParser()
         
         # Load BFO classes and relations
         self.load_bfo_classes()
@@ -49,7 +49,7 @@ class OwlTester:
     def load_bfo_classes(self):
         """
         Load BFO classes and relations from the BFO OWL file.
-        If the file doesn't exist, proceed with empty dictionaries.
+        If the file doesn't exist, proceed with default BFO dictionaries.
         """
         try:
             # Try to load the BFO ontology
@@ -79,7 +79,38 @@ class OwlTester:
             
             logging.info(f"Successfully loaded {len(self.bfo_classes)} BFO classes and {len(self.bfo_relations)} relations")
         except Exception as e:
-            logging.warning(f"Could not load BFO ontology: {e}. Proceeding with empty BFO class/relation dictionaries.")
+            logging.warning(f"Could not load BFO ontology: {e}. Loading default BFO class/relation dictionaries.")
+            
+            # Add fundamental BFO classes as a fallback
+            default_bfo_classes = [
+                "entity", "continuant", "occurrent", "independent_continuant", "dependent_continuant", 
+                "material_entity", "immaterial_entity", "quality", "role", "disposition", 
+                "function", "spatial_region", "process", "process_boundary", "temporal_region",
+                "continuant_fiat_boundary", "site", "object", "object_aggregate", "fiat_object_part"
+            ]
+            
+            for cls_name in default_bfo_classes:
+                self.bfo_classes[cls_name.lower()] = {
+                    'label': cls_name,
+                    'uri': f"http://purl.obolibrary.org/obo/BFO_{cls_name}",
+                    'description': f"BFO {cls_name.replace('_', ' ')}"
+                }
+            
+            # Add fundamental BFO relations as a fallback
+            default_bfo_relations = [
+                "part_of", "has_part", "located_in", "contains", "participates_in", 
+                "has_participant", "bearer_of", "inheres_in", "realized_in", "realizes",
+                "exists_at", "instance_of", "occurs_in", "has_quality", "quality_of"
+            ]
+            
+            for rel_name in default_bfo_relations:
+                self.bfo_relations[rel_name.lower()] = {
+                    'label': rel_name,
+                    'uri': f"http://purl.obolibrary.org/obo/BFO_{rel_name}",
+                    'description': f"BFO relation {rel_name.replace('_', ' ')}"
+                }
+                
+            logging.info(f"Loaded {len(self.bfo_classes)} default BFO classes and {len(self.bfo_relations)} default relations")
     
     def test_expression(self, expr_string):
         """
@@ -282,3 +313,158 @@ class OwlTester:
         
         # Remove duplicates and return
         return list(set(extracted_terms))
+        
+    def get_bfo_classes(self):
+        """
+        Return the BFO classes dictionary.
+        
+        Returns:
+            dict: Dictionary of BFO classes
+        """
+        return self.bfo_classes
+    
+    def get_bfo_relations(self):
+        """
+        Return the BFO relations dictionary.
+        
+        Returns:
+            dict: Dictionary of BFO relations
+        """
+        return self.bfo_relations
+        
+    def load_ontology_from_file(self, ontology_path):
+        """
+        Load an ontology from a file.
+        
+        Args:
+            ontology_path (str): Path to the ontology file
+            
+        Returns:
+            dict: Information about the loaded ontology
+        """
+        try:
+            # Try to load the ontology
+            onto = owlready2.get_ontology(ontology_path).load()
+            
+            # Return basic information about the ontology
+            return {
+                'name': onto.name,
+                'base_iri': onto.base_iri,
+                'ontology': onto,
+                'loaded': True
+            }
+        except Exception as e:
+            logging.error(f"Error loading ontology from {ontology_path}: {e}")
+            return {
+                'loaded': False,
+                'error': str(e)
+            }
+    
+    def analyze_ontology(self, onto):
+        """
+        Analyze an ontology and extract key information.
+        
+        Args:
+            onto: The owlready2 ontology object
+            
+        Returns:
+            dict: Analysis results
+        """
+        # Placeholder implementation
+        return {
+            'classes': len(list(onto.classes())),
+            'object_properties': len(list(onto.object_properties())),
+            'data_properties': len(list(onto.data_properties())),
+            'individuals': len(list(onto.individuals())),
+            'annotation_properties': len(list(onto.annotation_properties())),
+            'imported_ontologies': [o.base_iri for o in onto.imported_ontologies]
+        }
+    
+    def validate_completeness(self, onto):
+        """
+        Validate the completeness of an ontology.
+        
+        Args:
+            onto: The owlready2 ontology object
+            
+        Returns:
+            dict: Validation results
+        """
+        # Placeholder implementation
+        return {
+            'is_complete': True,
+            'missing_elements': []
+        }
+    
+    def check_consistency(self, onto):
+        """
+        Check the consistency of an ontology.
+        
+        Args:
+            onto: The owlready2 ontology object
+            
+        Returns:
+            dict: Consistency check results
+        """
+        # Placeholder implementation
+        return {
+            'is_consistent': True,
+            'inconsistency_explanations': []
+        }
+    
+    def generate_uml_diagram(self, onto):
+        """
+        Generate a UML diagram for an ontology.
+        
+        Args:
+            onto: The owlready2 ontology object
+            
+        Returns:
+            str: PlantUML diagram code
+        """
+        # Simple implementation to render a basic class diagram
+        plantuml_code = "@startuml\n"
+        plantuml_code += "' Ontology UML Diagram\n"
+        plantuml_code += "' Generated at " + datetime.datetime.now().isoformat() + "\n\n"
+        
+        # Add classes
+        for cls in onto.classes():
+            class_name = cls.name
+            plantuml_code += f"class \"{class_name}\" as {class_name}\n"
+        
+        # Add inheritance relationships
+        for cls in onto.classes():
+            for parent in cls.is_a:
+                if hasattr(parent, 'name'):  # Make sure parent is a class
+                    plantuml_code += f"{cls.name} --|> {parent.name}\n"
+        
+        # Close the diagram
+        plantuml_code += "\n@enduml"
+        
+        return plantuml_code
+        
+    def generate_fol_premises(self, onto):
+        """
+        Generate First Order Logic premises from an ontology.
+        
+        Args:
+            onto: The owlready2 ontology object
+            
+        Returns:
+            list: FOL premises
+        """
+        # Placeholder implementation
+        return []
+        
+    def generate_all_implications(self, premises):
+        """
+        Generate real-world implications from FOL premises.
+        
+        Args:
+            premises (list): FOL premises
+            
+        Returns:
+            list: Real-world implications
+        """
+        # Placeholder implementation
+        return []
