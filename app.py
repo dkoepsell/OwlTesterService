@@ -4,9 +4,11 @@ import uuid
 import datetime
 import base64
 import re
+import typing
+from typing import Optional, List, Dict, Any, Union, Tuple
 from html import escape
 import json
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session, make_response, Response
 from werkzeug.utils import secure_filename
 # We'll use urllib for URL parsing instead of werkzeug
 from urllib.parse import urlparse
@@ -1149,7 +1151,7 @@ def sandbox_download(ontology_id):
 # API routes for the sandbox
 
 @app.route('/api/sandbox/<int:ontology_id>/classes', methods=['GET', 'POST'])
-def api_sandbox_classes(ontology_id):
+def api_sandbox_classes(ontology_id: int):
     """API for sandbox ontology classes."""
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
@@ -1534,7 +1536,7 @@ def api_sandbox_ai_bfo_category():
         return jsonify({"error": f"Failed to suggest BFO category: {str(e)}"}), 500
 
 @app.route('/api/sandbox/<int:ontology_id>/properties', methods=['GET', 'POST'])
-def api_sandbox_properties(ontology_id):
+def api_sandbox_properties(ontology_id: int):
     """API for sandbox ontology properties."""
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
@@ -1596,7 +1598,7 @@ def api_sandbox_properties(ontology_id):
 
 
 @app.route('/api/sandbox/<int:ontology_id>/properties/<int:property_id>', methods=['GET', 'PUT', 'DELETE'])
-def api_sandbox_property(ontology_id, property_id):
+def api_sandbox_property(ontology_id: int, property_id: int):
     """API for a specific sandbox ontology property."""
     ontology = SandboxOntology.query.get_or_404(ontology_id)
     
