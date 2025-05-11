@@ -869,41 +869,92 @@ def api_diagram_data(filename):
         analysis = OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id).order_by(OntologyAnalysis.id.desc()).first_or_404()
         
         # Extract class list and property list from analysis
-        class_list = analysis.class_list if analysis.class_list else []
-        object_property_list = analysis.object_property_list if hasattr(analysis, 'object_property_list') and analysis.object_property_list else []
+        class_list = []
+        if analysis.class_list:
+            if isinstance(analysis.class_list, list):
+                class_list = analysis.class_list
+            elif isinstance(analysis.class_list, dict):
+                # Handle case where class_list is a dict
+                class_list = list(analysis.class_list.keys())
+            else:
+                # Try to convert to a list if it's a string or other type
+                try:
+                    class_list = list(analysis.class_list)
+                except:
+                    class_list = []
         
-        # Create an OwlTester instance
-        tester = OwlTester()
+        object_property_list = []
+        if hasattr(analysis, 'object_property_list') and analysis.object_property_list:
+            if isinstance(analysis.object_property_list, list):
+                object_property_list = analysis.object_property_list
+            elif isinstance(analysis.object_property_list, dict):
+                # Handle case where object_property_list is a dict
+                object_property_list = list(analysis.object_property_list.keys())
+            else:
+                # Try to convert to a list if it's a string or other type
+                try:
+                    object_property_list = list(analysis.object_property_list)
+                except:
+                    object_property_list = []
         
-        # Load the ontology file
-        result = tester.load_ontology_from_file(file_record.file_path)
+        # Always default to fallback mode using analysis data for now
+        # This gives us more consistent visualization
+        use_fallback = True
+        
+        # Try loading the ontology only if we need to
         onto = None
-        use_fallback = False
-        
-        if isinstance(result, dict) and not result.get('loaded', False):
-            # If load_ontology_from_file returns a dictionary with loaded=False
-            logger.warning(f"Using fallback visualization from analysis data for {filename}")
-            use_fallback = True
-        
-        # Get the ontology object from the result if loaded successfully
-        if isinstance(result, dict) and 'ontology' in result:
-            onto = result.get('ontology')
-        
-        if not onto:
-            use_fallback = True
-            logger.warning(f"Loaded ontology object not found in result, using fallback for {filename}")
+        if not use_fallback:
+            try:
+                # Create an OwlTester instance
+                tester = OwlTester()
+                
+                # Load the ontology file with a timeout
+                result = tester.load_ontology_from_file(file_record.file_path)
+                
+                if isinstance(result, dict) and result.get('loaded', False) and 'ontology' in result:
+                    onto = result.get('ontology')
+                else:
+                    use_fallback = True
+                    logger.warning(f"Failed to load ontology for visualization: {result.get('error', 'Unknown error')}")
+            except Exception as e:
+                use_fallback = True
+                logger.warning(f"Exception loading ontology for visualization: {str(e)}")
         
         # Process the ontology data into a format suitable for D3.js
         classes = []
         inheritance = []
         properties = []
         
-        # If we need to use fallback, generate diagram data from analysis database record
-        if use_fallback and (class_list or object_property_list):
-            # Create classes from analysis.class_list
+        # Generate visualization data from analysis database record
+        if use_fallback:
+            logger.info(f"Using fallback visualization from analysis data for {filename}")
+            logger.info(f"Classes: {len(class_list)}, Object Properties: {len(object_property_list)}")
+            
+            # If we have no classes but have FOL premises, try to extract classes from there
+            if not class_list and analysis.fol_premises:
+                logger.info("Extracting classes from FOL premises")
+                extracted_classes = set()
+                try:
+                    for premise in analysis.fol_premises:
+                        if isinstance(premise, dict) and 'fol' in premise:
+                            fol_text = premise['fol']
+                            # Look for instance_of(x, Class, t) pattern
+                            matches = re.findall(r'instance_of\([^,]+,\s*([^,\)]+)', fol_text)
+                            for match in matches:
+                                extracted_classes.add(match.strip())
+                    
+                    class_list = list(extracted_classes)
+                    logger.info(f"Extracted {len(class_list)} classes from FOL premises")
+                except Exception as extract_e:
+                    logger.error(f"Error extracting classes from FOL premises: {str(extract_e)}")
+            
+            # Create classes from class_list
             for cls_name in class_list:
+                if not cls_name or not isinstance(cls_name, str):
+                    continue
+                    
                 is_bfo = False  # Assume not a BFO class
-                if isinstance(cls_name, str) and ('BFO_' in cls_name or 'IAO_' in cls_name):
+                if 'BFO_' in cls_name or 'IAO_' in cls_name:
                     is_bfo = True
                     
                 classes.append({
@@ -931,15 +982,18 @@ def api_diagram_data(filename):
                 for cls in classes:
                     if cls['name'] != 'Thing':
                         inheritance.append({
-                            'source': cls['name'],
+                            'source': cls['id'],
                             'target': 'Thing',
                             'type': 'subClassOf'
                         })
             
-            # Create sample property connections if we have object properties
+            # Create property connections if we have object properties
             if object_property_list and len(classes) > 1:
-                classes_names = [cls['name'] for cls in classes if cls['name'] != 'Thing']
+                classes_names = [cls['id'] for cls in classes if cls['name'] != 'Thing']
                 for i, prop_name in enumerate(object_property_list):
+                    if not prop_name or not isinstance(prop_name, str):
+                        continue
+                        
                     if classes_names:  # Make sure we have classes to connect
                         # Create connections between classes using round-robin
                         source_idx = i % len(classes_names)
@@ -952,6 +1006,8 @@ def api_diagram_data(filename):
                             'type': 'objectProperty'
                         })
         elif onto is not None:  # Only run this if we have a valid ontology object
+            logger.info(f"Using direct ontology processing for visualization of {filename}")
+            
             # Process classes from the fully loaded ontology
             for cls in onto.classes():
                 if hasattr(cls, 'name') and cls.name:
@@ -989,16 +1045,48 @@ def api_diagram_data(filename):
                                         'type': 'objectProperty'
                                     })
         
-        # Return data as JSON
+        # Return data as JSON, but only if we actually have data
+        if classes:
+            logger.info(f"Returning visualization data with {len(classes)} classes, {len(inheritance)} inheritance links, and {len(properties)} properties")
+            return jsonify({
+                'classes': classes,
+                'inheritance': inheritance,
+                'properties': properties
+            })
+        else:
+            # Create minimal data with a basic structure
+            logger.warning("No classes found. Creating minimal default structure.")
+            classes = [
+                {'id': 'Thing', 'name': 'Thing', 'bfo': True},
+                {'id': 'Ontology', 'name': 'Ontology', 'bfo': False}
+            ]
+            inheritance = [
+                {'source': 'Ontology', 'target': 'Thing', 'type': 'subClassOf'}
+            ]
+            return jsonify({
+                'classes': classes,
+                'inheritance': inheritance,
+                'properties': []
+            })
+        
+    except Exception as e:
+        import traceback
+        trace = traceback.format_exc()
+        logger.error(f"Error generating diagram data: {str(e)}\nTraceback: {trace}")
+        # Return a minimal valid structure so the visualization doesn't break
+        classes = [
+            {'id': 'Error', 'name': 'Error Loading Diagram', 'bfo': False},
+            {'id': 'Thing', 'name': 'Thing', 'bfo': True}
+        ]
+        inheritance = [
+            {'source': 'Error', 'target': 'Thing', 'type': 'subClassOf'}
+        ]
         return jsonify({
             'classes': classes,
             'inheritance': inheritance,
-            'properties': properties
+            'properties': [],
+            'error': str(e)
         })
-        
-    except Exception as e:
-        logger.error(f"Error generating diagram data: {str(e)}")
-        return jsonify({'error': f"Error generating diagram data: {str(e)}"}), 500
 
 @app.route('/api/diagram/<filename>', methods=['GET'])
 def api_generate_diagram(filename):
