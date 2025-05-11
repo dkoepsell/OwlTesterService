@@ -574,22 +574,147 @@ def api_analyze_owl(filename):
         
         # Load the ontology file
         result = custom_tester.load_ontology_from_file(file_path)
+        analysis = {}
         
         if isinstance(result, dict) and not result.get('loaded', False):
-            # If load_ontology_from_file returns a dictionary with loaded=False
-            error_msg = result.get('error', 'Unknown error')
-            return jsonify({"error": f"Failed to load ontology: {error_msg}"}), 400
+            # If owlready2 fails, try with rdflib
+            try:
+                import rdflib
+                from rdflib import RDF, RDFS, OWL
+                
+                app.logger.info(f"Trying to analyze with rdflib directly: {file_path}")
+                g = rdflib.Graph()
+                g.parse(file_path)
+                
+                if len(g) > 0:
+                    app.logger.info(f"Successfully loaded {len(g)} triples with rdflib")
+                    
+                    # Count classes
+                    classes = set()
+                    for s, p, o in g.triples((None, RDF.type, OWL.Class)):
+                        classes.add(str(s))
+                    
+                    # Count object properties
+                    obj_properties = set()
+                    for s, p, o in g.triples((None, RDF.type, OWL.ObjectProperty)):
+                        obj_properties.add(str(s))
+                    
+                    # Count data properties
+                    data_properties = set()
+                    for s, p, o in g.triples((None, RDF.type, OWL.DatatypeProperty)):
+                        data_properties.add(str(s))
+                    
+                    # Count individuals
+                    individuals = set()
+                    for s, p, o in g.triples((None, RDF.type, OWL.NamedIndividual)):
+                        individuals.add(str(s))
+                        
+                    # Also check for instances of classes
+                    for s, p, o in g.triples((None, RDF.type, None)):
+                        if o != OWL.Class and o != OWL.ObjectProperty and o != OWL.DatatypeProperty:
+                            individuals.add(str(s))
+                    
+                    # Count annotation properties
+                    annot_properties = set()
+                    for s, p, o in g.triples((None, RDF.type, OWL.AnnotationProperty)):
+                        annot_properties.add(str(s))
+                    
+                    # Extract class names for display
+                    class_list = []
+                    for cls in classes:
+                        # Try to get a label
+                        label = None
+                        for _, _, l in g.triples((rdflib.URIRef(cls), RDFS.label, None)):
+                            label = str(l)
+                            break
+                        
+                        class_name = label or cls.split('/')[-1].split('#')[-1]
+                        class_list.append({
+                            'uri': cls,
+                            'name': class_name
+                        })
+                    
+                    # Extract property names
+                    obj_property_list = []
+                    for prop in obj_properties:
+                        # Try to get a label
+                        label = None
+                        for _, _, l in g.triples((rdflib.URIRef(prop), RDFS.label, None)):
+                            label = str(l)
+                            break
+                        
+                        # Get domain and range
+                        domain = []
+                        for _, _, d in g.triples((rdflib.URIRef(prop), RDFS.domain, None)):
+                            domain.append(str(d))
+                        
+                        range_classes = []
+                        for _, _, r in g.triples((rdflib.URIRef(prop), RDFS.range, None)):
+                            range_classes.append(str(r))
+                        
+                        prop_name = label or prop.split('/')[-1].split('#')[-1]
+                        obj_property_list.append({
+                            'uri': prop,
+                            'name': prop_name,
+                            'domain': domain,
+                            'range': range_classes
+                        })
+                    
+                    # Count axioms (approximately)
+                    axiom_count = len(classes) + len(obj_properties) + len(data_properties) + len(individuals)
+                    
+                    # Count subclass relationships
+                    for _, _, _ in g.triples((None, RDFS.subClassOf, None)):
+                        axiom_count += 1
+                    
+                    # Count property relationships (domain, range)
+                    for _, _, _ in g.triples((None, RDFS.domain, None)):
+                        axiom_count += 1
+                    for _, _, _ in g.triples((None, RDFS.range, None)):
+                        axiom_count += 1
+                    
+                    # Create analysis dictionary
+                    analysis = {
+                        'classes': len(classes),
+                        'object_properties': len(obj_properties),
+                        'data_properties': len(data_properties),
+                        'individuals': len(individuals),
+                        'annotation_properties': len(annot_properties),
+                        'imported_ontologies': [],
+                        'axioms': axiom_count,
+                        'class_list': class_list,
+                        'object_property_list': obj_property_list,
+                        'data_property_list': [],
+                        'individual_list': [],
+                        'consistency': 'Unknown',
+                        'expressivity': 'AL',
+                        'parsing_method': 'rdflib'
+                    }
+                    
+                    app.logger.info(f"Analysis with rdflib successful: {len(classes)} classes, {len(obj_properties)} object properties")
+                    app.logger.info(f"Class list: {[c['name'] for c in class_list]}")
+                    app.logger.info(f"Object property list: {[p['name'] for p in obj_property_list]}")
+                    
+                    # Use rdflib analysis instead of returning an error
+                    onto = "rdflib_analyzed"
+                else:
+                    return jsonify({"error": "No triples found in the ontology file"}), 400
+            except Exception as rdf_e:
+                app.logger.error(f"Error with rdflib analysis: {str(rdf_e)}")
+                error_msg = result.get('error', 'Unknown error')
+                return jsonify({"error": f"Failed to load ontology: {error_msg}, rdflib error: {str(rdf_e)}"}), 400
+        else:
+            # Get the ontology object from the result for owlready2 analysis
+            onto = None
+            if isinstance(result, dict) and 'ontology' in result:
+                onto = result.get('ontology')
+            
+            if not onto:
+                return jsonify({"error": "Loaded ontology object not found in result"}), 400
         
-        # Get the ontology object from the result
-        onto = None
-        if isinstance(result, dict) and 'ontology' in result:
-            onto = result.get('ontology')
-        
-        if not onto:
-            return jsonify({"error": "Loaded ontology object not found in result"}), 400
-        
-        # Generate analysis report with the ontology object
-        analysis = custom_tester.analyze_ontology(onto)
+        # Generate analysis report with the ontology object if it's not already done by rdflib
+        if onto != "rdflib_analyzed":
+            analysis = custom_tester.analyze_ontology(onto)
         
         # Move stats to top level for API consistency
         if 'stats' in analysis:
