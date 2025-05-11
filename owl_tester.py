@@ -1909,38 +1909,107 @@ class OwlTester:
                     class_terms = re.findall(r'\b[A-Z][a-zA-Z0-9_]*\b', fol_text)
                     fol_terms.update(class_terms)
                     
+                    # Extract property/relation terms (words followed by parentheses)
+                    property_terms = re.findall(r'([a-zA-Z][a-zA-Z0-9_]*)\s*\(', fol_text)
+                    fol_terms.update(property_terms)
+                    
+                    # Also extract terms that might be part of logical expressions
+                    logic_terms = re.findall(r'[→∧∨¬]\s*([a-zA-Z][a-zA-Z0-9_]*)', fol_text)
+                    fol_terms.update(logic_terms)
+                    
                     # Extract property terms (words followed by parentheses)
                     property_terms = re.findall(r'\b([a-zA-Z0-9_]+)\([^)]*\)', fol_text)
                     fol_terms.update(property_terms)
             
-            # Check classes
-            all_classes = set(self.bfo_classes)
-            missing_classes = all_classes - fol_terms
-            report["missing_classes"] = list(missing_classes)
+            # Get all elements from the ontology
+            all_classes = self.bfo_classes
+            all_object_properties = self.bfo_relations
+            all_data_properties = self.data_properties
+            all_individuals = self.individuals
             
-            # Check properties
-            all_properties = set(self.bfo_relations) | set(self.data_properties)
-            missing_properties = all_properties - fol_terms
-            report["missing_properties"] = list(missing_properties)
+            # Check for missing classes
+            missing_classes = []
+            for cls in all_classes:
+                # Perform case-insensitive check to handle varied capitalization
+                found = False
+                for term in fol_terms:
+                    if cls.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_classes.append(cls)
             
-            # Check individuals
-            all_individuals = set(self.individuals)
-            missing_individuals = all_individuals - fol_terms
-            report["missing_individuals"] = list(missing_individuals)
+            # Check for missing object properties
+            missing_object_properties = []
+            for prop in all_object_properties:
+                # Perform case-insensitive check
+                found = False
+                for term in fol_terms:
+                    if prop.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_object_properties.append(prop)
             
-            # Calculate coverage percentage
-            total_elements = len(all_classes) + len(all_properties) + len(all_individuals)
-            total_missing = len(missing_classes) + len(missing_properties) + len(missing_individuals)
+            # Check for missing data properties
+            missing_data_properties = []
+            for prop in all_data_properties:
+                # Perform case-insensitive check
+                found = False
+                for term in fol_terms:
+                    if prop.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_data_properties.append(prop)
+            
+            # Check for missing individuals
+            missing_individuals = []
+            for indiv in all_individuals:
+                # Perform case-insensitive check
+                found = False
+                for term in fol_terms:
+                    if indiv.lower() == term.lower():
+                        found = True
+                        break
+                if not found:
+                    missing_individuals.append(indiv)
+            
+            # Update the report
+            report["missing_classes"] = missing_classes
+            report["missing_object_properties"] = missing_object_properties
+            report["missing_data_properties"] = missing_data_properties
+            report["missing_individuals"] = missing_individuals
+            
+            # Calculate completeness metrics
+            total_elements = len(all_classes) + len(all_object_properties) + \
+                            len(all_data_properties) + len(all_individuals)
+            
+            missing_count = len(missing_classes) + len(missing_object_properties) + \
+                           len(missing_data_properties) + len(missing_individuals)
             
             if total_elements > 0:
-                coverage = 100.0 * (total_elements - total_missing) / total_elements
-                report["coverage_percentage"] = round(coverage, 2)
+                coverage_percentage = ((total_elements - missing_count) / total_elements) * 100
+                report["coverage_percentage"] = round(coverage_percentage, 2)
+            else:
+                report["coverage_percentage"] = 100.0
             
-            report["complete"] = total_missing == 0
+            # Set completeness flag
+            report["complete"] = missing_count == 0
+            
+            # Add detailed metrics
+            report["metrics"] = {
+                "total_elements": total_elements,
+                "covered_elements": total_elements - missing_count,
+                "missing_elements": missing_count,
+                "fol_premises_count": len(fol_premises),
+                "terms_extracted": len(fol_terms)
+            }
             
         except Exception as e:
             report["complete"] = False
             report["error"] = f"Error validating completeness: {str(e)}"
+            report["coverage_percentage"] = 0.0
             
         return report
     
