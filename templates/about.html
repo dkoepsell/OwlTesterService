@@ -298,6 +298,55 @@
             </div>
         </div>
         
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-exchange-alt me-2"></i>FOL Notation Formats</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    The system now detects and supports both traditional and BFO standard notation formats for FOL expressions:
+                </p>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0">Traditional Notation</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>The legacy format where class membership is represented by applying a predicate to a variable:</p>
+                                <pre class="bg-light p-2"><code>Continuant(x)</code></pre>
+                                <p>This format is simpler but less semantically precise for complex BFO ontologies.</p>
+                                <p><strong>Example:</strong></p>
+                                <pre class="bg-light p-2"><code>forall x (Human(x) -> Mammal(x))</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-success">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">BFO Standard Notation (Recommended)</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>The BFO-preferred format that uses the instance_of relation to represent class membership with temporal contexts:</p>
+                                <pre class="bg-light p-2"><code>instance_of(x, Continuant, t)</code></pre>
+                                <p>This format is more expressive and handles temporal aspects of BFO entities effectively.</p>
+                                <p><strong>Example:</strong></p>
+                                <pre class="bg-light p-2"><code>forall x,t (instance_of(x, Human, t) -> instance_of(x, Mammal, t))</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>New Feature:</strong> The system now automatically detects which format you're using and provides appropriate guidance. 
+                    While both formats are supported, we recommend using the BFO Standard Notation (instance_of) for more precise and temporally-aware expressions.
+                </div>
+            </div>
+        </div>
+        
         <div class="card">
             <div class="card-header bg-secondary text-white">
                 <h5 class="mb-0"><i class="fas fa-code-branch me-2"></i>Project Information</h5>

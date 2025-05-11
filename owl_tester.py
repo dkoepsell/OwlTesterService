@@ -199,6 +199,19 @@ class OwlTester:
             result["issues"].append(f"Parsing error: {str(e)}")
             return result
         
+        # Detect the format used in the expression
+        if re.search(r'instance_of\s*\(', input_expr, re.IGNORECASE):
+            result["format_detected"] = "instance_of"
+        elif re.search(r'\w+\s*\(\w+\)', input_expr):
+            result["format_detected"] = "traditional"
+        else:
+            # If neither format is clearly detected
+            result["format_detected"] = "unknown"
+            
+        # If the instance_of format is not detected, add a suggestion
+        if result["format_detected"] != "instance_of":
+            result["issues"].append("Consider using the BFO standard instance_of(x,Class,t) format for clearer semantics.")
+            
         # Extract terms from the expression
         terms = self.extract_terms(input_expr)
         
