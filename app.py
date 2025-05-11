@@ -575,6 +575,10 @@ def api_analyze_owl(filename):
         consistency_issues = analysis_result.get('consistency_issues', [])
         inferred_axioms = analysis_result.get('inferred_axioms', [])
         
+        # Extract transparency information
+        reasoning_methodology = analysis_result.get('reasoning_methodology', {})
+        derivation_steps = analysis_result.get('derivation_steps', [])
+            
         # Create a new analysis record
         analysis = OntologyAnalysis(
             ontology_file_id=file_record.id,
@@ -595,7 +599,9 @@ def api_analyze_owl(filename):
             class_list=class_list,
             object_property_list=object_property_list,
             data_property_list=data_property_list,
-            individual_list=individual_list
+            individual_list=individual_list,
+            reasoning_methodology=reasoning_methodology,
+            derivation_steps=derivation_steps
         )
         
         # Attempt to extract FOL premises from the ontology

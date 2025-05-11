@@ -89,6 +89,10 @@ class OntologyAnalysis(db.Model):
     data_property_list = db.Column(db.JSON, nullable=True)
     individual_list = db.Column(db.JSON, nullable=True)
     
+    # Transparency fields
+    reasoning_methodology = db.Column(db.JSON, nullable=True) 
+    derivation_steps = db.Column(db.JSON, nullable=True)
+    
     def __repr__(self):
         return f"<OntologyAnalysis {self.id} for {self.ontology_file_id}>"
 
