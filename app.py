@@ -452,16 +452,19 @@ def analyze_owl(filename):
         # Generate analysis report with the ontology object
         analysis = custom_tester.analyze_ontology(onto)
         
-        # Generate PlantUML diagram code with increased max_classes
-        diagram_result = custom_tester.generate_uml_diagram(onto, 
+        # Generate PlantUML diagram code
+        from plantuml_generator import PlantUMLGenerator
+        plant_generator = PlantUMLGenerator()
+        plantuml_code, diagram_path, svg_path = plant_generator.generate_class_diagram(
+            onto, 
+            filename_base=os.path.splitext(filename)[0],  # Use the current filename as base
             include_individuals=False,
             include_data_properties=True,
             include_annotation_properties=False,
             max_classes=1000  # Increased to show more classes
         )
         
-        # Get the PlantUML code if successful
-        plantuml_code = diagram_result.get("plantuml_code", "") if diagram_result.get("success", False) else ""
+        # plantuml_code is already populated from generate_class_diagram
         
         # Save analysis to database if we have a file_id
         if file_id:
@@ -800,13 +803,24 @@ def generate_diagram(filename):
             raise Exception("Loaded ontology object not found in result")
         
         # Generate PlantUML code directly with increased max_classes
-        result = tester.generate_uml_diagram(
-            onto,
+        from plantuml_generator import PlantUMLGenerator
+        plant_generator = PlantUMLGenerator()
+        plantuml_code, diagram_path, svg_path = plant_generator.generate_class_diagram(
+            onto, 
+            filename_base=os.path.splitext(os.path.basename(filename))[0],
             include_individuals=include_individuals,
             include_data_properties=include_data_properties,
             include_annotation_properties=include_annotation_properties,
             max_classes=1000  # Increased to show more classes
         )
+        
+        # Format result to match existing code expectations
+        result = {
+            "success": plantuml_code is not None,
+            "plantuml_code": plantuml_code,
+            "diagram_url": diagram_path,
+            "svg_url": svg_path
+        }
         
         if not result["success"]:
             logger.error(f"Error generating diagram code: {result.get('error', 'Unknown error')}")
