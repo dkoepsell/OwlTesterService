@@ -549,43 +549,43 @@ def api_analyze_owl(filename):
             onto = load_result.get('ontology')
             
             if onto:
-                    premises = []
-                    found_premises = False
+                premises = []
+                found_premises = False
+                
+                # Try to extract annotations if available
+                for cls in onto.classes():
+                    if hasattr(cls, 'comment'):
+                        for comment in cls.comment:
+                            if "FOL:" in comment:
+                                premises.append(comment.split("FOL:")[1].strip())
+                                found_premises = True
+                
+                # If no premises were found in annotations, generate default ones
+                if not found_premises:
+                    app.logger.info(f"★★★ NO FOL PREMISES FOUND IN ANNOTATIONS. GENERATING DEFAULTS... ★★★")
+                    app.logger.info(f"★★★ FOUND {class_count} CLASSES AND {object_property_count} PROPERTIES FOR DEFAULT PREMISES ★★★")
                     
-                    # Try to extract annotations if available
+                    # Generate default premises for classes
                     for cls in onto.classes():
-                        if hasattr(cls, 'comment'):
-                            for comment in cls.comment:
-                                if "FOL:" in comment:
-                                    premises.append(comment.split("FOL:")[1].strip())
-                                    found_premises = True
+                        if hasattr(cls, 'name') and cls.name:
+                            # Skip some common base classes that might create noise
+                            if cls.name in ['Thing', 'Nothing', 'Entity']:
+                                continue
+                                
+                            # Create a premise in BFO format: instance_of(x, ClassName, t)
+                            premise = f"instance_of(x, {cls.name}, t)"
+                            premises.append(premise)
+                            app.logger.info(f"★★★ Added default class FOL premise for: {cls.name} ★★★")
                     
-                    # If no premises were found in annotations, generate default ones
-                    if not found_premises:
-                        app.logger.info(f"★★★ NO FOL PREMISES FOUND IN ANNOTATIONS. GENERATING DEFAULTS... ★★★")
-                        app.logger.info(f"★★★ FOUND {class_count} CLASSES AND {object_property_count} PROPERTIES FOR DEFAULT PREMISES ★★★")
+                    # Generate default premises for object properties
+                    for prop in onto.object_properties():
+                        if hasattr(prop, 'name') and prop.name:
+                            # Create a premise in BFO format: PropertyName(x, y, t)
+                            premise = f"{prop.name}(x, y, t)"
+                            premises.append(premise)
+                            app.logger.info(f"★★★ Added default property FOL premise for: {prop.name} ★★★")
                         
-                        # Generate default premises for classes
-                        for cls in onto.classes():
-                            if hasattr(cls, 'name') and cls.name:
-                                # Skip some common base classes that might create noise
-                                if cls.name in ['Thing', 'Nothing', 'Entity']:
-                                    continue
-                                    
-                                # Create a premise in BFO format: instance_of(x, ClassName, t)
-                                premise = f"instance_of(x, {cls.name}, t)"
-                                premises.append(premise)
-                                app.logger.info(f"★★★ Added default class FOL premise for: {cls.name} ★★★")
-                        
-                        # Generate default premises for object properties
-                        for prop in onto.object_properties():
-                            if hasattr(prop, 'name') and prop.name:
-                                # Create a premise in BFO format: PropertyName(x, y, t)
-                                premise = f"{prop.name}(x, y, t)"
-                                premises.append(premise)
-                                app.logger.info(f"★★★ Added default property FOL premise for: {prop.name} ★★★")
-                        
-                        app.logger.info(f"★★★ GENERATED {len(premises)} DEFAULT FOL PREMISES ★★★")
+                    app.logger.info(f"★★★ GENERATED {len(premises)} DEFAULT FOL PREMISES ★★★")
                     
                     # Add the premises to the analysis
                     analysis.fol_premises = premises
