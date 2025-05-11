@@ -444,11 +444,28 @@ def analyze_owl(filename):
         logger.info(f"Individual count: {analysis.get('individual_count')}")
         logger.info(f"Axiom count: {analysis.get('axiom_count')}")
         
-        # Render analysis template with results
-        return render_template('analysis_new.html', 
+        # Update analysis with completeness validation if available
+        if 'completeness' in analysis:
+            logger.info(f"Completeness data available: {analysis['completeness']}")
+        
+        # Add analysis ID for API calls
+        analysis_id = None
+        try:
+            # Try to get the analysis ID if we saved to DB
+            if file_id:
+                ont_analysis = OntologyAnalysis.query.filter_by(ontology_file_id=int(file_id)).order_by(OntologyAnalysis.id.desc()).first()
+                if ont_analysis:
+                    analysis_id = ont_analysis.id
+                    logger.info(f"Using analysis ID {analysis_id} for API calls")
+        except Exception as e:
+            logger.error(f"Error getting analysis ID: {str(e)}")
+        
+        # Render enhanced analysis template with results
+        return render_template('analysis_enhanced.html', 
                               original_filename=original_name,
                               filename=filename,
-                              file_id=file_id,  # Add file_id to be available in the template
+                              file_id=file_id,
+                              analysis_id=analysis_id,
                               analysis=analysis,
                               plantuml_code=plantuml_code)
                               
