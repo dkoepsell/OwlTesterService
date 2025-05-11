@@ -610,26 +610,56 @@ def api_analyze_owl(filename):
             if len(g) > 0:
                 app.logger.info(f"Successfully loaded {len(g)} triples with rdflib")
                 
-                # Define OWL namespace explicitly
+                # Explicitly define namespaces
                 OWL = rdflib.Namespace("http://www.w3.org/2002/07/owl#")
                 
                 # Count classes - support all formats of OWL class declarations
                 classes = set()
-                # Standard OWL class
+                
+                # Standard OWL class declaration check
                 for s, p, o in g.triples((None, RDF.type, OWL.Class)):
                     classes.add(str(s))
-                # RDF Schema class definition
+                
+                # RDF Schema class definition - subclass relationships
                 for s, p, o in g.triples((None, RDFS.subClassOf, None)):
                     classes.add(str(s))
                     if str(o) != str(OWL.Thing) and str(o) != str(RDFS.Resource):
                         classes.add(str(o))
                 
-                # Find all domain and range values - they're often classes even if not explicitly typed
+                # Important: Handle alternate formats - in some RDF/XML formats, classes
+                # are just referenced in domain/range without explicit type declaration
                 domain_range_resources = set()
+                
+                # Get all domain values (often classes)
                 for s, p, o in g.triples((None, RDFS.domain, None)):
                     domain_range_resources.add(str(o))
+                
+                # Get all range values (often classes)
                 for s, p, o in g.triples((None, RDFS.range, None)):
                     domain_range_resources.add(str(o))
+                    
+                # Check for other RDF/XML formats where Classes may be implied by other patterns
+                # - Classes often have a "label" property
+                for s, p, o in g.triples((None, RDFS.label, None)):
+                    # Verify this is an entity without a defined type (which would be handled elsewhere)
+                    has_type = False
+                    for _, _, _ in g.triples((s, RDF.type, None)):
+                        has_type = True
+                        break
+                    
+                    # If it's just a labelled resource with no type, check for class-like patterns
+                    if not has_type:
+                        # See if it appears in any domain/range (class-like behavior)
+                        in_domain_range = False
+                        for _, _, o2 in g.triples((None, RDFS.domain, s)):
+                            in_domain_range = True
+                            break
+                        for _, _, o2 in g.triples((None, RDFS.range, s)):
+                            in_domain_range = True
+                            break
+                        
+                        if in_domain_range:
+                            classes.add(str(s))
                 
                 # Add any resource referenced in domain or range if it's not a literal or XSD type
                 for resource in domain_range_resources:
@@ -913,14 +943,49 @@ def api_analyze_owl(filename):
                 if has_cardinality:
                     expressivity += "N"
                 
+                # Function to get clean label for FOL premises
+                def get_clean_label(uri_str):
+                    """Get a clean label from a URI for FOL expression"""
+                    # First check if we have a label for this class
+                    uri_ref = rdflib.URIRef(uri_str)
+                    for _, _, l in g.triples((uri_ref, RDFS.label, None)):
+                        label = str(l)
+                        # Replace spaces with underscores for valid FOL
+                        return label.replace(' ', '_')
+                    
+                    # If no label, use the URI fragment
+                    if '#' in uri_str:
+                        return uri_str.split('#')[-1]
+                    else:
+                        return uri_str.split('/')[-1]
+                
+                # Get each class's description if available
+                class_descriptions = {}
+                for cls in classes:
+                    for _, _, c in g.triples((rdflib.URIRef(cls), RDFS.comment, None)):
+                        class_descriptions[cls] = str(c)
+                        break
+                
                 # Generate FOL premises
                 fol_premises = []
                 
-                # Class hierarchy premises
+                # Class instantiation premises for all classes (These form the basic ontology vocabulary)
+                for cls in classes:
+                    cls_label = get_clean_label(cls)
+                    description = class_descriptions.get(cls, f"Entities that are {cls_label}")
+                    
+                    # Add a premise for membership in this class
+                    fol_premises.append({
+                        'type': 'class',
+                        'fol': f"instance_of(x, {cls_label}, t)",
+                        'description': description
+                    })
+                
+                # Class hierarchy premises (subclass relationships)
                 for s, p, o in g.triples((None, RDFS.subClassOf, None)):
                     if str(s) in classes and str(o) in classes:
-                        s_label = str(s).split('#')[-1] if '#' in str(s) else str(s).split('/')[-1]
-                        o_label = str(o).split('#')[-1] if '#' in str(o) else str(o).split('/')[-1]
+                        s_label = get_clean_label(str(s))
+                        o_label = get_clean_label(str(o))
                         fol = f"forall x (instance_of(x, {s_label}, t) -> instance_of(x, {o_label}, t))"
                         fol_premises.append({
                             'type': 'subclass',
@@ -930,13 +995,41 @@ def api_analyze_owl(filename):
                 
                 # Domain and range premises for object properties
                 for p in obj_properties:
-                    # Get property label
-                    p_label = str(p).split('#')[-1] if '#' in str(p) else str(p).split('/')[-1]
+                    # Get property label and description
+                    p_label = get_clean_label(p)
+                    p_desc = ""
+                    for _, _, c in g.triples((rdflib.URIRef(p), RDFS.comment, None)):
+                        p_desc = str(c)
+                        break
+                    
+                    # Add a premise for the existence of this property
+                    if not p_desc:
+                        # Create a description based on domain and range if available
+                        domain_labels = []
+                        range_labels = []
+                        for _, _, d in g.triples((rdflib.URIRef(p), RDFS.domain, None)):
+                            if str(d) in classes:
+                                domain_labels.append(get_clean_label(str(d)))
+                        for _, _, r in g.triples((rdflib.URIRef(p), RDFS.range, None)):
+                            if str(r) in classes:
+                                range_labels.append(get_clean_label(str(r)))
+                        
+                        if domain_labels and range_labels:
+                            p_desc = f"Relationship from {', '.join(domain_labels)} to {', '.join(range_labels)}"
+                        else:
+                            p_desc = f"The property {p_label}"
+                    
+                    # Add a premise for this property
+                    fol_premises.append({
+                        'type': 'property',
+                        'fol': f"{p_label}(x, y, t)",
+                        'description': p_desc
+                    })
                     
                     # Domain restrictions
                     for _, _, d in g.triples((rdflib.URIRef(p), RDFS.domain, None)):
                         if str(d) in classes:
-                            d_label = str(d).split('#')[-1] if '#' in str(d) else str(d).split('/')[-1]
+                            d_label = get_clean_label(str(d))
                             fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(x, {d_label}, t))"
                             fol_premises.append({
                                 'type': 'domain',
@@ -947,7 +1040,7 @@ def api_analyze_owl(filename):
                     # Range restrictions
                     for _, _, r in g.triples((rdflib.URIRef(p), RDFS.range, None)):
                         if str(r) in classes:
-                            r_label = str(r).split('#')[-1] if '#' in str(r) else str(r).split('/')[-1]
+                            r_label = get_clean_label(str(r))
                             fol = f"forall x,y ({p_label}(x, y, t) -> instance_of(y, {r_label}, t))"
                             fol_premises.append({
                                 'type': 'range',
