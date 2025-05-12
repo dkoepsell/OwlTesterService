@@ -1649,10 +1649,13 @@ def api_sandbox_ai_suggestions():
     """API endpoint to get AI-generated class and property suggestions for an ontology domain."""
     logger.info(f"AI suggestions endpoint called with method: {request.method}")
     try:
+        request_type = 'classes'  # Default to classes
+        
         if request.method == 'GET':
             # Handle GET requests
             domain = request.args.get('domain')
             subject = request.args.get('subject')
+            request_type = request.args.get('type', 'classes')
             if not domain or not subject:
                 return jsonify({'error': 'Domain and subject are required'}), 400
         else:
@@ -1662,9 +1665,17 @@ def api_sandbox_ai_suggestions():
                 return jsonify({'error': 'Domain and subject are required'}), 400
             domain = data.get('domain')
             subject = data.get('subject')
+            request_type = data.get('type', 'classes')
+        
+        logger.info(f"Generating suggestions for domain: {domain}, subject: {subject}, type: {request_type}")
         
         # Call the OpenAI function to generate suggestions
-        suggestions = suggest_ontology_classes(domain, subject)
+        if request_type == 'properties':
+            # Generate property suggestions
+            suggestions = suggest_ontology_properties(domain, subject)
+        else:
+            # Generate class suggestions
+            suggestions = suggest_ontology_classes(domain, subject)
         
         return jsonify(suggestions)
         
