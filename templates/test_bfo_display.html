@@ -86,11 +86,15 @@ function displayResults(data) {
     const resultsDiv = document.getElementById('results');
     const bfoClassesList = document.getElementById('bfo-classes');
     const bfoRelationsList = document.getElementById('bfo-relations');
+    const freeVariablesList = document.getElementById('free-variables');
+    const nonBfoTermsList = document.getElementById('non-bfo-terms');
     const issuesList = document.getElementById('issues');
     
     // Clear previous results
     bfoClassesList.innerHTML = '';
     bfoRelationsList.innerHTML = '';
+    freeVariablesList.innerHTML = '';
+    nonBfoTermsList.innerHTML = '';
     issuesList.innerHTML = '';
     
     // Display BFO classes
@@ -119,16 +123,53 @@ function displayResults(data) {
         bfoRelationsList.appendChild(li);
     }
     
+    // Display free variables
+    if (data.free_variables && data.free_variables.length > 0) {
+        data.free_variables.forEach(variable => {
+            const li = document.createElement('li');
+            li.textContent = variable;
+            li.className = 'text-danger';
+            freeVariablesList.appendChild(li);
+        });
+    } else {
+        const li = document.createElement('li');
+        li.textContent = 'No free variables detected';
+        li.className = 'text-success';
+        freeVariablesList.appendChild(li);
+    }
+    
+    // Display non-BFO terms
+    if (data.non_bfo_terms && data.non_bfo_terms.length > 0) {
+        data.non_bfo_terms.forEach(term => {
+            const li = document.createElement('li');
+            li.textContent = term;
+            li.className = 'text-warning';
+            nonBfoTermsList.appendChild(li);
+        });
+    } else {
+        const li = document.createElement('li');
+        li.textContent = 'No non-BFO terms found';
+        li.className = 'text-success';
+        nonBfoTermsList.appendChild(li);
+    }
+    
     // Display issues
     if (data.issues && data.issues.length > 0) {
         data.issues.forEach(issue => {
             const li = document.createElement('li');
             li.textContent = issue;
+            // Highlight warnings and errors with different colors
+            if (issue.includes('Warning')) {
+                li.className = 'text-warning';
+            } else if (issue.includes('Error') || issue.includes('error')) {
+                li.className = 'text-danger';
+            }
             issuesList.appendChild(li);
         });
     } else {
         const li = document.createElement('li');
         li.textContent = 'No issues found';
+        li.className = 'text-success';
         issuesList.appendChild(li);
     }
     
