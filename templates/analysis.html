@@ -680,75 +680,26 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Search functionality for axioms
-        const searchAllAxioms = document.getElementById('searchAllAxioms');
-        const allAxiomsTable = document.getElementById('allAxiomsTable');
-        
-        if (searchAllAxioms && allAxiomsTable) {
-            searchAllAxioms.addEventListener('input', function() {
+        // Helper function for search functionality
+        function setupSearch(searchInputId, targetElementId, itemSelector = 'tr') {
+            const searchInput = document.getElementById(searchInputId);
+            const targetElement = document.getElementById(targetElementId);
+            
+            if (!searchInput || !targetElement) return;
+            
+            searchInput.addEventListener('input', function() {
                 const searchText = this.value.toLowerCase();
-                const rows = allAxiomsTable.getElementsByTagName('tr');
+                const items = targetElement.getElementsByTagName(itemSelector);
                 
-                for (let i = 0; i < rows.length; i++) {
-                    const textContent = rows[i].textContent.toLowerCase();
-                    if (textContent.includes(searchText)) {
-                        rows[i].style.display = '';
-                    } else {
-                        rows[i].style.display = 'none';
+                // Show all items if search text is empty
+                if (!searchText || searchText.trim() === '') {
+                    for (let i = 0; i < items.length; i++) {
+                        items[i].style.display = '';
                     }
+                    return;
                 }
-            });
-        }
-        
-        // Search functionality for inferred axioms
-        const searchInferredAxioms = document.getElementById('searchInferredAxioms');
-        const inferredAxiomsTable = document.getElementById('inferredAxiomsTable');
-        
-        if (searchInferredAxioms && inferredAxiomsTable) {
-            searchInferredAxioms.addEventListener('input', function() {
-                const searchText = this.value.toLowerCase();
-                const rows = inferredAxiomsTable.getElementsByTagName('tr');
                 
-                for (let i = 0; i < rows.length; i++) {
-                    const textContent = rows[i].textContent.toLowerCase();
-                    if (textContent.includes(searchText)) {
-                        rows[i].style.display = '';
-                    } else {
-                        rows[i].style.display = 'none';
-                    }
-                }
-            });
-        }
-        
-        // Search functionality for FOL premises
-        const searchFOLPremises = document.getElementById('searchFOLPremises');
-        const folPremisesTable = document.getElementById('folPremisesTable');
-        
-        if (searchFOLPremises && folPremisesTable) {
-            searchFOLPremises.addEventListener('input', function() {
-                const searchText = this.value.toLowerCase();
-                const rows = folPremisesTable.getElementsByTagName('tr');
-                
-                for (let i = 0; i < rows.length; i++) {
-                    const textContent = rows[i].textContent.toLowerCase();
-                    if (textContent.includes(searchText)) {
-                        rows[i].style.display = '';
-                    } else {
-                        rows[i].style.display = 'none';
-                    }
-                }
-            });
-        }
-        
-        // Search functionality for classes
-        const searchClasses = document.getElementById('searchClasses');
-        const classesList = document.getElementById('classesList');
-        
-        if (searchClasses && classesList) {
-            searchClasses.addEventListener('input', function() {
-                const searchText = this.value.toLowerCase();
-                const items = classesList.getElementsByTagName('li');
-                
+                // Otherwise filter based on search text
                 for (let i = 0; i < items.length; i++) {
                     const textContent = items[i].textContent.toLowerCase();
                     if (textContent.includes(searchText)) {
@@ -760,65 +711,16 @@
             });
         }
         
-        // Search functionality for object properties
-        const searchObjectProperties = document.getElementById('searchObjectProperties');
-        const objectPropertiesList = document.getElementById('objectPropertiesList');
+        // Setup search for all axioms
+        setupSearch('searchAllAxioms', 'allAxiomsTable');
         
-        if (searchObjectProperties && objectPropertiesList) {
-            searchObjectProperties.addEventListener('input', function() {
-                const searchText = this.value.toLowerCase();
-                const items = objectPropertiesList.getElementsByTagName('li');
-                
-                for (let i = 0; i < items.length; i++) {
-                    const textContent = items[i].textContent.toLowerCase();
-                    if (textContent.includes(searchText)) {
-                        items[i].style.display = '';
-                    } else {
-                        items[i].style.display = 'none';
-                    }
-                }
-            });
-        }
-        
-        // Search functionality for data properties
-        const searchDataProperties = document.getElementById('searchDataProperties');
-        const dataPropertiesList = document.getElementById('dataPropertiesList');
-        
-        if (searchDataProperties && dataPropertiesList) {
-            searchDataProperties.addEventListener('input', function() {
-                const searchText = this.value.toLowerCase();
-                const items = dataPropertiesList.getElementsByTagName('li');
-                
-                for (let i = 0; i < items.length; i++) {
-                    const textContent = items[i].textContent.toLowerCase();
-                    if (textContent.includes(searchText)) {
-                        items[i].style.display = '';
-                    } else {
-                        items[i].style.display = 'none';
-                    }
-                }
-            });
-        }
-        
-        // Search functionality for individuals
-        const searchIndividuals = document.getElementById('searchIndividuals');
-        const individualsList = document.getElementById('individualsList');
-        
-        if (searchIndividuals && individualsList) {
-            searchIndividuals.addEventListener('input', function() {
-                const searchText = this.value.toLowerCase();
-                const items = individualsList.getElementsByTagName('li');
-                
-                for (let i = 0; i < items.length; i++) {
-                    const textContent = items[i].textContent.toLowerCase();
-                    if (textContent.includes(searchText)) {
-                        items[i].style.display = '';
-                    } else {
-                        items[i].style.display = 'none';
-                    }
-                }
-            });
-        }
+        // Setup search for other tables and lists
+        setupSearch('searchInferredAxioms', 'inferredAxiomsTable');
+        setupSearch('searchFOLPremises', 'folPremisesTable');
+        setupSearch('searchClasses', 'classesList', 'li');
+        setupSearch('searchObjectProperties', 'objectPropertiesList', 'li');
+        setupSearch('searchDataProperties', 'dataPropertiesList', 'li');
+        setupSearch('searchIndividuals', 'individualsList', 'li');
     });
 </script>
 {% endblock %}
