@@ -223,6 +223,11 @@ def test_expression():
         app.logger.error(f"Error testing expression: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/test-bfo-display')
+def test_bfo_display():
+    """Test page for displaying BFO classes and relations."""
+    return render_template('test_bfo_display.html')
+
 @app.route('/api/get-bfo-classes')
 def get_bfo_classes():
     """API endpoint to get all BFO classes."""

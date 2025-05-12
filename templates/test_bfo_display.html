@@ -1,0 +1,129 @@
+{% extends "layout.html" %}
+
+{% block title %}Test BFO Display{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Test BFO Classes and Relations Display</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">FOL Expression Test</h5>
+        </div>
+        <div class="card-body">
+            <form id="testForm" method="POST" action="/api/test-bfo-display">
+                <div class="mb-3">
+                    <label for="expression" class="form-label">FOL Expression:</label>
+                    <input type="text" class="form-control" id="expression" name="expression" 
+                           placeholder="e.g., forall x,t (instance_of(x, continuant, t) -> ..." required>
+                </div>
+                <button type="submit" class="btn btn-primary">Test Expression</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="results" class="card mb-4 d-none">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Test Results</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>BFO Classes Used:</h6>
+                    <ul id="bfo-classes"></ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>BFO Relations Used:</h6>
+                    <ul id="bfo-relations"></ul>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h6>Issues:</h6>
+                    <ul id="issues"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('testForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const expression = document.getElementById('expression').value;
+    
+    fetch('/api/test-expression', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            expression: expression
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Success:', data);
+        displayResults(data);
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        alert('An error occurred while testing the expression.');
+    });
+});
+
+function displayResults(data) {
+    const resultsDiv = document.getElementById('results');
+    const bfoClassesList = document.getElementById('bfo-classes');
+    const bfoRelationsList = document.getElementById('bfo-relations');
+    const issuesList = document.getElementById('issues');
+    
+    // Clear previous results
+    bfoClassesList.innerHTML = '';
+    bfoRelationsList.innerHTML = '';
+    issuesList.innerHTML = '';
+    
+    // Display BFO classes
+    if (data.bfo_classes_used && data.bfo_classes_used.length > 0) {
+        data.bfo_classes_used.forEach(cls => {
+            const li = document.createElement('li');
+            li.textContent = cls;
+            bfoClassesList.appendChild(li);
+        });
+    } else {
+        const li = document.createElement('li');
+        li.textContent = 'No BFO classes used';
+        bfoClassesList.appendChild(li);
+    }
+    
+    // Display BFO relations
+    if (data.bfo_relations_used && data.bfo_relations_used.length > 0) {
+        data.bfo_relations_used.forEach(rel => {
+            const li = document.createElement('li');
+            li.textContent = rel;
+            bfoRelationsList.appendChild(li);
+        });
+    } else {
+        const li = document.createElement('li');
+        li.textContent = 'No BFO relations used';
+        bfoRelationsList.appendChild(li);
+    }
+    
+    // Display issues
+    if (data.issues && data.issues.length > 0) {
+        data.issues.forEach(issue => {
+            const li = document.createElement('li');
+            li.textContent = issue;
+            issuesList.appendChild(li);
+        });
+    } else {
+        const li = document.createElement('li');
+        li.textContent = 'No issues found';
+        issuesList.appendChild(li);
+    }
+    
+    // Show results
+    resultsDiv.classList.remove('d-none');
+}
+</script>
+{% endblock %}
