@@ -154,10 +154,14 @@ class OwlTester:
                 
                 # Check for exact match in BFO classes
                 if term_lower in self.bfo_classes:
-                    bfo_classes_used.append(self.bfo_classes[term_lower])
+                    # Store only the label to prevent [object Object] display
+                    class_obj = self.bfo_classes[term_lower]
+                    bfo_classes_used.append(class_obj['label'] if isinstance(class_obj, dict) else str(class_obj))
                 # Check for exact match in BFO relations
                 elif term_lower in self.bfo_relations:
-                    bfo_relations_used.append(self.bfo_relations[term_lower])
+                    # Store only the label to prevent [object Object] display
+                    relation_obj = self.bfo_relations[term_lower]
+                    bfo_relations_used.append(relation_obj['label'] if isinstance(relation_obj, dict) else str(relation_obj))
                 else:
                     # Check for partial matches
                     for bfo_class in self.bfo_classes:
