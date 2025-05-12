@@ -228,6 +228,11 @@ def test_bfo_display():
     """Test page for displaying BFO classes and relations."""
     return render_template('test_bfo_display.html')
 
+@app.route('/fol-syntax-guide')
+def fol_syntax_guide():
+    """Documentation page for FOL syntax rules."""
+    return render_template('fol_syntax_guide.html')
+
 @app.route('/api/get-bfo-classes')
 def get_bfo_classes():
     """API endpoint to get all BFO classes."""

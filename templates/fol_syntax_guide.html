@@ -1,0 +1,263 @@
+{% extends "layout.html" %}
+
+{% block title %}FOL Syntax Guide{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">First-Order Logic (FOL) Syntax Guide</h1>
+    
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        This guide explains the syntax rules for writing valid First-Order Logic (FOL) expressions in our system, particularly focusing on compatibility with Basic Formal Ontology (BFO) terms.
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-book me-2"></i>Supported Notation Formats</h5>
+        </div>
+        <div class="card-body">
+            <p>Our system supports two primary notation formats for FOL expressions:</p>
+            
+            <h6 class="mt-4">1. BFO Standard Notation (Recommended)</h6>
+            <div class="card bg-light mb-3">
+                <div class="card-body">
+                    <p class="mb-0">Uses <code>instance_of(x, Class, t)</code> syntax with explicit temporal parameter.</p>
+                    <p class="text-muted">This is the preferred format that allows for temporal reasoning.</p>
+                    <pre class="bg-dark text-light p-3 mt-2 rounded"><code>forall x, t (instance_of(x, continuant, t) -> exists_at(x, t))</code></pre>
+                </div>
+            </div>
+            
+            <h6>2. Traditional Notation</h6>
+            <div class="card bg-light mb-3">
+                <div class="card-body">
+                    <p class="mb-0">Uses <code>Class(x)</code> syntax without explicit temporal parameter.</p>
+                    <p class="text-muted">This simplified format is more limited but easier to write.</p>
+                    <pre class="bg-dark text-light p-3 mt-2 rounded"><code>forall x (Continuant(x) -> exists t (Exists_at(x, t)))</code></pre>
+                </div>
+            </div>
+            
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Important:</strong> We recommend using the BFO Standard Notation as it provides better compatibility with temporal reasoning and BFO ontologies.
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-code me-2"></i>Syntax Elements</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Element</th>
+                        <th>Symbol</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Universal Quantifier</td>
+                        <td><code>forall</code></td>
+                        <td>For all values of the variable</td>
+                        <td><code>forall x (P(x))</code></td>
+                    </tr>
+                    <tr>
+                        <td>Existential Quantifier</td>
+                        <td><code>exists</code></td>
+                        <td>There exists at least one value of the variable</td>
+                        <td><code>exists x (P(x))</code></td>
+                    </tr>
+                    <tr>
+                        <td>Implication</td>
+                        <td><code>-></code></td>
+                        <td>If...then... relationship</td>
+                        <td><code>P(x) -> Q(x)</code></td>
+                    </tr>
+                    <tr>
+                        <td>Conjunction</td>
+                        <td><code>&</code></td>
+                        <td>Logical AND</td>
+                        <td><code>P(x) & Q(x)</code></td>
+                    </tr>
+                    <tr>
+                        <td>Disjunction</td>
+                        <td><code>|</code></td>
+                        <td>Logical OR</td>
+                        <td><code>P(x) | Q(x)</code></td>
+                    </tr>
+                    <tr>
+                        <td>Negation</td>
+                        <td><code>-</code></td>
+                        <td>Logical NOT</td>
+                        <td><code>-P(x)</code></td>
+                    </tr>
+                    <tr>
+                        <td>Biconditional</td>
+                        <td><code><-></code></td>
+                        <td>If and only if (equivalent to)</td>
+                        <td><code>P(x) <-> Q(x)</code></td>
+                    </tr>
+                    <tr>
+                        <td>Parentheses</td>
+                        <td><code>()</code></td>
+                        <td>Group expressions and establish precedence</td>
+                        <td><code>(P(x) & Q(x)) -> R(x)</code></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <h6 class="mt-4">Multiple Variable Quantification</h6>
+            <p>For multiple variables in quantifiers, use any of these formats:</p>
+            <ul>
+                <li><code>forall x, t (P(x, t))</code> - Comma-separated variables (automatically preprocessed)</li>
+                <li><code>forall x forall t (P(x, t))</code> - Separate quantifiers</li>
+            </ul>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-lightbulb me-2"></i>
+                <strong>Tip:</strong> When using multiple variables in <code>forall x, t</code> format, our system automatically converts it to <code>forall x forall t</code> for compatibility with the parser.
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Working with BFO Terms</h5>
+        </div>
+        <div class="card-body">
+            <p>When writing FOL expressions, you can use any BFO classes and relations. Here are some common BFO terms:</p>
+            
+            <h6 class="mt-3">Common BFO Classes</h6>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><code>entity</code> - The root class of all BFO entities</li>
+                <li class="list-group-item"><code>continuant</code> - Entities that persist through time</li>
+                <li class="list-group-item"><code>occurrent</code> - Entities that unfold in time</li>
+                <li class="list-group-item"><code>independent_continuant</code> - Continuants that don't require bearers</li>
+                <li class="list-group-item"><code>material_entity</code> - Physical objects</li>
+                <li class="list-group-item"><code>process</code> - Occurrents with temporal parts</li>
+            </ul>
+            
+            <h6 class="mt-3">Common BFO Relations</h6>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><code>instance_of</code> - Relates an individual to a class</li>
+                <li class="list-group-item"><code>exists_at</code> - Temporal existence of a continuant</li>
+                <li class="list-group-item"><code>part_of</code> - Mereological part relation</li>
+                <li class="list-group-item"><code>has_part</code> - Inverse of part_of</li>
+                <li class="list-group-item"><code>located_in</code> - Spatial location</li>
+            </ul>
+            
+            <div class="alert alert-warning mt-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Note:</strong> Our system checks for term compatibility with BFO. Unknown terms will be flagged as "non-BFO terms" in the test results.
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>CLIF Notation (Common Logic Interchange Format)</h5>
+        </div>
+        <div class="card-body">
+            <p>CLIF (Common Logic Interchange Format) is a standardized syntax for expressing first-order logic that is more machine-friendly and serves as an ISO standard (ISO/IEC 24707).</p>
+            
+            <h6 class="mt-3">CLIF Syntax Basics</h6>
+            <ul>
+                <li>Uses parenthesized prefix notation</li>
+                <li>Variables start with a question mark or capital letter</li>
+                <li>Quantifiers: <code>(forall (?x) ...)</code> and <code>(exists (?x) ...)</code></li>
+                <li>Connectives: <code>and</code>, <code>or</code>, <code>not</code>, <code>implies</code>, <code>iff</code></li>
+            </ul>
+            
+            <h6 class="mt-3">Example in CLIF</h6>
+            <pre class="bg-dark text-light p-3 rounded"><code>(forall (?x ?t) 
+  (if (instance_of ?x continuant ?t) 
+      (exists_at ?x ?t)))</code></pre>
+            
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Note:</strong> While our system currently uses NLTK's parser which follows a more traditional syntax, we plan to add CLIF support in a future update for better interoperability with ontology tools.
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-exclamation-circle me-2"></i>Common Errors</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Error</th>
+                            <th>Example</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Missing parentheses</td>
+                            <td><code>forall x P(x) -> Q(x)</code></td>
+                            <td><code>forall x (P(x) -> Q(x))</code></td>
+                        </tr>
+                        <tr>
+                            <td>Incorrect case for BFO terms</td>
+                            <td><code>instance_of(x, Continuant, t)</code></td>
+                            <td><code>instance_of(x, continuant, t)</code></td>
+                        </tr>
+                        <tr>
+                            <td>Free variables (not bound by a quantifier)</td>
+                            <td><code>P(x) -> Q(y)</code></td>
+                            <td><code>forall x (P(x) -> exists y (Q(y)))</code></td>
+                        </tr>
+                        <tr>
+                            <td>Mixed notation formats</td>
+                            <td><code>forall x (Continuant(x) & instance_of(x, entity, t))</code></td>
+                            <td>Stick to one format: <code>forall x,t (instance_of(x, continuant, t) & instance_of(x, entity, t))</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Examples</h5>
+        </div>
+        <div class="card-body">
+            <h6>Valid FOL Expressions</h6>
+            <ul class="list-group mb-3">
+                <li class="list-group-item">
+                    <code>forall x,t (instance_of(x, material_entity, t) -> instance_of(x, independent_continuant, t))</code>
+                    <p class="text-muted mb-0 small">All material entities are independent continuants</p>
+                </li>
+                <li class="list-group-item">
+                    <code>forall x,t (instance_of(x, process, t) -> instance_of(x, occurrent, t))</code>
+                    <p class="text-muted mb-0 small">All processes are occurrents</p>
+                </li>
+                <li class="list-group-item">
+                    <code>forall x,t,u (instance_of(x, continuant, t) & instance_of(x, continuant, u) -> exists_at(x, t) & exists_at(x, u))</code>
+                    <p class="text-muted mb-0 small">A continuant exists at all times at which it is a continuant</p>
+                </li>
+                <li class="list-group-item">
+                    <code>forall x,t (instance_of(x, process, t) -> exists y,u (instance_of(y, continuant, u) & participates_in(y, x, u) & part_of(u, t)))</code>
+                    <p class="text-muted mb-0 small">All processes have at least one continuant participant</p>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-between mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Home
+        </a>
+        <a href="{{ url_for('test_expression') if 'test_expression' in url_for_routes else url_for('index') }}" class="btn btn-primary">
+            <i class="fas fa-flask me-2"></i>Test an Expression
+        </a>
+    </div>
+</div>
+{% endblock %}

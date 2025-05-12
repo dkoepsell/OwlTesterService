@@ -196,6 +196,12 @@ class OwlTester:
             if format_detected:
                 results['format_detected'] = format_detected
             
+            # Detect any free variables in the expression
+            free_vars = self.detect_free_variables(expr_string)
+            if free_vars:
+                results['free_variables'] = free_vars
+                results['issues'].append(f"Warning: Found free variables not bound by quantifiers: {', '.join(free_vars)}")
+            
             # Store the terms found
             results['bfo_classes_used'] = bfo_classes_used
             results['bfo_relations_used'] = bfo_relations_used
@@ -280,6 +286,46 @@ class OwlTester:
         preprocessed = re.sub(pattern, replacement, expr_string)
         
         return preprocessed
+    
+    def detect_free_variables(self, expr_string):
+        """
+        Detect free variables in an FOL expression that are not bound by a quantifier.
+        
+        Args:
+            expr_string (str): The expression to analyze
+            
+        Returns:
+            list: List of free variable names found in the expression
+        """
+        # If parsing failed, we can't reliably detect free variables
+        try:
+            expr = self.read_parser.parse(expr_string)
+        except:
+            return []
+            
+        # Extract all variables used in the expression
+        all_vars = set()
+        var_pattern = r'\b([a-zA-Z][a-zA-Z0-9_]*)\s*(?=\)|,)'
+        for var_match in re.finditer(var_pattern, expr_string):
+            var_name = var_match.group(1)
+            # Skip if it's likely a class or relation name (starts with uppercase)
+            if not var_name[0].isupper() and var_name not in ['forall', 'exists', 'instance_of']:
+                all_vars.add(var_name)
+                
+        # Extract bound variables from quantifiers
+        bound_vars = set()
+        
+        # Match forall x, forall x,y, exists x patterns
+        quant_pattern = r'\b(forall|exists)\s+([a-zA-Z][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z][a-zA-Z0-9_]*)*)'
+        for quant_match in re.finditer(quant_pattern, expr_string):
+            quant_vars = quant_match.group(2)
+            # Split comma-separated variables
+            for var in re.split(r'\s*,\s*', quant_vars):
+                bound_vars.add(var.strip())
+                
+        # Free variables are those that appear in all_vars but not in bound_vars
+        free_vars = all_vars - bound_vars
+        return sorted(list(free_vars))
         
     def extract_terms(self, expr_string):
         """
