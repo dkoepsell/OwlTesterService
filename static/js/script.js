@@ -74,26 +74,38 @@ document.addEventListener('DOMContentLoaded', function() {
         copyBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 const term = this.getAttribute('data-term');
+                const buttonType = this.textContent.trim();
                 
                 if (expressionInput && term) {
                     // Get current cursor position
                     const cursorPos = expressionInput.selectionStart;
                     const currentValue = expressionInput.value;
+                    let insertText = term;
                     
-                    // Insert the term at cursor position
+                    // Format based on button type
+                    if (buttonType.includes('ID')) {
+                        // For ID button, format with instance_of syntax
+                        insertText = `instance_of(x, ${term}, t)`;
+                    } else {
+                        // For Label button, just use the term directly
+                        insertText = term;
+                    }
+                    
+                    // Insert the formatted text at cursor position
                     expressionInput.value = 
                         currentValue.substring(0, cursorPos) + 
-                        term + 
+                        insertText + 
                         currentValue.substring(cursorPos);
                     
                     // Set focus back to the input and place cursor after inserted term
                     expressionInput.focus();
-                    expressionInput.setSelectionRange(cursorPos + term.length, cursorPos + term.length);
+                    expressionInput.setSelectionRange(cursorPos + insertText.length, cursorPos + insertText.length);
                     
                     // Show feedback (temporary visual indication)
+                    const originalHTML = this.innerHTML;
                     this.innerHTML = '<i class="fas fa-check"></i>';
                     setTimeout(() => {
-                        this.innerHTML = '<i class="fas fa-copy"></i>';
+                        this.innerHTML = originalHTML;
                     }, 1000);
                 }
             });
