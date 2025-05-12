@@ -591,7 +591,8 @@ function setupAIAssistantButtons(ontologyId) {
                 },
                 body: JSON.stringify({
                     domain: domain,
-                    subject: subject
+                    subject: subject,
+                    type: 'classes'
                 })
             })
             .then(response => response.json())
@@ -658,7 +659,8 @@ function setupAIAssistantButtons(ontologyId) {
                 },
                 body: JSON.stringify({
                     domain: domain,
-                    subject: subject
+                    subject: subject,
+                    type: 'properties'
                 })
             })
             .then(response => response.json())
