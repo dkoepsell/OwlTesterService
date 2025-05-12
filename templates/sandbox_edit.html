@@ -2,6 +2,9 @@
 
 {% block content %}
 <div class="container">
+    <!-- Hidden input field for ontology ID -->
+    <input type="hidden" id="ontology-id" value="{{ ontology.id }}">
+    
     <div class="row mb-4">
         <div class="col-md-12">
             <h1 class="display-4">Edit Ontology: {{ ontology.title }}</h1>
@@ -19,6 +22,17 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
+    
+    <!-- AI Suggestions Disclaimer -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="alert alert-info" role="alert">
+                <h5 class="alert-heading"><i class="fas fa-magic me-2"></i>AI Assistant Available</h5>
+                <p>This sandbox now features AI-powered suggestions for classes and properties based on your ontology domain and subject.</p>
+                <p class="mb-0">Click the "Suggest Classes" or "Suggest Properties" buttons in each tab to get intelligent recommendations tailored to your ontology.</p>
+            </div>
+        </div>
+    </div>
     
     <div class="row mb-4">
         <div class="col-md-12 d-flex justify-content-between align-items-center">

@@ -622,30 +622,46 @@ function setupAIAssistantButtons(ontologyId) {
     }
     
     // Add properties suggestion button
-    const suggestPropertiesBtn = document.getElementById('suggest-properties-btn');
+    const suggestPropertiesBtn = document.getElementById('suggestPropertiesBtn');
     if (suggestPropertiesBtn) {
         suggestPropertiesBtn.addEventListener('click', function() {
-            // Get domain and subject from ontology metadata section
-            const domainElement = document.querySelector('.domain-badge');
-            const subjectElement = document.querySelector('.subject-badge');
+            // Get domain and subject from the settings tab
+            const domainInput = document.getElementById('ontologyDomain');
+            const subjectInput = document.getElementById('ontologySubject');
             
-            if (!domainElement || !subjectElement) {
+            if (!domainInput || !subjectInput) {
                 alert('Domain and subject information not found');
                 return;
             }
             
-            const domain = domainElement.textContent.trim();
-            const subject = subjectElement.textContent.trim();
+            const domain = domainInput.value.trim();
+            const subject = subjectInput.value.trim();
+            
+            if (!domain || !subject) {
+                alert('Domain and subject must be specified');
+                return;
+            }
             
             // Show loading state
             suggestPropertiesBtn.disabled = true;
-            suggestPropertiesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
+            suggestPropertiesBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Loading...';
             
-            // Request property suggestions - use 'properties' type and pass ontology_id
-            requestAISuggestions(domain, subject, function(data, type) {
+            // Request property suggestions
+            fetch('/api/sandbox/ai/suggestions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    domain: domain,
+                    subject: subject
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
                 // Reset button state
                 suggestPropertiesBtn.disabled = false;
-                suggestPropertiesBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Properties';
+                suggestPropertiesBtn.innerHTML = '<i class="fas fa-lightbulb me-1"></i> Suggest Properties';
                 
                 if (data.error) {
                     alert('Error: ' + data.error);
@@ -653,8 +669,10 @@ function setupAIAssistantButtons(ontologyId) {
                 }
                 
                 // Display suggested properties
-                if (data.suggestions && data.suggestions.length > 0) {
-                    showSuggestionsList(data.suggestions, ontologyId, type);
+                if (Array.isArray(data) && data.length > 0) {
+                    showSuggestionsList(data, ontologyId, 'properties');
+                } else if (data.suggestions && data.suggestions.length > 0) {
+                    showSuggestionsList(data.suggestions, ontologyId, 'properties');
                     
                     // Log information about existing classes
                     if (data.existing_classes && data.existing_classes.length > 0) {
@@ -663,7 +681,13 @@ function setupAIAssistantButtons(ontologyId) {
                 } else {
                     alert('No property suggestions generated');
                 }
-            }, 'properties', ontologyId); // Pass 'properties' type parameter and ontologyId
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                suggestPropertiesBtn.disabled = false;
+                suggestPropertiesBtn.innerHTML = '<i class="fas fa-lightbulb me-1"></i> Suggest Properties';
+                alert('Error getting AI suggestions: ' + error.message);
+            });
         });
     }
 }
