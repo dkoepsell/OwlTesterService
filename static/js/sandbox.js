@@ -559,7 +559,9 @@ function setupAIAssistantButtons(ontologyId) {
     // Add classes suggestion button in the classes tab
     const suggestClassesBtn = document.getElementById('suggestClassesBtn');
     if (suggestClassesBtn) {
+        console.log('Found suggestClassesBtn element, adding click handler');
         suggestClassesBtn.addEventListener('click', function() {
+            console.log('Suggest Classes button clicked');
             // Get domain and subject from the settings tab
             const domainInput = document.getElementById('ontologyDomain');
             const subjectInput = document.getElementById('ontologySubject');
@@ -624,7 +626,9 @@ function setupAIAssistantButtons(ontologyId) {
     // Add properties suggestion button
     const suggestPropertiesBtn = document.getElementById('suggestPropertiesBtn');
     if (suggestPropertiesBtn) {
+        console.log('Found suggestPropertiesBtn element, adding click handler');
         suggestPropertiesBtn.addEventListener('click', function() {
+            console.log('Suggest Properties button clicked');
             // Get domain and subject from the settings tab
             const domainInput = document.getElementById('ontologyDomain');
             const subjectInput = document.getElementById('ontologySubject');
@@ -694,6 +698,12 @@ function setupAIAssistantButtons(ontologyId) {
 
 // Show a modal with entity suggestions
 function showSuggestionsList(suggestions, ontologyId, type = 'all') {
+    console.log('showSuggestionsList called with:', { 
+        suggestionsCount: suggestions ? suggestions.length : 0, 
+        ontologyId: ontologyId, 
+        type: type 
+    });
+    
     // Create or get the suggestions modal
     let modal = document.getElementById('suggestions-modal');
     

@@ -1644,17 +1644,24 @@ def generate_owl_xml(ontology, classes, properties, individuals):
     
     return xml
 
-@app.route('/api/sandbox/ai/suggestions', methods=['POST'])
+@app.route('/api/sandbox/ai/suggestions', methods=['GET', 'POST'])
 def api_sandbox_ai_suggestions():
     """API endpoint to get AI-generated class and property suggestions for an ontology domain."""
+    logger.info(f"AI suggestions endpoint called with method: {request.method}")
     try:
-        data = request.get_json()
-        
-        if not data or 'domain' not in data or 'subject' not in data:
-            return jsonify({'error': 'Domain and subject are required'}), 400
-            
-        domain = data.get('domain')
-        subject = data.get('subject')
+        if request.method == 'GET':
+            # Handle GET requests
+            domain = request.args.get('domain')
+            subject = request.args.get('subject')
+            if not domain or not subject:
+                return jsonify({'error': 'Domain and subject are required'}), 400
+        else:
+            # Handle POST requests
+            data = request.get_json()
+            if not data or 'domain' not in data or 'subject' not in data:
+                return jsonify({'error': 'Domain and subject are required'}), 400
+            domain = data.get('domain')
+            subject = data.get('subject')
         
         # Call the OpenAI function to generate suggestions
         suggestions = suggest_ontology_classes(domain, subject)
