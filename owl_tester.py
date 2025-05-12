@@ -27,8 +27,11 @@ try:
 except LookupError:
     nltk.download('omw-1.4')
 
-# Path to the BFO OWL file - use BFO-2020 from GitHub if local file not specified
-BFO_PATH = os.environ.get('BFO_PATH', 'https://raw.githubusercontent.com/BFO-ontology/BFO-2020/master/21838-2/owl/bfo-2020.owl')
+# Path to the BFO OWL file if manually specified
+BFO_PATH = os.environ.get('BFO_PATH', '')
+
+# Import our local BFO-2020 definitions
+from bfo_2020_definitions import BFO_2020_CLASSES, BFO_2020_RELATIONS
 
 class OwlTester:
     """
@@ -49,100 +52,69 @@ class OwlTester:
     
     def load_bfo_classes(self):
         """
-        Load BFO classes and relations from the BFO-2020 OWL file.
-        If the file doesn't exist, proceed with default BFO dictionaries.
+        Load BFO classes and relations from BFO-2020.
+        First tries to load from specified OWL file if provided,
+        otherwise uses the built-in BFO-2020 definitions.
         """
-        try:
-            # Try to load the BFO ontology from the specified path
-            self.bfo_onto = owlready2.get_ontology(BFO_PATH).load()
-            
-            # Extract classes and store them in a dictionary with URI as key
-            for cls in self.bfo_onto.classes():
-                # Get the class ID from the IRI - BFO-2020 uses specific IDs
-                cls_id = cls.name.lower() if cls.name else str(cls.iri).split('/')[-1].lower()
+        if BFO_PATH:
+            try:
+                # Try to load the BFO ontology from the specified path if provided
+                self.bfo_onto = owlready2.get_ontology(BFO_PATH).load()
                 
-                # Use rdfs:label if available, otherwise format the class name
-                if cls.label and cls.label.first():
-                    label = str(cls.label.first())
-                else:
-                    # Format the class name for display (capitalize words, replace underscores with spaces)
-                    label = cls_id.replace('_', ' ').title()
+                # Extract classes and store them in a dictionary with URI as key
+                for cls in self.bfo_onto.classes():
+                    # Get the class ID from the IRI - BFO-2020 uses specific IDs
+                    cls_id = cls.name.lower() if cls.name else str(cls.iri).split('/')[-1].lower()
+                    
+                    # Use rdfs:label if available, otherwise format the class name
+                    if cls.label and cls.label.first():
+                        label = str(cls.label.first())
+                    else:
+                        # Format the class name for display (capitalize words, replace underscores with spaces)
+                        label = cls_id.replace('_', ' ').title()
+                    
+                    # Store class information
+                    self.bfo_classes[cls_id] = {
+                        'id': cls_id,
+                        'label': label,
+                        'uri': cls.iri,
+                        'description': str(cls.comment.first()) if cls.comment and cls.comment.first() else f"BFO-2020 class: {label}"
+                    }
                 
-                # Store class information
-                self.bfo_classes[cls_id] = {
-                    'id': cls_id,
-                    'label': label,
-                    'uri': cls.iri,
-                    'description': str(cls.comment.first()) if cls.comment and cls.comment.first() else f"BFO-2020 class: {label}"
-                }
-            
-            # Extract object properties (relations)
-            for prop in self.bfo_onto.object_properties():
-                # Get the property ID from the IRI
-                prop_id = prop.name.lower() if prop.name else str(prop.iri).split('/')[-1].lower()
+                # Extract object properties (relations)
+                for prop in self.bfo_onto.object_properties():
+                    # Get the property ID from the IRI
+                    prop_id = prop.name.lower() if prop.name else str(prop.iri).split('/')[-1].lower()
+                    
+                    # Use rdfs:label if available, otherwise format the property name
+                    if prop.label and prop.label.first():
+                        label = str(prop.label.first())
+                    else:
+                        # Format the property name for display
+                        label = prop_id.replace('_', ' ').title()
+                    
+                    # Store property information
+                    self.bfo_relations[prop_id] = {
+                        'id': prop_id,
+                        'label': label,
+                        'uri': prop.iri,
+                        'description': str(prop.comment.first()) if prop.comment and prop.comment.first() else f"BFO-2020 relation: {label}",
+                        'domain': str(prop.domain[0].name) if prop.domain and prop.domain[0] else '',
+                        'range': str(prop.range[0].name) if prop.range and prop.range[0] else ''
+                    }
                 
-                # Use rdfs:label if available, otherwise format the property name
-                if prop.label and prop.label.first():
-                    label = str(prop.label.first())
-                else:
-                    # Format the property name for display
-                    label = prop_id.replace('_', ' ').title()
-                
-                # Store property information
-                self.bfo_relations[prop_id] = {
-                    'id': prop_id,
-                    'label': label,
-                    'uri': prop.iri,
-                    'description': str(prop.comment.first()) if prop.comment and prop.comment.first() else f"BFO-2020 relation: {label}",
-                    'domain': str(prop.domain[0].name) if prop.domain and prop.domain[0] else '',
-                    'range': str(prop.range[0].name) if prop.range and prop.range[0] else ''
-                }
-            
-            logging.info(f"Successfully loaded {len(self.bfo_classes)} BFO classes and {len(self.bfo_relations)} relations from BFO-2020")
-        except Exception as e:
-            logging.warning(f"Could not load BFO ontology: {e}. Loading default BFO class/relation dictionaries.")
-            
-            # Add fundamental BFO-2020 classes as a fallback
-            default_bfo_classes = [
-                "entity", "continuant", "occurrent", "independent_continuant", "dependent_continuant", 
-                "material_entity", "immaterial_entity", "quality", "role", "disposition", 
-                "function", "spatial_region", "process", "process_boundary", "temporal_region",
-                "continuant_fiat_boundary", "site", "object", "object_aggregate", "fiat_object_part",
-                "generically_dependent_continuant", "specifically_dependent_continuant", "realizable_entity",
-                "zero_dimensional_spatial_region", "one_dimensional_spatial_region", "two_dimensional_spatial_region",
-                "three_dimensional_spatial_region", "history", "relational_quality", "spatiotemporal_region", 
-                "temporal_instant", "connected_temporal_region", "scattered_temporal_region", "process_profile"
-            ]
-            
-            for cls_name in default_bfo_classes:
-                # BFO-2020 uses specific IDs for each class
-                self.bfo_classes[cls_name.lower()] = {
-                    'id': cls_name.lower(),
-                    'label': cls_name.replace('_', ' ').title(),
-                    'uri': f"http://purl.obolibrary.org/obo/BFO_{cls_name}",
-                    'description': f"BFO-2020 class: {cls_name.replace('_', ' ')}"
-                }
-            
-            # Add fundamental BFO-2020 relations as a fallback
-            default_bfo_relations = [
-                "part_of", "has_part", "located_in", "location_of", "contained_in", "contains", 
-                "participates_in", "has_participant", "bearer_of", "inheres_in", "realized_in", 
-                "realizes", "exists_at", "instance_of", "occurs_in", "has_quality", "quality_of",
-                "has_material_basis", "material_basis_of", "concretizes", "concretization_of",
-                "has_first_instant", "has_last_instant", "preceded_by", "precedes", 
-                "spatially_contains", "spatially_contained_in", "temporally_contains", 
-                "temporally_contained_in", "temporal_part_of", "has_temporal_part"
-            ]
-            
-            for rel_name in default_bfo_relations:
-                self.bfo_relations[rel_name.lower()] = {
-                    'id': rel_name.lower(),
-                    'label': rel_name.replace('_', ' ').title(),
-                    'uri': f"http://purl.obolibrary.org/obo/BFO_{rel_name}",
-                    'description': f"BFO-2020 relation: {rel_name.replace('_', ' ')}"
-                }
-                
-            logging.info(f"Loaded {len(self.bfo_classes)} default BFO classes and {len(self.bfo_relations)} default relations")
+                logging.info(f"Successfully loaded {len(self.bfo_classes)} BFO classes and {len(self.bfo_relations)} relations from OWL file")
+            except Exception as e:
+                logging.warning(f"Could not load BFO ontology from file: {e}. Using built-in BFO-2020 definitions.")
+                # Fall back to built-in definitions
+                self.bfo_classes = BFO_2020_CLASSES.copy()
+                self.bfo_relations = BFO_2020_RELATIONS.copy()
+                logging.info(f"Loaded {len(self.bfo_classes)} BFO-2020 classes and {len(self.bfo_relations)} relations from built-in definitions")
+        else:
+            # Use the built-in BFO-2020 definitions directly
+            self.bfo_classes = BFO_2020_CLASSES.copy()
+            self.bfo_relations = BFO_2020_RELATIONS.copy()
+            logging.info(f"Loaded {len(self.bfo_classes)} BFO-2020 classes and {len(self.bfo_relations)} relations from built-in definitions")
     
     def test_expression(self, expr_string):
         """
