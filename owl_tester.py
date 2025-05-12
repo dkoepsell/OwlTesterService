@@ -187,8 +187,8 @@ class OwlTester:
                         match = partial_matches[0]
                         results['issues'].append(f"Note: '{term}' was interpreted as BFO {match['type']} '{match['match']}'. This is a partial match.")
                     else:
-                        # No match found
-                        non_bfo_terms.append(term)
+                        # No match found - ensure we're storing strings not objects
+                        non_bfo_terms.append(str(term))
                         results['issues'].append(f"Term '{term}' is not recognized as a BFO class or relation.")
             
             # Detect the format used in the expression
