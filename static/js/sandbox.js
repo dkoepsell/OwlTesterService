@@ -556,31 +556,47 @@ function setupAIAssistantButtons(ontologyId) {
         });
     }
     
-    // Add classes suggestion button in the header area
-    const suggestClassesBtn = document.getElementById('suggest-classes-btn');
+    // Add classes suggestion button in the classes tab
+    const suggestClassesBtn = document.getElementById('suggestClassesBtn');
     if (suggestClassesBtn) {
         suggestClassesBtn.addEventListener('click', function() {
-            // Get domain and subject from ontology metadata section
-            const domainElement = document.querySelector('.domain-badge');
-            const subjectElement = document.querySelector('.subject-badge');
+            // Get domain and subject from the settings tab
+            const domainInput = document.getElementById('ontologyDomain');
+            const subjectInput = document.getElementById('ontologySubject');
             
-            if (!domainElement || !subjectElement) {
+            if (!domainInput || !subjectInput) {
                 alert('Domain and subject information not found');
                 return;
             }
             
-            const domain = domainElement.textContent.trim();
-            const subject = subjectElement.textContent.trim();
+            const domain = domainInput.value.trim();
+            const subject = subjectInput.value.trim();
+            
+            if (!domain || !subject) {
+                alert('Domain and subject must be specified');
+                return;
+            }
             
             // Show loading state
             suggestClassesBtn.disabled = true;
-            suggestClassesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
+            suggestClassesBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Loading...';
             
-            // Request class suggestions - use 'classes' type and pass ontology_id
-            requestAISuggestions(domain, subject, function(data, type) {
+            // Request class suggestions
+            fetch('/api/sandbox/ai/suggestions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    domain: domain,
+                    subject: subject
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
                 // Reset button state
                 suggestClassesBtn.disabled = false;
-                suggestClassesBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Classes';
+                suggestClassesBtn.innerHTML = '<i class="fas fa-lightbulb me-1"></i> Suggest Classes';
                 
                 if (data.error) {
                     alert('Error: ' + data.error);
@@ -588,53 +604,20 @@ function setupAIAssistantButtons(ontologyId) {
                 }
                 
                 // Display suggested classes
-                if (data.suggestions && data.suggestions.length > 0) {
-                    showSuggestionsList(data.suggestions, ontologyId, type);
+                if (Array.isArray(data) && data.length > 0) {
+                    showSuggestionsList(data, ontologyId, 'classes');
+                } else if (data.suggestions && data.suggestions.length > 0) {
+                    showSuggestionsList(data.suggestions, ontologyId, 'classes');
                 } else {
                     alert('No class suggestions generated');
                 }
-            }, 'classes', ontologyId); // Pass 'classes' type parameter and ontologyId
-        });
-    }
-    
-    // Add classes suggestion button in the classes tab
-    const suggestClassesBtnTab = document.getElementById('suggest-classes-btn-tab');
-    if (suggestClassesBtnTab) {
-        suggestClassesBtnTab.addEventListener('click', function() {
-            // Get domain and subject from ontology metadata section
-            const domainElement = document.querySelector('.domain-badge');
-            const subjectElement = document.querySelector('.subject-badge');
-            
-            if (!domainElement || !subjectElement) {
-                alert('Domain and subject information not found');
-                return;
-            }
-            
-            const domain = domainElement.textContent.trim();
-            const subject = subjectElement.textContent.trim();
-            
-            // Show loading state
-            suggestClassesBtnTab.disabled = true;
-            suggestClassesBtnTab.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating suggestions...';
-            
-            // Request class suggestions - use 'classes' type and pass ontology_id for consistency
-            requestAISuggestions(domain, subject, function(data, type) {
-                // Reset button state
-                suggestClassesBtnTab.disabled = false;
-                suggestClassesBtnTab.innerHTML = '<i class="fas fa-lightbulb"></i> Suggest Classes';
-                
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                
-                // Display suggested classes
-                if (data.suggestions && data.suggestions.length > 0) {
-                    showSuggestionsList(data.suggestions, ontologyId, type);
-                } else {
-                    alert('No class suggestions generated');
-                }
-            }, 'classes', ontologyId); // Pass 'classes' type parameter and ontologyId
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                suggestClassesBtn.disabled = false;
+                suggestClassesBtn.innerHTML = '<i class="fas fa-lightbulb me-1"></i> Suggest Classes';
+                alert('Error getting AI suggestions: ' + error.message);
+            });
         });
     }
     
