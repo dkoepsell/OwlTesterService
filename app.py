@@ -19,7 +19,7 @@ from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationE
 from owl_tester import OwlTester
 from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression, SandboxOntology, OntologyClass, OntologyProperty, OntologyIndividual
 # Import from improved OpenAI utils to avoid hanging issues
-from improved_openai_utils import suggest_ontology_classes, suggest_bfo_category, generate_class_description  
+from improved_openai_utils import suggest_ontology_classes, suggest_ontology_properties, suggest_bfo_category, generate_class_description  
 from openai_utils import generate_real_world_implications
 # Import the preprocess_expression function for handling comma-separated quantifiers
 from owl_preprocessor import preprocess_expression
