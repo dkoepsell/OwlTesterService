@@ -116,9 +116,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Filter a list based on search input
     function filterList(listElement, itemSelector, searchText) {
-        if (!listElement || !searchText) return;
+        if (!listElement) return;
         
         const items = listElement.querySelectorAll(itemSelector);
+        
+        // If search text is empty, show all items
+        if (!searchText || searchText.trim() === '') {
+            items.forEach(item => {
+                item.style.display = '';
+            });
+            return;
+        }
+        
         const searchLower = searchText.toLowerCase();
         
         items.forEach(item => {
