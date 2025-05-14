@@ -1496,11 +1496,16 @@ def sandbox_list():
         if current_user.is_authenticated:
             # Get ontologies for the current user
             ontologies = SandboxOntology.query.filter_by(user_id=current_user.id).order_by(SandboxOntology.last_modified.desc()).all()
+            # Get history files for the import from history modal
+            history_files = OntologyFile.query.filter_by(user_id=current_user.id).order_by(OntologyFile.upload_date.desc()).all()
         else:
             # Get public ontologies
+            # For anonymous users, we'll get a subset of history files
+            ontologies = []
+            history_files = OntologyFile.query.filter_by(user_id=None).order_by(OntologyFile.upload_date.desc()).limit(10).all()
             ontologies = SandboxOntology.query.order_by(SandboxOntology.last_modified.desc()).limit(20).all()
             
-        return render_template('sandbox_list.html', ontologies=ontologies)
+        return render_template('sandbox_list.html', ontologies=ontologies, history_files=history_files)
     except Exception as e:
         logger.error(f"Error listing sandbox ontologies: {str(e)}")
         flash(f"Error listing sandbox ontologies: {str(e)}", 'error')
