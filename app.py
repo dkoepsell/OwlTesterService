@@ -942,7 +942,12 @@ def import_to_sandbox(file_id):
                                     class_names.append(str(values[0]))
                                 else:
                                     # Last resort: use the keys
-                                    class_names.append(str(list(analysis.class_list.keys())[0]))
+                                    keys = list(analysis.class_list.keys())
+                                    if keys:
+                                        class_names.append(str(keys[0]))
+                                    else:
+                                        # Nothing to use, add a placeholder
+                                        class_names.append("Unknown_Class")
                         elif isinstance(analysis.class_list, str):
                             # If it's a JSON string, try to parse it
                             try:
@@ -965,7 +970,11 @@ def import_to_sandbox(file_id):
                                         if values:
                                             class_names.append(str(values[0]))
                                         else:
-                                            class_names.append(str(list(parsed.keys())[0]))
+                                            keys = list(parsed.keys())
+                                            if keys:
+                                                class_names.append(str(keys[0]))
+                                            else:
+                                                class_names.append("Unknown_Class")
                             except:
                                 # Just treat it as a single class name
                                 class_names.append(analysis.class_list)
@@ -1046,7 +1055,11 @@ def import_to_sandbox(file_id):
                                         if values:
                                             property_names.append(str(values[0]))
                                         else:
-                                            property_names.append(str(list(parsed.keys())[0]))
+                                            keys = list(parsed.keys())
+                                            if keys:
+                                                property_names.append(str(keys[0]))
+                                            else:
+                                                property_names.append("Unknown_Property")
                             except:
                                 # Just treat it as a single property name
                                 property_names.append(analysis.object_property_list)
