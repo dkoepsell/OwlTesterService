@@ -3,6 +3,28 @@
 {% block title %}Analysis History{% endblock %}
 
 {% block content %}
+<!-- Delete File Confirmation Modal -->
+<div class="modal fade" id="deleteFileModal" tabindex="-1" aria-labelledby="deleteFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteFileModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the file <strong id="fileNameToDelete"></strong>?</p>
+                <p class="text-danger">This action cannot be undone. All analyses associated with this file will also be deleted.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteFileForm" method="POST" action="">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="container py-4">
     <h1 class="mb-4">Analysis History</h1>
     
@@ -27,6 +49,7 @@
                             <th>Size</th>
                             <th>Upload Date</th>
                             <th>Analysis Count</th>
+                            <th>Source</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -37,6 +60,13 @@
                             <td>{{ (ontology.file_size / 1024)|round(1) }} KB</td>
                             <td>{{ ontology.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td>{{ ontology.analyses|length }}</td>
+                            <td>
+                                {% if ontology.from_sandbox %}
+                                <span class="badge bg-info"><i class="fas fa-cubes me-1"></i>Sandbox</span>
+                                {% else %}
+                                <span class="badge bg-secondary"><i class="fas fa-upload me-1"></i>Upload</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <div class="btn-group">
                                     <a href="{{ url_for('analyze_owl', filename=ontology.filename, original_name=ontology.original_filename, file_id=ontology.id) }}" 
@@ -49,6 +79,16 @@
                                         <i class="fas fa-lightbulb me-1"></i>Implications
                                     </a>
                                     {% endif %}
+                                    <a href="{{ url_for('import_to_sandbox', file_id=ontology.id) }}"
+                                       class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-edit me-1"></i>Edit in Sandbox
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger delete-file-btn" 
+                                            data-bs-toggle="modal" data-bs-target="#deleteFileModal" 
+                                            data-file-id="{{ ontology.id }}" 
+                                            data-file-name="{{ ontology.original_filename }}">
+                                        <i class="fas fa-trash-alt me-1"></i>Delete
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -125,4 +165,27 @@
         </a>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up delete file modal
+        const deleteFileModal = document.getElementById('deleteFileModal');
+        if (deleteFileModal) {
+            deleteFileModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                const fileId = button.getAttribute('data-file-id');
+                const fileName = button.getAttribute('data-file-name');
+                
+                // Update the modal content
+                document.getElementById('fileNameToDelete').textContent = fileName;
+                
+                // Update the form action
+                const deleteForm = document.getElementById('deleteFileForm');
+                deleteForm.setAttribute('action', '/delete_file/' + fileId);
+            });
+        }
+    });
+</script>
 {% endblock %}
