@@ -42,6 +42,8 @@ class OntologyFile(db.Model):
     upload_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     mime_type = db.Column(db.String(100), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # Can be null for legacy files
+    from_sandbox = db.Column(db.Boolean, default=False)  # Flag to indicate if the file came from sandbox
+    sandbox_ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=True)  # Link to source sandbox if applicable
     
     # Relationship with analysis results
     analyses = db.relationship('OntologyAnalysis', backref='ontology_file', lazy=True, cascade="all, delete-orphan")
@@ -136,6 +138,9 @@ class SandboxOntology(db.Model):
     
     # Reference to the user (optional)
     user = db.relationship('User', backref=db.backref('sandbox_ontologies', lazy=True))
+    
+    # Reference to exported ontology files
+    exported_files = db.relationship('OntologyFile', backref='sandbox_source', lazy=True)
     
     def __repr__(self):
         return f"<SandboxOntology {self.id}: {self.title}>"
