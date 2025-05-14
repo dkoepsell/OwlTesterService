@@ -6,6 +6,10 @@ import base64
 import re
 import typing
 from typing import Optional, List, Dict, Any, Union, Tuple
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 from html import escape
 import json
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session, make_response, Response
@@ -868,6 +872,9 @@ def import_to_sandbox(file_id):
         # Get the file or return 404
         file = OntologyFile.query.get_or_404(file_id)
         
+        # Add debug logging
+        logger.debug(f"Importing file ID {file_id} - Original filename: {file.original_filename}")
+        
         # Get the file path
         file_path = file.file_path
         
@@ -890,41 +897,92 @@ def import_to_sandbox(file_id):
                 ontology.domain = analysis.ontology_name or "Imported Ontology"
                 
                 # If we have class and property lists, use them
-                if analysis.class_list:
-                    # Handle both formats: list of dictionaries or list of strings
-                    for cls_item in analysis.class_list:
-                        cls = OntologyClass()
-                        cls.ontology_id = ontology.id
+                try:
+                    # Debugging information
+                    logger.debug(f"class_list type: {type(analysis.class_list)}")
+                    logger.debug(f"class_list: {analysis.class_list}")
+                    
+                    if analysis.class_list:
+                        # Convert anything into a list of strings for safety
+                        class_names = []
                         
-                        # Check if it's a dictionary or string
-                        if isinstance(cls_item, dict):
-                            cls.name = cls_item.get('name', 'Unknown Class')
-                            cls.description = cls_item.get('description', f"Imported from '{file.original_filename}'")
-                            cls.bfo_category = cls_item.get('bfo_category')
-                        else:
-                            # It's a string
-                            cls.name = cls_item
-                            cls.description = f"Class '{cls_item}' imported from '{file.original_filename}'"
-                            
-                        db.session.add(cls)
+                        # Try to handle possible formats
+                        if isinstance(analysis.class_list, list):
+                            for item in analysis.class_list:
+                                if isinstance(item, dict) and 'name' in item:
+                                    class_names.append(item['name'])
+                                elif isinstance(item, str):
+                                    class_names.append(item)
+                        elif isinstance(analysis.class_list, str):
+                            # If it's a JSON string, try to parse it
+                            try:
+                                import json
+                                parsed = json.loads(analysis.class_list)
+                                if isinstance(parsed, list):
+                                    for item in parsed:
+                                        if isinstance(item, dict) and 'name' in item:
+                                            class_names.append(item['name'])
+                                        elif isinstance(item, str):
+                                            class_names.append(item)
+                            except:
+                                # Just treat it as a single class name
+                                class_names.append(analysis.class_list)
+                        
+                        logger.debug(f"Processed class_names: {class_names}")
+                        
+                        # Add the classes
+                        for class_name in class_names:
+                            cls = OntologyClass()
+                            cls.ontology_id = ontology.id
+                            cls.name = class_name
+                            cls.description = f"Class '{class_name}' imported from '{file.original_filename}'"
+                            db.session.add(cls)
+                except Exception as e:
+                    logger.error(f"Error processing class_list: {str(e)}")
                 
-                if analysis.object_property_list:
-                    # Handle both formats: list of dictionaries or list of strings
-                    for prop_item in analysis.object_property_list:
-                        prop = OntologyProperty()
-                        prop.ontology_id = ontology.id
+                try:
+                    # Debugging information
+                    logger.debug(f"object_property_list type: {type(analysis.object_property_list)}")
+                    logger.debug(f"object_property_list: {analysis.object_property_list}")
+                    
+                    if analysis.object_property_list:
+                        # Convert anything into a list of strings for safety
+                        property_names = []
                         
-                        # Check if it's a dictionary or string
-                        if isinstance(prop_item, dict):
-                            prop.name = prop_item.get('name', 'Unknown Property')
-                            prop.description = prop_item.get('description', f"Imported from '{file.original_filename}'")
-                        else:
-                            # It's a string
-                            prop.name = prop_item
-                            prop.description = f"Property '{prop_item}' imported from '{file.original_filename}'"
-                            
-                        prop.property_type = 'object'
-                        db.session.add(prop)
+                        # Try to handle possible formats
+                        if isinstance(analysis.object_property_list, list):
+                            for item in analysis.object_property_list:
+                                if isinstance(item, dict) and 'name' in item:
+                                    property_names.append(item['name'])
+                                elif isinstance(item, str):
+                                    property_names.append(item)
+                        elif isinstance(analysis.object_property_list, str):
+                            # If it's a JSON string, try to parse it
+                            try:
+                                import json
+                                parsed = json.loads(analysis.object_property_list)
+                                if isinstance(parsed, list):
+                                    for item in parsed:
+                                        if isinstance(item, dict) and 'name' in item:
+                                            property_names.append(item['name'])
+                                        elif isinstance(item, str):
+                                            property_names.append(item)
+                            except:
+                                # Just treat it as a single property name
+                                property_names.append(analysis.object_property_list)
+                        
+                        logger.debug(f"Processed property_names: {property_names}")
+                        
+                        # Add the properties
+                        for property_name in property_names:
+                            prop = OntologyProperty()
+                            prop.ontology_id = ontology.id
+                            prop.name = property_name
+                            prop.description = f"Property '{property_name}' imported from '{file.original_filename}'"
+                            prop.property_type = 'object'
+                            db.session.add(prop)
+                except Exception as e:
+                    logger.error(f"Error processing object_property_list: {str(e)}")
             
             db.session.add(ontology)
             db.session.commit()
