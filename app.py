@@ -1816,6 +1816,16 @@ def sandbox_edit(ontology_id):
         
         # Check if the current user can edit this ontology
         if current_user.is_authenticated and ontology.user_id == current_user.id:
+            # Get the ontology's classes and properties from the database
+            ontology_classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
+            ontology_properties = OntologyProperty.query.filter_by(ontology_id=ontology_id).all()
+            ontology_individuals = OntologyIndividual.query.filter_by(ontology_id=ontology_id).all()
+            
+            # Add the related objects to the ontology model for the template
+            ontology.ontology_classes = ontology_classes
+            ontology.ontology_properties = ontology_properties 
+            ontology.ontology_individuals = ontology_individuals
+            
             return render_template('sandbox_edit.html', ontology=ontology)
         else:
             flash('You do not have permission to edit this ontology', 'error')
