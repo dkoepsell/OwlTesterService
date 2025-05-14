@@ -896,15 +896,10 @@ def import_to_sandbox(file_id):
         # Handle missing files by creating a basic ontology structure
         # This allows us to work with ontologies even if the original file is missing
         if not os.path.exists(file_path):
-            logger.warning(f"File not found at {file_path}. Creating sandbox ontology with metadata only.")
+            logger.warning(f"File not found at {file_path}. Using metadata only.")
             
-            # Create a new SandboxOntology with basic information
-            ontology = SandboxOntology()
-            ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
-            ontology.domain = "Imported Ontology"
-            ontology.subject = "Imported from History"
+            # Update the existing ontology description to note the missing file
             ontology.description = f"Imported from file '{file.original_filename}'. Note: The original file could not be found, so only metadata was imported."
-            ontology.user_id = current_user.id if not current_user.is_anonymous else None
             
             # Use existing analyses if available
             if file.analyses:
@@ -917,83 +912,105 @@ def import_to_sandbox(file_id):
                     logger.debug(f"class_list type: {type(analysis.class_list)}")
                     logger.debug(f"class_list: {analysis.class_list}")
                     
-                    if analysis.class_list:
-                        # Convert anything into a list of strings for safety
-                        class_names = []
-                        
-                        # Try to handle possible formats
-                        if isinstance(analysis.class_list, list):
-                            for item in analysis.class_list:
-                                if isinstance(item, dict) and 'name' in item:
-                                    class_names.append(item['name'])
-                                elif isinstance(item, str):
-                                    class_names.append(item)
-                                else:
-                                    # Handle non-string, non-dict objects by converting to string
-                                    class_names.append(str(item))
-                        elif isinstance(analysis.class_list, dict):
-                            # If it's a dictionary (e.g. a single class object)
-                            if 'name' in analysis.class_list:
-                                class_names.append(analysis.class_list['name'])
-                            else:
-                                # Handle dictionaries without name by taking first value
-                                values = list(analysis.class_list.values())
-                                if values:
-                                    class_names.append(str(values[0]))
-                                else:
-                                    # Last resort: use the keys
-                                    keys = list(analysis.class_list.keys())
-                                    if keys:
-                                        class_names.append(str(keys[0]))
-                                    else:
-                                        # Nothing to use, add a placeholder
-                                        class_names.append("Unknown_Class")
-                        elif isinstance(analysis.class_list, str):
-                            # If it's a JSON string, try to parse it
-                            try:
-                                import json
-                                parsed = json.loads(analysis.class_list)
-                                if isinstance(parsed, list):
-                                    for item in parsed:
+                    # Wrap in a try-except to catch all possible data format issues
+                    try:
+                        if analysis.class_list:
+                            # Convert anything into a list of strings for safety
+                            class_names = []
+                            
+                            # Try to handle possible formats
+                            if isinstance(analysis.class_list, list):
+                                for item in analysis.class_list:
+                                    try:
                                         if isinstance(item, dict) and 'name' in item:
                                             class_names.append(item['name'])
                                         elif isinstance(item, str):
                                             class_names.append(item)
                                         else:
+                                            # Handle non-string, non-dict objects by converting to string
                                             class_names.append(str(item))
-                                elif isinstance(parsed, dict):
-                                    if 'name' in parsed:
-                                        class_names.append(parsed['name'])
+                                    except Exception as e:
+                                        logger.warning(f"Error processing list item in class_list: {str(e)}")
+                                        class_names.append("Unknown_Class")
+                            elif isinstance(analysis.class_list, dict):
+                                # If it's a dictionary (e.g. a single class object)
+                                try:
+                                    if 'name' in analysis.class_list:
+                                        class_names.append(analysis.class_list['name'])
                                     else:
-                                        # Use first value or key as fallback
-                                        values = list(parsed.values())
+                                        # Handle dictionaries without name by taking first value
+                                        values = list(analysis.class_list.values())
                                         if values:
                                             class_names.append(str(values[0]))
                                         else:
-                                            keys = list(parsed.keys())
+                                            # Last resort: use the keys
+                                            keys = list(analysis.class_list.keys())
                                             if keys:
                                                 class_names.append(str(keys[0]))
                                             else:
+                                                # Nothing to use, add a placeholder
                                                 class_names.append("Unknown_Class")
-                            except:
-                                # Just treat it as a single class name
-                                class_names.append(analysis.class_list)
+                                except Exception as e:
+                                    logger.warning(f"Error processing dict in class_list: {str(e)}")
+                                    class_names.append("Unknown_Class")
+                            elif isinstance(analysis.class_list, str):
+                                # If it's a JSON string, try to parse it
+                                try:
+                                    import json
+                                    parsed = json.loads(analysis.class_list)
+                                    if isinstance(parsed, list):
+                                        for item in parsed:
+                                            try:
+                                                if isinstance(item, dict) and 'name' in item:
+                                                    class_names.append(item['name'])
+                                                elif isinstance(item, str):
+                                                    class_names.append(item)
+                                                else:
+                                                    class_names.append(str(item))
+                                            except Exception:
+                                                class_names.append("Unknown_Class")
+                                    elif isinstance(parsed, dict):
+                                        if 'name' in parsed:
+                                            class_names.append(parsed['name'])
+                                        else:
+                                            # Use first value or key as fallback
+                                            values = list(parsed.values())
+                                            if values:
+                                                class_names.append(str(values[0]))
+                                            else:
+                                                keys = list(parsed.keys())
+                                                if keys:
+                                                    class_names.append(str(keys[0]))
+                                                else:
+                                                    class_names.append("Unknown_Class")
+                                except Exception as e:
+                                    logger.warning(f"Error parsing JSON in class_list: {str(e)}")
+                                    # Just treat it as a single class name
+                                    class_names.append(str(analysis.class_list))
+                            else:
+                                # Handle any other type by converting to string
+                                class_names.append(str(analysis.class_list))
                         else:
-                            # Handle any other type by converting to string
-                            class_names.append(str(analysis.class_list))
+                            # Handle empty class list
+                            class_names = []
+                    except Exception as e:
+                        logger.error(f"Error in overall class_list processing: {str(e)}")
+                        # Provide a default class if everything fails
+                        class_names = ["Default_Class"]
                         
-                        logger.debug(f"Processed class_names: {class_names}")
-                        
-                        # Add the classes
-                        for class_name in class_names:
-                            # Create the class with all required fields directly set
-                            cls = OntologyClass(
-                                ontology_id=ontology.id,
-                                name=class_name,
-                                description=f"Class '{class_name}' imported from '{file.original_filename}'",
-                                creation_date=datetime.datetime.utcnow()
-                            )
-                            db.session.add(cls)
+                    # Log the processed class names
+                    logger.debug(f"Processed class_names: {class_names}")
+                    
+                    # Add the classes
+                    for class_name in class_names:
+                        # Create the class with all required fields directly set
+                        cls = OntologyClass(
+                            ontology_id=ontology.id,
+                            name=class_name,
+                            description=f"Class '{class_name}' imported from '{file.original_filename}'",
+                            creation_date=datetime.datetime.utcnow()
+                        )
+                        db.session.add(cls)
                 except Exception as e:
                     logger.error(f"Error processing class_list: {str(e)}")
                 
