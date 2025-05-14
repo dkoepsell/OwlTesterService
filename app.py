@@ -1186,9 +1186,23 @@ def import_to_sandbox(file_id):
                 for cls_data in analysis.class_list:
                     cls = OntologyClass()
                     cls.ontology_id = ontology.id
-                    cls.name = cls_data.get('name', 'Unknown Class')
-                    cls.description = cls_data.get('description', f"Imported from '{file.original_filename}'")
-                    cls.bfo_category = cls_data.get('bfo_category')
+                    
+                    # Handle different data types that might be in class_list
+                    if isinstance(cls_data, dict):
+                        cls.name = cls_data.get('name', 'Unknown Class')
+                        cls.description = cls_data.get('description', f"Imported from '{file.original_filename}'")
+                        cls.bfo_category = cls_data.get('bfo_category')
+                    elif isinstance(cls_data, str):
+                        # If we have a string, use it as the class name
+                        cls.name = cls_data
+                        cls.description = f"Imported from '{file.original_filename}'"
+                        cls.bfo_category = None
+                    else:
+                        # For any other type, convert to string
+                        cls.name = str(cls_data)
+                        cls.description = f"Imported from '{file.original_filename}'"
+                        cls.bfo_category = None
+                    
                     db.session.add(cls)
             
             # Add properties
@@ -1196,9 +1210,23 @@ def import_to_sandbox(file_id):
                 for prop_data in analysis.object_property_list:
                     prop = OntologyProperty()
                     prop.ontology_id = ontology.id
-                    prop.name = prop_data.get('name', 'Unknown Property')
-                    prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
-                    prop.property_type = 'object'
+                    
+                    # Handle different data types that might be in object_property_list
+                    if isinstance(prop_data, dict):
+                        prop.name = prop_data.get('name', 'Unknown Property')
+                        prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
+                        prop.property_type = prop_data.get('property_type', 'object')
+                    elif isinstance(prop_data, str):
+                        # If we have a string, use it as the property name
+                        prop.name = prop_data
+                        prop.description = f"Imported from '{file.original_filename}'"
+                        prop.property_type = 'object'
+                    else:
+                        # For any other type, convert to string
+                        prop.name = str(prop_data)
+                        prop.description = f"Imported from '{file.original_filename}'"
+                        prop.property_type = 'object'
+                    
                     db.session.add(prop)
                     
             # Add data properties
@@ -1206,9 +1234,23 @@ def import_to_sandbox(file_id):
                 for prop_data in analysis.data_property_list:
                     prop = OntologyProperty()
                     prop.ontology_id = ontology.id
-                    prop.name = prop_data.get('name', 'Unknown Property')
-                    prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
-                    prop.property_type = 'data'
+                    
+                    # Handle different data types that might be in data_property_list
+                    if isinstance(prop_data, dict):
+                        prop.name = prop_data.get('name', 'Unknown Property')
+                        prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
+                        prop.property_type = 'data'
+                    elif isinstance(prop_data, str):
+                        # If we have a string, use it as the property name
+                        prop.name = prop_data
+                        prop.description = f"Imported from '{file.original_filename}'"
+                        prop.property_type = 'data'
+                    else:
+                        # For any other type, convert to string
+                        prop.name = str(prop_data)
+                        prop.description = f"Imported from '{file.original_filename}'"
+                        prop.property_type = 'data'
+                    
                     db.session.add(prop)
             
             # Final commit for all changes
