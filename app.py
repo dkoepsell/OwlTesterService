@@ -928,6 +928,21 @@ def import_to_sandbox(file_id):
                                     class_names.append(item['name'])
                                 elif isinstance(item, str):
                                     class_names.append(item)
+                                else:
+                                    # Handle non-string, non-dict objects by converting to string
+                                    class_names.append(str(item))
+                        elif isinstance(analysis.class_list, dict):
+                            # If it's a dictionary (e.g. a single class object)
+                            if 'name' in analysis.class_list:
+                                class_names.append(analysis.class_list['name'])
+                            else:
+                                # Handle dictionaries without name by taking first value
+                                values = list(analysis.class_list.values())
+                                if values:
+                                    class_names.append(str(values[0]))
+                                else:
+                                    # Last resort: use the keys
+                                    class_names.append(str(list(analysis.class_list.keys())[0]))
                         elif isinstance(analysis.class_list, str):
                             # If it's a JSON string, try to parse it
                             try:
@@ -939,9 +954,24 @@ def import_to_sandbox(file_id):
                                             class_names.append(item['name'])
                                         elif isinstance(item, str):
                                             class_names.append(item)
+                                        else:
+                                            class_names.append(str(item))
+                                elif isinstance(parsed, dict):
+                                    if 'name' in parsed:
+                                        class_names.append(parsed['name'])
+                                    else:
+                                        # Use first value or key as fallback
+                                        values = list(parsed.values())
+                                        if values:
+                                            class_names.append(str(values[0]))
+                                        else:
+                                            class_names.append(str(list(parsed.keys())[0]))
                             except:
                                 # Just treat it as a single class name
                                 class_names.append(analysis.class_list)
+                        else:
+                            # Handle any other type by converting to string
+                            class_names.append(str(analysis.class_list))
                         
                         logger.debug(f"Processed class_names: {class_names}")
                         
@@ -974,6 +1004,26 @@ def import_to_sandbox(file_id):
                                     property_names.append(item['name'])
                                 elif isinstance(item, str):
                                     property_names.append(item)
+                                else:
+                                    # Handle non-string, non-dict objects by converting to string
+                                    property_names.append(str(item))
+                        elif isinstance(analysis.object_property_list, dict):
+                            # If it's a dictionary (e.g. a single property object)
+                            if 'name' in analysis.object_property_list:
+                                property_names.append(analysis.object_property_list['name'])
+                            else:
+                                # Handle dictionaries without name by taking first value
+                                values = list(analysis.object_property_list.values())
+                                if values:
+                                    property_names.append(str(values[0]))
+                                else:
+                                    # Last resort: use the keys
+                                    keys = list(analysis.object_property_list.keys())
+                                    if keys:
+                                        property_names.append(str(keys[0]))
+                                    else:
+                                        # Nothing to use, add a placeholder
+                                        property_names.append("Unknown_Property")
                         elif isinstance(analysis.object_property_list, str):
                             # If it's a JSON string, try to parse it
                             try:
@@ -985,9 +1035,24 @@ def import_to_sandbox(file_id):
                                             property_names.append(item['name'])
                                         elif isinstance(item, str):
                                             property_names.append(item)
+                                        else:
+                                            property_names.append(str(item))
+                                elif isinstance(parsed, dict):
+                                    if 'name' in parsed:
+                                        property_names.append(parsed['name'])
+                                    else:
+                                        # Use first value or key as fallback
+                                        values = list(parsed.values())
+                                        if values:
+                                            property_names.append(str(values[0]))
+                                        else:
+                                            property_names.append(str(list(parsed.keys())[0]))
                             except:
                                 # Just treat it as a single property name
                                 property_names.append(analysis.object_property_list)
+                        else:
+                            # Handle any other type by converting to string
+                            property_names.append(str(analysis.object_property_list))
                         
                         logger.debug(f"Processed property_names: {property_names}")
                         
@@ -1130,9 +1195,10 @@ def import_to_sandbox(file_id):
                 ontology_prop.property_type = 'data'
                 db.session.add(ontology_prop)
             
-            # Commit changes
+            # Final commit for all changes
             db.session.commit()
             
+            logger.debug(f"Successfully imported ontology to sandbox with ID: {ontology.id}")
             flash(f"Ontology '{file.original_filename}' successfully imported to Sandbox.", 'success')
             return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
         except Exception as e:
