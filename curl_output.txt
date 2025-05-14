@@ -1,0 +1,1812 @@
+* Host localhost:5000 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying [::1]:5000...
+* Immediate connect fail for ::1: Cannot assign requested address
+*   Trying 127.0.0.1:5000...
+* Connected to localhost (127.0.0.1) port 5000
+* using HTTP/1.x
+> GET / HTTP/1.1
+> Host: localhost:5000
+> User-Agent: curl/8.11.1
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Server: gunicorn
+< Date: Wed, 14 May 2025 20:28:12 GMT
+< Connection: close
+< Content-Type: text/html; charset=utf-8
+< Content-Length: 118199
+< Vary: Cookie
+< 
+{ [65536 bytes data]
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FOL-BFO-OWL Tester</title>
+    <!-- Replit-themed Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <!-- Additional head content -->
+    
+    
+    <!-- Head scripts -->
+    
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-spider me-2"></i>FOL-BFO-OWL Tester
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/"><i class="fas fa-home me-1"></i> Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/upload"><i class="fas fa-upload me-1"></i> Upload Ontology</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/sandbox"><i class="fas fa-project-diagram me-1"></i> Ontology Sandbox</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/history"><i class="fas fa-history me-1"></i> History</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/about"><i class="fas fa-info-circle me-1"></i> About</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="https://github.com/dkoepsell/FOL-BFO-OWL-tester" target="_blank">
+                                <i class="fab fa-github me-1"></i> GitHub
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="/login">
+                                <i class="fas fa-sign-in-alt me-1"></i> Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/register">
+                                <i class="fas fa-user-plus me-1"></i> Register
+                            </a>
+                        </li>
+                        
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container my-4">
+        <!-- Flash messages display -->
+        
+            
+        
+        
+        
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">FOL-BFO-OWL Expression Tester</h1>
+        
+        
+        
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-code me-2"></i>Test Your FOL Expression</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="expression-form">
+                            <div class="mb-3">
+                                <label for="expression-input" class="form-label">Enter your First-Order Logic expression:</label>
+                                <textarea class="form-control" id="expression-input" rows="3" placeholder="e.g., forall x,t (instance_of(x,continuant,t) -> exists_at(x,t))"
+                                         required></textarea>
+                                <div class="form-text">
+                                    Use BFO standard syntax with instance_of(x,Class,t) format for class membership.
+                                    <span class="fw-bold">Note</span>: Both formats are supported: instance_of(x,Class,t) and traditional Class(x).
+                                    <a href="/fol-syntax-guide" class="ms-2 text-decoration-none">
+                                        <i class="fas fa-book"></i> View full syntax guide
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-check-circle me-2"></i>Test Expression
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="clear-btn">
+                                    <i class="fas fa-eraser me-2"></i>Clear
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Analyze Ontology</h5>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <p>
+                            Want to analyze a complete OWL file instead? Upload your ontology to:
+                        </p>
+                        <ul>
+                            <li>Extract all axioms</li>
+                            <li>Check for consistency</li>
+                            <li>Identify contradictions</li>
+                            <li>Generate a complete report</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <a href="/upload" class="btn btn-primary w-100">
+                                <i class="fas fa-cloud-upload-alt me-2"></i>Upload OWL File
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="results-container" class="card mb-4 d-none">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Test Results</h5>
+            </div>
+            <div class="card-body">
+                <div id="expression-display" class="alert alert-secondary mb-3">
+                    <strong>Expression:</strong> <span id="expression-text"></span>
+                </div>
+                
+                <div id="format-detected" class="mb-3 d-none">
+                    <div class="d-flex align-items-center">
+                        <strong class="me-2">Format detected:</strong> 
+                        <span id="format-badge" class="badge rounded-pill"></span>
+                    </div>
+                </div>
+                
+                <div id="validity-result" class="mb-3">
+                    <!-- Filled by JavaScript -->
+                </div>
+                
+                <div id="issues-container" class="mb-3 d-none">
+                    <h6><i class="fas fa-exclamation-circle me-2"></i>Issues:</h6>
+                    <ul id="issues-list" class="list-group">
+                        <!-- Filled by JavaScript -->
+                    </ul>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">BFO Classes Used</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul id="classes-used-list" class="list-unstyled">
+                                    <!-- Filled by JavaScript -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">BFO Relations Used</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul id="relations-used-list" class="list-unstyled">
+                                    <!-- Filled by JavaScript -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0">Non-BFO Terms</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul id="non-bfo-terms-list" class="list-unstyled">
+                                    <!-- Filled by JavaScript -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Available BFO Classes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text" id="search-classes-addon">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="search-classes" 
+                                   placeholder="Search classes..." aria-label="Search classes" 
+                                   aria-describedby="search-classes-addon">
+                        </div>
+                        <div class="bfo-list-container">
+                            <ul id="bfo-classes-list" class="list-group">
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Entity</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, entity, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Continuant</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, continuant, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Occurrent</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="occurrent" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, occurrent, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Occurrent" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Independent Continuant</span>
+                                        
+                                        <small class="text-muted d-block">ID: independent_continuant</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="independent_continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, independent_continuant, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Independent Continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Specifically Dependent Continuant</span>
+                                        
+                                        <small class="text-muted d-block">ID: specifically_dependent_continuant</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="specifically_dependent_continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, specifically_dependent_continuant, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Specifically Dependent Continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Generically Dependent Continuant</span>
+                                        
+                                        <small class="text-muted d-block">ID: generically_dependent_continuant</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="generically_dependent_continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, generically_dependent_continuant, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Generically Dependent Continuant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Process</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="process" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, process, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Process" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Material Entity</span>
+                                        
+                                        <small class="text-muted d-block">ID: material_entity</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="material_entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, material_entity, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Material Entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Immaterial Entity</span>
+                                        
+                                        <small class="text-muted d-block">ID: immaterial_entity</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="immaterial_entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, immaterial_entity, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Immaterial Entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Spatial Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: spatial_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="spatial_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, spatial_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Spatial Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Quality</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="quality" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, quality, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Quality" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Realizable Entity</span>
+                                        
+                                        <small class="text-muted d-block">ID: realizable_entity</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="realizable_entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, realizable_entity, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Realizable Entity" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Role</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="role" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, role, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Role" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Disposition</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="disposition" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, disposition, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Disposition" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Function</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="function" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, function, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Function" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Site</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="site" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, site, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Site" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Object</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="object" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, object, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Object" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Object Aggregate</span>
+                                        
+                                        <small class="text-muted d-block">ID: object_aggregate</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="object_aggregate" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, object_aggregate, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Object Aggregate" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Fiat Object Part</span>
+                                        
+                                        <small class="text-muted d-block">ID: fiat_object_part</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="fiat_object_part" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, fiat_object_part, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Fiat Object Part" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Process Boundary</span>
+                                        
+                                        <small class="text-muted d-block">ID: process_boundary</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="process_boundary" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, process_boundary, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Process Boundary" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Temporal Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: temporal_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="temporal_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, temporal_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Temporal Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Continuant Fiat Boundary</span>
+                                        
+                                        <small class="text-muted d-block">ID: continuant_fiat_boundary</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="continuant_fiat_boundary" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, continuant_fiat_boundary, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Continuant Fiat Boundary" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Zero Dimensional Spatial Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: zero_dimensional_spatial_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="zero_dimensional_spatial_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, zero_dimensional_spatial_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Zero Dimensional Spatial Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">One Dimensional Spatial Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: one_dimensional_spatial_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="one_dimensional_spatial_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, one_dimensional_spatial_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="One Dimensional Spatial Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Two Dimensional Spatial Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: two_dimensional_spatial_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="two_dimensional_spatial_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, two_dimensional_spatial_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Two Dimensional Spatial Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Three Dimensional Spatial Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: three_dimensional_spatial_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="three_dimensional_spatial_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, three_dimensional_spatial_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Three Dimensional Spatial Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">History</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="history" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, history, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="History" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Relational Quality</span>
+                                        
+                                        <small class="text-muted d-block">ID: relational_quality</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="relational_quality" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, relational_quality, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Relational Quality" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Spatiotemporal Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: spatiotemporal_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="spatiotemporal_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, spatiotemporal_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Spatiotemporal Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Temporal Instant</span>
+                                        
+                                        <small class="text-muted d-block">ID: temporal_instant</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="temporal_instant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, temporal_instant, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Temporal Instant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Connected Temporal Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: connected_temporal_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="connected_temporal_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, connected_temporal_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Connected Temporal Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Scattered Temporal Region</span>
+                                        
+                                        <small class="text-muted d-block">ID: scattered_temporal_region</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="scattered_temporal_region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, scattered_temporal_region, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Scattered Temporal Region" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-class-item">
+                                    <div>
+                                        <span class="class-label fw-medium">Process Profile</span>
+                                        
+                                        <small class="text-muted d-block">ID: process_profile</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="process_profile" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert with instance_of(x, process_profile, t) format">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Process Profile" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-link me-2"></i>Available BFO Relations</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <span class="input-group-text" id="search-relations-addon">
+                                <i class="fas fa-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="search-relations" 
+                                   placeholder="Search relations..." aria-label="Search relations" 
+                                   aria-describedby="search-relations-addon">
+                        </div>
+                        <div class="bfo-list-container">
+                            <ul id="bfo-relations-list" class="list-group">
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Part Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: part_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="part_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Part Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Has Part</span>
+                                        
+                                        <small class="text-muted d-block">ID: has_part</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="has_part" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Has Part" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Located In</span>
+                                        
+                                        <small class="text-muted d-block">ID: located_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="located_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Located In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Location Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: location_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="location_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Location Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Contained In</span>
+                                        
+                                        <small class="text-muted d-block">ID: contained_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="contained_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Contained In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Contains</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="contains" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Contains" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Participates In</span>
+                                        
+                                        <small class="text-muted d-block">ID: participates_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="participates_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Participates In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Has Participant</span>
+                                        
+                                        <small class="text-muted d-block">ID: has_participant</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="has_participant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Has Participant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Bearer Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: bearer_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="bearer_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Bearer Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Inheres In</span>
+                                        
+                                        <small class="text-muted d-block">ID: inheres_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="inheres_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Inheres In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Realized In</span>
+                                        
+                                        <small class="text-muted d-block">ID: realized_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="realized_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Realized In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Realizes</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="realizes" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Realizes" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Exists At</span>
+                                        
+                                        <small class="text-muted d-block">ID: exists_at</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="exists_at" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Exists At" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Instance Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: instance_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="instance_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Instance Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Occurs In</span>
+                                        
+                                        <small class="text-muted d-block">ID: occurs_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="occurs_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Occurs In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Has Quality</span>
+                                        
+                                        <small class="text-muted d-block">ID: has_quality</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="has_quality" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Has Quality" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Quality Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: quality_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="quality_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Quality Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Has Material Basis</span>
+                                        
+                                        <small class="text-muted d-block">ID: has_material_basis</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="has_material_basis" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Has Material Basis" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Material Basis Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: material_basis_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="material_basis_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Material Basis Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Concretizes</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="concretizes" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Concretizes" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Concretization Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: concretization_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="concretization_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Concretization Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Has First Instant</span>
+                                        
+                                        <small class="text-muted d-block">ID: has_first_instant</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="has_first_instant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Has First Instant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Has Last Instant</span>
+                                        
+                                        <small class="text-muted d-block">ID: has_last_instant</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="has_last_instant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Has Last Instant" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Preceded By</span>
+                                        
+                                        <small class="text-muted d-block">ID: preceded_by</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="preceded_by" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Preceded By" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Precedes</span>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="precedes" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Precedes" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Spatially Contains</span>
+                                        
+                                        <small class="text-muted d-block">ID: spatially_contains</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="spatially_contains" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Spatially Contains" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Spatially Contained In</span>
+                                        
+                                        <small class="text-muted d-block">ID: spatially_contained_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="spatially_contained_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Spatially Contained In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Temporally Contains</span>
+                                        
+                                        <small class="text-muted d-block">ID: temporally_contains</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="temporally_contains" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Temporally Contains" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Temporally Contained In</span>
+                                        
+                                        <small class="text-muted d-block">ID: temporally_contained_in</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="temporally_contained_in" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Temporally Contained In" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Temporal Part Of</span>
+                                        
+                                        <small class="text-muted d-block">ID: temporal_part_of</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="temporal_part_of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Temporal Part Of" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                                <li class="list-group-item d-flex justify-content-between align-items-center bfo-relation-item">
+                                    <div>
+                                        <span class="relation-label fw-medium">Has Temporal Part</span>
+                                        
+                                        <small class="text-muted d-block">ID: has_temporal_part</small>
+                                        
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-primary copy-btn" 
+                                                data-term="has_temporal_part" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert relation ID for expressions">
+                                            <i class="fas fa-code"></i> ID
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-term="Has Temporal Part" 
+                                                data-bs-toggle="tooltip" 
+                                                title="Insert label as plain text">
+                                            <i class="fas fa-font"></i> Label
+                                        </button>
+                                    </div>
+                                </li>
+                                
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Example Expressions</h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="exampleAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingOne">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                                Example 1: Continuant exists at some temporal region
+                            </button>
+                        </h2>
+                        <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#exampleAccordion">
+                            <div class="accordion-body">
+                                <code>forall x,t (instance_of(x,continuant,t) -> exists_at(x,t))</code>
+                                <button class="btn btn-sm btn-outline-primary float-end use-example" 
+                                        data-example="forall x,t (instance_of(x,continuant,t) -> exists_at(x,t))">
+                                    Use This Example
+                                </button>
+                            </di100  115k  100  115k    0     0  1966k      0 --:--:-- --:--:-- --:--:-- 2025k
+* shutting down connection #0
+v>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingTwo">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                Example 2: Process occurs in some temporal region
+                            </button>
+                        </h2>
+                        <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#exampleAccordion">
+                            <div class="accordion-body">
+                                <code>forall p,t (instance_of(p,process,t) -> occurs_in(p,t))</code>
+                                <button class="btn btn-sm btn-outline-primary float-end use-example" 
+                                        data-example="forall p,t (instance_of(p,process,t) -> occurs_in(p,t))">
+                                    Use This Example
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingThree">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                Example 3: Material entity is a subclass of independent continuant
+                            </button>
+                        </h2>
+                        <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#exampleAccordion">
+                            <div class="accordion-body">
+                                <code>forall x,t (instance_of(x,material_entity,t) -> instance_of(x,independent_continuant,t))</code>
+                                <button class="btn btn-sm btn-outline-primary float-end use-example" 
+                                        data-example="forall x,t (instance_of(x,material_entity,t) -> instance_of(x,independent_continuant,t))">
+                                    Use This Example
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    </main>
+
+    <footer class="bg-dark text-light py-3 mt-5">
+        <div class="container text-center">
+            <p class="mb-0">
+                <small>
+                    FOL-BFO-OWL Tester Web Service | 
+                    Based on <a href="https://github.com/dkoepsell/FOL-BFO-OWL-tester" target="_blank" class="text-light">
+                        FOL-BFO-OWL-tester
+                    </a> by dkoepsell
+                </small>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery (needed for some components) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Custom JS -->
+    <script src="/static/js/script.js"></script>
+    
+    
+<script>
+    // The main JavaScript functionality is in static/js/script.js
+</script>
+
+</body>
+</html>
