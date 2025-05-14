@@ -875,6 +875,21 @@ def import_to_sandbox(file_id):
         # Add debug logging
         logger.debug(f"Importing file ID {file_id} - Original filename: {file.original_filename}")
         
+        # Create a base ontology first, before doing anything that might fail
+        ontology = SandboxOntology()
+        ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
+        ontology.domain = "Imported Ontology"
+        ontology.subject = "Imported from History"
+        ontology.description = f"Imported from file '{file.original_filename}'."
+        ontology.user_id = current_user.id if not current_user.is_anonymous else None
+        
+        # Save and COMMIT to get a permanent ID before creating related records
+        db.session.add(ontology)
+        db.session.commit()
+        
+        # Log the newly created ontology ID for debugging
+        logger.debug(f"Created new sandbox ontology with ID: {ontology.id}")
+        
         # Get the file path
         file_path = file.file_path
         
@@ -932,10 +947,13 @@ def import_to_sandbox(file_id):
                         
                         # Add the classes
                         for class_name in class_names:
-                            cls = OntologyClass()
-                            cls.ontology_id = ontology.id
-                            cls.name = class_name
-                            cls.description = f"Class '{class_name}' imported from '{file.original_filename}'"
+                            # Create the class with all required fields directly set
+                            cls = OntologyClass(
+                                ontology_id=ontology.id,
+                                name=class_name,
+                                description=f"Class '{class_name}' imported from '{file.original_filename}'",
+                                creation_date=datetime.datetime.utcnow()
+                            )
                             db.session.add(cls)
                 except Exception as e:
                     logger.error(f"Error processing class_list: {str(e)}")
@@ -975,19 +993,23 @@ def import_to_sandbox(file_id):
                         
                         # Add the properties
                         for property_name in property_names:
-                            prop = OntologyProperty()
-                            prop.ontology_id = ontology.id
-                            prop.name = property_name
-                            prop.description = f"Property '{property_name}' imported from '{file.original_filename}'"
-                            prop.property_type = 'object'
+                            # Create the property with all required fields directly set
+                            prop = OntologyProperty(
+                                ontology_id=ontology.id,
+                                name=property_name,
+                                description=f"Property '{property_name}' imported from '{file.original_filename}'",
+                                property_type='object',
+                                creation_date=datetime.datetime.utcnow()
+                            )
                             db.session.add(prop)
                 except Exception as e:
                     logger.error(f"Error processing object_property_list: {str(e)}")
             
-            db.session.add(ontology)
+            # Final commit for any remaining changes
             db.session.commit()
             
-            flash(f"Created sandbox ontology from '{file.original_filename}' metadata. The original file could not be found.", 'warning')
+            # Success message
+            flash(f"Created sandbox ontology from '{file.original_filename}' metadata.", 'success')
             return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
         
         # We'll try to use Owlready2 to parse the ontology to get classes, properties, etc.
@@ -1041,9 +1063,10 @@ def import_to_sandbox(file_id):
                     prop.property_type = 'data'
                     db.session.add(prop)
             
-            # Commit changes
+            # Final commit for all changes
             db.session.commit()
             
+            logger.debug(f"Successfully imported ontology to sandbox with ID: {ontology.id}")
             flash(f"Ontology '{file.original_filename}' successfully imported to Sandbox.", 'success')
             return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
         
