@@ -871,10 +871,48 @@ def import_to_sandbox(file_id):
         # Get the file path
         file_path = file.file_path
         
-        # Check if file exists
+        # Handle missing files by creating a basic ontology structure
+        # This allows us to work with ontologies even if the original file is missing
         if not os.path.exists(file_path):
-            flash(f"Error: Could not find the file '{file.original_filename}'.", 'error')
-            return redirect(url_for('view_history'))
+            logger.warning(f"File not found at {file_path}. Creating sandbox ontology with metadata only.")
+            
+            # Create a new SandboxOntology with basic information
+            ontology = SandboxOntology()
+            ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
+            ontology.domain = "Imported Ontology"
+            ontology.subject = "Imported from History"
+            ontology.description = f"Imported from file '{file.original_filename}'. Note: The original file could not be found, so only metadata was imported."
+            ontology.user_id = current_user.id if not current_user.is_anonymous else None
+            
+            # Use existing analyses if available
+            if file.analyses:
+                analysis = file.analyses[0]
+                ontology.domain = analysis.ontology_name or "Imported Ontology"
+                
+                # If we have class and property lists, use them
+                if analysis.class_list:
+                    for cls_data in analysis.class_list:
+                        cls = OntologyClass()
+                        cls.ontology_id = ontology.id
+                        cls.name = cls_data.get('name', 'Unknown Class')
+                        cls.description = cls_data.get('description', f"Imported from '{file.original_filename}'")
+                        cls.bfo_category = cls_data.get('bfo_category')
+                        db.session.add(cls)
+                
+                if analysis.object_property_list:
+                    for prop_data in analysis.object_property_list:
+                        prop = OntologyProperty()
+                        prop.ontology_id = ontology.id
+                        prop.name = prop_data.get('name', 'Unknown Property')
+                        prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
+                        prop.property_type = 'object'
+                        db.session.add(prop)
+            
+            db.session.add(ontology)
+            db.session.commit()
+            
+            flash(f"Created sandbox ontology from '{file.original_filename}' metadata. The original file could not be found.", 'warning')
+            return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
         
         # We'll try to use Owlready2 to parse the ontology to get classes, properties, etc.
         from owlready2 import get_ontology
