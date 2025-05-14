@@ -891,20 +891,38 @@ def import_to_sandbox(file_id):
                 
                 # If we have class and property lists, use them
                 if analysis.class_list:
-                    for cls_data in analysis.class_list:
+                    # Handle both formats: list of dictionaries or list of strings
+                    for cls_item in analysis.class_list:
                         cls = OntologyClass()
                         cls.ontology_id = ontology.id
-                        cls.name = cls_data.get('name', 'Unknown Class')
-                        cls.description = cls_data.get('description', f"Imported from '{file.original_filename}'")
-                        cls.bfo_category = cls_data.get('bfo_category')
+                        
+                        # Check if it's a dictionary or string
+                        if isinstance(cls_item, dict):
+                            cls.name = cls_item.get('name', 'Unknown Class')
+                            cls.description = cls_item.get('description', f"Imported from '{file.original_filename}'")
+                            cls.bfo_category = cls_item.get('bfo_category')
+                        else:
+                            # It's a string
+                            cls.name = cls_item
+                            cls.description = f"Class '{cls_item}' imported from '{file.original_filename}'"
+                            
                         db.session.add(cls)
                 
                 if analysis.object_property_list:
-                    for prop_data in analysis.object_property_list:
+                    # Handle both formats: list of dictionaries or list of strings
+                    for prop_item in analysis.object_property_list:
                         prop = OntologyProperty()
                         prop.ontology_id = ontology.id
-                        prop.name = prop_data.get('name', 'Unknown Property')
-                        prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
+                        
+                        # Check if it's a dictionary or string
+                        if isinstance(prop_item, dict):
+                            prop.name = prop_item.get('name', 'Unknown Property')
+                            prop.description = prop_item.get('description', f"Imported from '{file.original_filename}'")
+                        else:
+                            # It's a string
+                            prop.name = prop_item
+                            prop.description = f"Property '{prop_item}' imported from '{file.original_filename}'"
+                            
                         prop.property_type = 'object'
                         db.session.add(prop)
             
