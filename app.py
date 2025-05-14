@@ -896,13 +896,13 @@ def import_to_sandbox(file_id):
         # Get the file path
         file_path = file.file_path
         
-        # Handle missing files by creating a basic ontology structure
+        # Handle missing files by creating a basic ontology structure from database records
         # This allows us to work with ontologies even if the original file is missing
         if not os.path.exists(file_path):
-            logger.warning(f"File not found at {file_path}. Using metadata only.")
+            logger.warning(f"File not found at {file_path}. Using database records instead.")
             
             # Update the existing ontology description to note the missing file
-            ontology.description = f"Imported from file '{file.original_filename}'. Note: The original file could not be found, so only metadata was imported."
+            ontology.description = f"Imported from file '{file.original_filename}'. Note: The original file could not be found, but class and property data was imported from database records."
             
             # Use existing analyses if available
             if file.analyses:
@@ -1004,9 +1004,20 @@ def import_to_sandbox(file_id):
                     # Log the processed class names
                     logger.debug(f"Processed class_names: {class_names}")
                     
+                    # Create a list to hold class objects for the SandboxOntology
+                    class_objects = []
+                    
                     # Add the classes
                     for class_name in class_names:
-                        # Create the class with all required fields directly set
+                        # Create a class object for the SandboxOntology.classes list
+                        class_obj = {
+                            "name": class_name,
+                            "description": f"Class '{class_name}' imported from '{file.original_filename}'",
+                            "bfo_category": None
+                        }
+                        class_objects.append(class_obj)
+                        
+                        # Also create the class in the OntologyClass table
                         cls = OntologyClass(
                             ontology_id=ontology.id,
                             name=class_name,
@@ -1014,6 +1025,9 @@ def import_to_sandbox(file_id):
                             creation_date=datetime.datetime.utcnow()
                         )
                         db.session.add(cls)
+                    
+                    # Update the SandboxOntology with the class list
+                    ontology.classes = class_objects
                 except Exception as e:
                     logger.error(f"Error processing class_list: {str(e)}")
                 
