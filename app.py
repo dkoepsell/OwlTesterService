@@ -861,6 +861,198 @@ def view_history():
         flash(f"Error viewing history: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+@app.route('/import_to_sandbox/<int:file_id>')
+def import_to_sandbox(file_id):
+    """Import an ontology file from history to the sandbox."""
+    try:
+        # Get the file or return 404
+        file = OntologyFile.query.get_or_404(file_id)
+        
+        # Get the file path
+        file_path = file.file_path
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            flash(f"Error: Could not find the file '{file.original_filename}'.", 'error')
+            return redirect(url_for('view_history'))
+        
+        # We'll try to use Owlready2 to parse the ontology to get classes, properties, etc.
+        from owlready2 import get_ontology
+        import tempfile
+        
+        # Check if there's already an analysis we can use
+        if file.analyses:
+            # Use the analysis data to create a sandbox ontology
+            analysis = file.analyses[0]  # Use the first analysis
+            
+            # Create a new SandboxOntology
+            ontology = SandboxOntology()
+            ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
+            ontology.domain = analysis.ontology_name or "Imported Ontology"
+            ontology.subject = "Imported from History"
+            ontology.description = f"Imported from file '{file.original_filename}'. Original IRI: {analysis.ontology_iri or 'Unknown'}"
+            ontology.user_id = current_user.id if not current_user.is_anonymous else None
+            
+            # Save to get an ID
+            db.session.add(ontology)
+            db.session.flush()
+            
+            # Add classes
+            if analysis.class_list:
+                for cls_data in analysis.class_list:
+                    cls = OntologyClass()
+                    cls.ontology_id = ontology.id
+                    cls.name = cls_data.get('name', 'Unknown Class')
+                    cls.description = cls_data.get('description', f"Imported from '{file.original_filename}'")
+                    cls.bfo_category = cls_data.get('bfo_category')
+                    db.session.add(cls)
+            
+            # Add properties
+            if analysis.object_property_list:
+                for prop_data in analysis.object_property_list:
+                    prop = OntologyProperty()
+                    prop.ontology_id = ontology.id
+                    prop.name = prop_data.get('name', 'Unknown Property')
+                    prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
+                    prop.property_type = 'object'
+                    db.session.add(prop)
+                    
+            # Add data properties
+            if analysis.data_property_list:
+                for prop_data in analysis.data_property_list:
+                    prop = OntologyProperty()
+                    prop.ontology_id = ontology.id
+                    prop.name = prop_data.get('name', 'Unknown Property')
+                    prop.description = prop_data.get('description', f"Imported from '{file.original_filename}'")
+                    prop.property_type = 'data'
+                    db.session.add(prop)
+            
+            # Commit changes
+            db.session.commit()
+            
+            flash(f"Ontology '{file.original_filename}' successfully imported to Sandbox.", 'success')
+            return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
+        
+        # If no analysis, try to parse with Owlready2 directly
+        try:
+            onto = get_ontology(file_path).load()
+            
+            # Create a new SandboxOntology
+            ontology = SandboxOntology()
+            ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
+            ontology.domain = onto.name or "Imported Ontology"
+            ontology.subject = "Imported from History" 
+            ontology.description = f"Imported from file '{file.original_filename}'. Original IRI: {onto.base_iri or 'Unknown'}"
+            ontology.user_id = current_user.id if not current_user.is_anonymous else None
+            
+            # Save to get an ID
+            db.session.add(ontology)
+            db.session.flush()
+            
+            # Add classes
+            for cls in onto.classes():
+                ontology_class = OntologyClass()
+                ontology_class.ontology_id = ontology.id
+                ontology_class.name = cls.name
+                # Get comment or description if available
+                desc = None
+                for p in cls.get_properties():
+                    if p.name.lower() in ['comment', 'description', 'definition']:
+                        desc = p[cls]
+                        break
+                ontology_class.description = desc or f"Class imported from '{file.original_filename}'"
+                db.session.add(ontology_class)
+            
+            # Add properties
+            for prop in onto.object_properties():
+                ontology_prop = OntologyProperty()
+                ontology_prop.ontology_id = ontology.id
+                ontology_prop.name = prop.name
+                # Get comment or description if available
+                desc = None
+                for p in prop.get_properties():
+                    if p.name.lower() in ['comment', 'description', 'definition']:
+                        desc = p[prop]
+                        break
+                ontology_prop.description = desc or f"Object property imported from '{file.original_filename}'"
+                ontology_prop.property_type = 'object'
+                db.session.add(ontology_prop)
+            
+            # Add data properties
+            for prop in onto.data_properties():
+                ontology_prop = OntologyProperty()
+                ontology_prop.ontology_id = ontology.id
+                ontology_prop.name = prop.name
+                # Get comment or description if available
+                desc = None
+                for p in prop.get_properties():
+                    if p.name.lower() in ['comment', 'description', 'definition']:
+                        desc = p[prop]
+                        break
+                ontology_prop.description = desc or f"Data property imported from '{file.original_filename}'"
+                ontology_prop.property_type = 'data'
+                db.session.add(ontology_prop)
+            
+            # Commit changes
+            db.session.commit()
+            
+            flash(f"Ontology '{file.original_filename}' successfully imported to Sandbox.", 'success')
+            return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
+        except Exception as e:
+            logger.warning(f"Could not parse ontology with Owlready2: {str(e)}")
+            
+            # Create a basic sandbox ontology
+            ontology = SandboxOntology()
+            ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
+            ontology.domain = "Imported Ontology"
+            ontology.subject = "Imported from History"
+            ontology.description = f"Imported from file '{file.original_filename}'. Note: Unable to parse classes and properties automatically."
+            ontology.user_id = current_user.id if not current_user.is_anonymous else None
+            
+            db.session.add(ontology)
+            db.session.commit()
+            
+            flash(f"Created sandbox ontology from '{file.original_filename}', but could not parse classes and properties. You'll need to add them manually.", 'warning')
+            return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error importing file to sandbox: {str(e)}")
+        flash(f"Error importing file to sandbox: {str(e)}", 'error')
+        return redirect(url_for('view_history'))
+
+@app.route('/delete_file/<int:file_id>', methods=['POST'])
+def delete_file(file_id):
+    """Delete an ontology file and all its analyses."""
+    try:
+        # Get the file or return 404
+        file = OntologyFile.query.get_or_404(file_id)
+        
+        # Get file path to delete the physical file
+        file_path = file.file_path
+        
+        # Store information for flash message
+        filename = file.original_filename
+        
+        # Delete the file from database (cascade will delete analyses)
+        db.session.delete(file)
+        db.session.commit()
+        
+        # Try to delete the physical file, but don't worry if it fails
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            logger.warning(f"Could not delete physical file {file_path}: {str(e)}")
+        
+        flash(f"File '{filename}' deleted successfully.", 'success')
+        return redirect(url_for('view_history'))
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting file: {str(e)}")
+        flash(f"Error deleting file: {str(e)}", 'error')
+        return redirect(url_for('view_history'))
+
 # UML Diagram generation with D3.js
 @app.route('/analyze/<filename>/diagram')
 def generate_diagram(filename):
@@ -1341,6 +1533,68 @@ def sandbox_edit(ontology_id):
         logger.error(f"Error editing sandbox ontology: {str(e)}")
         flash(f"Error editing sandbox ontology: {str(e)}", 'error')
         return redirect(url_for('sandbox_list'))
+
+@app.route('/sandbox/<int:ontology_id>/export_to_history')
+def export_to_history(ontology_id):
+    """Export a sandbox ontology to history for analysis."""
+    try:
+        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        
+        # Get the ontology's classes, properties, and individuals
+        classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
+        properties = OntologyProperty.query.filter_by(ontology_id=ontology_id).all()
+        individuals = OntologyIndividual.query.filter_by(ontology_id=ontology_id).all()
+        
+        # Generate OWL/RDF XML
+        owl_xml = generate_owl_xml(ontology, classes, properties, individuals)
+        
+        # Create a temp file to save the OWL content
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.owl')
+        temp_file.write(owl_xml.encode('utf-8'))
+        temp_file_path = temp_file.name
+        temp_file.close()
+        
+        # Generate a unique filename
+        unique_filename = f"{ontology.title.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.owl"
+        
+        # Define the destination path (uploads directory)
+        upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        dest_path = os.path.join(upload_dir, unique_filename)
+        
+        # Copy the temp file to the uploads directory
+        import shutil
+        shutil.copy2(temp_file_path, dest_path)
+        
+        # Clean up the temp file
+        os.unlink(temp_file_path)
+        
+        # Create a new OntologyFile record
+        file_size = os.path.getsize(dest_path)
+        file_record = OntologyFile(
+            filename=unique_filename,
+            original_filename=f"{ontology.title}.owl",
+            file_path=dest_path,
+            file_size=file_size,
+            mime_type='application/rdf+xml',
+            user_id=current_user.id if not current_user.is_anonymous else None,
+            from_sandbox=True,
+            sandbox_ontology_id=ontology.id
+        )
+        
+        db.session.add(file_record)
+        db.session.commit()
+        
+        flash(f"Ontology '{ontology.title}' exported to History.", 'success')
+        
+        # Redirect to analyze the new file
+        return redirect(url_for('analyze_owl', filename=unique_filename, original_name=f"{ontology.title}.owl", file_id=file_record.id))
+    except Exception as e:
+        logger.error(f"Error exporting sandbox ontology to history: {str(e)}")
+        flash(f"Error exporting sandbox ontology to history: {str(e)}", 'error')
+        return redirect(url_for('sandbox_view', ontology_id=ontology_id))
 
 @app.route('/sandbox/<int:ontology_id>/download')
 def sandbox_download(ontology_id):
