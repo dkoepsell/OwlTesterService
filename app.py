@@ -868,6 +868,9 @@ def view_history():
 @app.route('/import_to_sandbox/<int:file_id>')
 def import_to_sandbox(file_id):
     """Import an ontology file from history to the sandbox."""
+    success = False
+    error_message = None
+    
     try:
         # Get the file or return 404
         file = OntologyFile.query.get_or_404(file_id)
