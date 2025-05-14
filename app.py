@@ -1125,9 +1125,20 @@ def import_to_sandbox(file_id):
                     # Log the processed property names
                     logger.debug(f"Processed property_names: {property_names}")
                     
+                    # Create a list to hold property objects for the SandboxOntology
+                    property_objects = []
+                    
                     # Add the properties
                     for property_name in property_names:
-                        # Create the property with all required fields directly set
+                        # Create a property object for the SandboxOntology.properties list
+                        property_obj = {
+                            "name": property_name,
+                            "description": f"Property '{property_name}' imported from '{file.original_filename}'",
+                            "property_type": "object"
+                        }
+                        property_objects.append(property_obj)
+                        
+                        # Also create the property in the OntologyProperty table
                         prop = OntologyProperty(
                             ontology_id=ontology.id,
                             name=property_name,
@@ -1136,6 +1147,9 @@ def import_to_sandbox(file_id):
                             creation_date=datetime.datetime.utcnow()
                         )
                         db.session.add(prop)
+                    
+                    # Update the SandboxOntology with the property list
+                    ontology.properties = property_objects
                 except Exception as e:
                     logger.error(f"Error processing object_property_list: {str(e)}")
             
@@ -1143,7 +1157,7 @@ def import_to_sandbox(file_id):
             db.session.commit()
             
             # Success message
-            flash(f"Created sandbox ontology from '{file.original_filename}' metadata.", 'success')
+            flash(f"Successfully imported '{file.original_filename}' to sandbox with {len(ontology.classes)} classes and {len(ontology.properties)} properties.", 'success')
             return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
         
         # We'll try to use Owlready2 to parse the ontology to get classes, properties, etc.
