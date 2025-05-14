@@ -1019,84 +1019,106 @@ def import_to_sandbox(file_id):
                     logger.debug(f"object_property_list type: {type(analysis.object_property_list)}")
                     logger.debug(f"object_property_list: {analysis.object_property_list}")
                     
-                    if analysis.object_property_list:
-                        # Convert anything into a list of strings for safety
-                        property_names = []
-                        
-                        # Try to handle possible formats
-                        if isinstance(analysis.object_property_list, list):
-                            for item in analysis.object_property_list:
-                                if isinstance(item, dict) and 'name' in item:
-                                    property_names.append(item['name'])
-                                elif isinstance(item, str):
-                                    property_names.append(item)
-                                else:
-                                    # Handle non-string, non-dict objects by converting to string
-                                    property_names.append(str(item))
-                        elif isinstance(analysis.object_property_list, dict):
-                            # If it's a dictionary (e.g. a single property object)
-                            if 'name' in analysis.object_property_list:
-                                property_names.append(analysis.object_property_list['name'])
-                            else:
-                                # Handle dictionaries without name by taking first value
-                                values = list(analysis.object_property_list.values())
-                                if values:
-                                    property_names.append(str(values[0]))
-                                else:
-                                    # Last resort: use the keys
-                                    keys = list(analysis.object_property_list.keys())
-                                    if keys:
-                                        property_names.append(str(keys[0]))
-                                    else:
-                                        # Nothing to use, add a placeholder
-                                        property_names.append("Unknown_Property")
-                        elif isinstance(analysis.object_property_list, str):
-                            # If it's a JSON string, try to parse it
-                            try:
-                                import json
-                                parsed = json.loads(analysis.object_property_list)
-                                if isinstance(parsed, list):
-                                    for item in parsed:
+                    # Wrap in a try-except to catch all possible data format issues
+                    try:
+                        if analysis.object_property_list:
+                            # Convert anything into a list of strings for safety
+                            property_names = []
+                            
+                            # Try to handle possible formats
+                            if isinstance(analysis.object_property_list, list):
+                                for item in analysis.object_property_list:
+                                    try:
                                         if isinstance(item, dict) and 'name' in item:
                                             property_names.append(item['name'])
                                         elif isinstance(item, str):
                                             property_names.append(item)
                                         else:
+                                            # Handle non-string, non-dict objects by converting to string
                                             property_names.append(str(item))
-                                elif isinstance(parsed, dict):
-                                    if 'name' in parsed:
-                                        property_names.append(parsed['name'])
+                                    except Exception as e:
+                                        logger.warning(f"Error processing list item in object_property_list: {str(e)}")
+                                        property_names.append("Unknown_Property")
+                            elif isinstance(analysis.object_property_list, dict):
+                                # If it's a dictionary (e.g. a single property object)
+                                try:
+                                    if 'name' in analysis.object_property_list:
+                                        property_names.append(analysis.object_property_list['name'])
                                     else:
-                                        # Use first value or key as fallback
-                                        values = list(parsed.values())
+                                        # Handle dictionaries without name by taking first value
+                                        values = list(analysis.object_property_list.values())
                                         if values:
                                             property_names.append(str(values[0]))
                                         else:
-                                            keys = list(parsed.keys())
+                                            # Last resort: use the keys
+                                            keys = list(analysis.object_property_list.keys())
                                             if keys:
                                                 property_names.append(str(keys[0]))
                                             else:
+                                                # Nothing to use, add a placeholder
                                                 property_names.append("Unknown_Property")
-                            except:
-                                # Just treat it as a single property name
-                                property_names.append(analysis.object_property_list)
+                                except Exception as e:
+                                    logger.warning(f"Error processing dict in object_property_list: {str(e)}")
+                                    property_names.append("Unknown_Property")
+                            elif isinstance(analysis.object_property_list, str):
+                                # If it's a JSON string, try to parse it
+                                try:
+                                    import json
+                                    parsed = json.loads(analysis.object_property_list)
+                                    if isinstance(parsed, list):
+                                        for item in parsed:
+                                            try:
+                                                if isinstance(item, dict) and 'name' in item:
+                                                    property_names.append(item['name'])
+                                                elif isinstance(item, str):
+                                                    property_names.append(item)
+                                                else:
+                                                    property_names.append(str(item))
+                                            except Exception:
+                                                property_names.append("Unknown_Property")
+                                    elif isinstance(parsed, dict):
+                                        if 'name' in parsed:
+                                            property_names.append(parsed['name'])
+                                        else:
+                                            # Use first value or key as fallback
+                                            values = list(parsed.values())
+                                            if values:
+                                                property_names.append(str(values[0]))
+                                            else:
+                                                keys = list(parsed.keys())
+                                                if keys:
+                                                    property_names.append(str(keys[0]))
+                                                else:
+                                                    property_names.append("Unknown_Property")
+                                except Exception as e:
+                                    logger.warning(f"Error parsing JSON in object_property_list: {str(e)}")
+                                    # Just treat it as a single property name
+                                    property_names.append(str(analysis.object_property_list))
+                            else:
+                                # Handle any other type by converting to string
+                                property_names.append(str(analysis.object_property_list))
                         else:
-                            # Handle any other type by converting to string
-                            property_names.append(str(analysis.object_property_list))
-                        
-                        logger.debug(f"Processed property_names: {property_names}")
-                        
-                        # Add the properties
-                        for property_name in property_names:
-                            # Create the property with all required fields directly set
-                            prop = OntologyProperty(
-                                ontology_id=ontology.id,
-                                name=property_name,
-                                description=f"Property '{property_name}' imported from '{file.original_filename}'",
-                                property_type='object',
-                                creation_date=datetime.datetime.utcnow()
-                            )
-                            db.session.add(prop)
+                            # Handle empty property list
+                            property_names = []
+                    except Exception as e:
+                        logger.error(f"Error in overall object_property_list processing: {str(e)}")
+                        # Provide a default property if everything fails
+                        property_names = ["Default_Property"]
+                    
+                    # Log the processed property names
+                    logger.debug(f"Processed property_names: {property_names}")
+                    
+                    # Add the properties
+                    for property_name in property_names:
+                        # Create the property with all required fields directly set
+                        prop = OntologyProperty(
+                            ontology_id=ontology.id,
+                            name=property_name,
+                            description=f"Property '{property_name}' imported from '{file.original_filename}'",
+                            property_type='object',
+                            creation_date=datetime.datetime.utcnow()
+                        )
+                        db.session.add(prop)
                 except Exception as e:
                     logger.error(f"Error processing object_property_list: {str(e)}")
             
