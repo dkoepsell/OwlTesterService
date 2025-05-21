@@ -312,7 +312,11 @@ class OwlTester:
         for var_match in re.finditer(var_pattern, expr_string):
             var_name = var_match.group(1)
             # Skip if it's likely a class or relation name (starts with uppercase)
-            if not var_name[0].isupper() and var_name not in ['forall', 'exists', 'instance_of']:
+            # Also skip if it's a known BFO class or relation name
+            if (not var_name[0].isupper() and 
+                var_name not in ['forall', 'exists', 'instance_of'] and
+                var_name.lower() not in [c.lower() for c in self.bfo_classes.keys()] and
+                var_name.lower() not in [r.lower() for r in self.bfo_relations.keys()]):
                 all_vars.add(var_name)
                 
         # Extract bound variables from quantifiers
