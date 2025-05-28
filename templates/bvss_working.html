@@ -29,22 +29,57 @@
         </div>
 
         <div style="background: #1a1a1a; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <div class="mb-3">
+                <button class="btn btn-secondary btn-sm" id="reset-zoom">Reset View</button>
+                <button class="btn btn-secondary btn-sm" id="center-graph">Center Graph</button>
+                <span class="ms-3 text-light">Drag nodes to rearrange • Scroll to zoom • Click and drag background to pan</span>
+            </div>
             <div id="viz-container"></div>
         </div>
 
         <div class="card">
             <div class="card-body">
-                <h6>BFO Type Legend</h6>
+                <h6>BFO Visual Syntax Legend</h6>
                 <div class="row">
                     <div class="col-md-6">
-                        <span style="color: #2563eb;">■</span> Independent Continuant<br>
-                        <span style="color: #dc2626;">■</span> Dependent Continuant<br>
-                        <span style="color: #059669;">■</span> Process
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="8" fill="none" stroke="#2563eb" stroke-width="2"/>
+                            </svg>
+                            Independent Continuant
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="8" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="3,3"/>
+                            </svg>
+                            Dependent Continuant
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <rect x="2" y="6" width="16" height="8" fill="none" stroke="#059669" stroke-width="2" rx="2"/>
+                            </svg>
+                            Generally Dependent
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <span style="color: #7c3aed;">■</span> Temporal Region<br>
-                        <span style="color: #ea580c;">■</span> Spatial Region<br>
-                        <span style="color: #6b7280;">■</span> Relations
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <polygon points="10,2 18,10 10,18 2,10" fill="none" stroke="#7c3aed" stroke-width="2"/>
+                            </svg>
+                            Process
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <rect x="2" y="6" width="16" height="8" fill="none" stroke="#ea580c" stroke-width="2"/>
+                            </svg>
+                            Temporal Region
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <line x1="2" y1="10" x2="18" y2="10" stroke="#6b7280" stroke-width="2" marker-end="url(#arrowhead)"/>
+                            </svg>
+                            Relations
+                        </div>
                     </div>
                 </div>
             </div>
@@ -57,34 +92,34 @@
         const width = 800;
         const height = 600;
         
-        // Your legal ontology data
+        // Your legal ontology data with proper BVSS shape types
         const nodes = [
-            {id: "Contract", name: "Contract", group: 1},
-            {id: "Legal_Role", name: "Legal_Role", group: 2},
-            {id: "Claim", name: "Claim", group: 2},
-            {id: "Legal_Entity", name: "Legal_Entity", group: 1},
-            {id: "Obligation", name: "Obligation", group: 2},
-            {id: "Legal_System", name: "Legal_System", group: 1},
-            {id: "Precedent", name: "Precedent", group: 1},
-            {id: "Authority", name: "Authority", group: 2},
-            {id: "Evidence", name: "Evidence", group: 1},
-            {id: "Legal_Fact", name: "Legal_Fact", group: 1},
-            {id: "Jurisdiction", name: "Jurisdiction", group: 5},
-            {id: "Right", name: "Right", group: 2},
-            {id: "Legal_Person", name: "Legal_Person", group: 1},
-            {id: "Legal_Process", name: "Legal_Process", group: 3},
-            {id: "Regulation", name: "Regulation", group: 1},
-            {id: "Judgment", name: "Judgment", group: 1},
-            {id: "Court", name: "Court", group: 1},
-            {id: "Statute", name: "Statute", group: 1},
-            {id: "Legal_Document", name: "Legal_Document", group: 1},
-            {id: "Liability", name: "Liability", group: 2},
-            {id: "Legal_Interpretation", name: "Legal_Interpretation", group: 3},
-            {id: "Legal_Proceeding", name: "Legal_Proceeding", group: 3},
-            {id: "Legal_Capacity", name: "Legal_Capacity", group: 2},
-            {id: "Legal_Status", name: "Legal_Status", group: 2},
-            {id: "Legal_Relationship", name: "Legal_Relationship", group: 2},
-            {id: "Legal_Event", name: "Legal_Event", group: 3}
+            {id: "Contract", name: "Contract", shape: "circle", group: 1},
+            {id: "Legal_Role", name: "Legal_Role", shape: "dashed-circle", group: 2},
+            {id: "Claim", name: "Claim", shape: "dashed-circle", group: 2},
+            {id: "Legal_Entity", name: "Legal_Entity", shape: "circle", group: 1},
+            {id: "Obligation", name: "Obligation", shape: "dashed-circle", group: 2},
+            {id: "Legal_System", name: "Legal_System", shape: "circle", group: 1},
+            {id: "Precedent", name: "Precedent", shape: "circle", group: 1},
+            {id: "Authority", name: "Authority", shape: "dashed-circle", group: 2},
+            {id: "Evidence", name: "Evidence", shape: "circle", group: 1},
+            {id: "Legal_Fact", name: "Legal_Fact", shape: "circle", group: 1},
+            {id: "Jurisdiction", name: "Jurisdiction", shape: "rect", group: 5},
+            {id: "Right", name: "Right", shape: "dashed-circle", group: 2},
+            {id: "Legal_Person", name: "Legal_Person", shape: "circle", group: 1},
+            {id: "Legal_Process", name: "Legal_Process", shape: "diamond", group: 4},
+            {id: "Regulation", name: "Regulation", shape: "circle", group: 1},
+            {id: "Judgment", name: "Judgment", shape: "circle", group: 1},
+            {id: "Court", name: "Court", shape: "circle", group: 1},
+            {id: "Statute", name: "Statute", shape: "rounded-rect", group: 3},
+            {id: "Legal_Document", name: "Legal_Document", shape: "rounded-rect", group: 3},
+            {id: "Liability", name: "Liability", shape: "dashed-circle", group: 2},
+            {id: "Legal_Interpretation", name: "Legal_Interpretation", shape: "diamond", group: 4},
+            {id: "Legal_Proceeding", name: "Legal_Proceeding", shape: "diamond", group: 4},
+            {id: "Legal_Capacity", name: "Legal_Capacity", shape: "dashed-circle", group: 2},
+            {id: "Legal_Status", name: "Legal_Status", shape: "dashed-circle", group: 2},
+            {id: "Legal_Relationship", name: "Legal_Relationship", shape: "dashed-circle", group: 2},
+            {id: "Legal_Event", name: "Legal_Event", shape: "diamond", group: 4}
         ];
 
         const links = [
@@ -96,12 +131,38 @@
             {source: "Legal_Fact", target: "Evidence"}
         ];
 
-        // Create SVG
+        // Create SVG with zoom and pan
         const svg = d3.create("svg")
             .attr("width", width)
             .attr("height", height)
             .style("background", "#2d3748")
             .style("border-radius", "4px");
+
+        // Add zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+
+        svg.call(zoom);
+
+        // Main group for all elements
+        const g = svg.append("g");
+
+        // Define markers for arrows
+        const defs = svg.append("defs");
+        defs.append("marker")
+            .attr("id", "arrowhead")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 15)
+            .attr("refY", 0)
+            .attr("markerWidth", 6)
+            .attr("markerHeight", 6)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", "#9ca3af");
 
         // Color scale
         const color = d3.scaleOrdinal()
@@ -110,41 +171,88 @@
 
         // Create force simulation
         const simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(80))
-            .force("charge", d3.forceManyBody().strength(-200))
+            .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-300))
             .force("center", d3.forceCenter(width / 2, height / 2));
 
         // Add links
-        const link = svg.append("g")
+        const link = g.append("g")
             .selectAll("line")
             .data(links)
             .join("line")
             .attr("stroke", "#9ca3af")
-            .attr("stroke-width", 2);
-
-        // Add nodes
-        const node = svg.append("g")
-            .selectAll("circle")
-            .data(nodes)
-            .join("circle")
-            .attr("r", 20)
-            .attr("fill", d => color(d.group))
-            .attr("stroke", "#fff")
             .attr("stroke-width", 2)
+            .attr("marker-end", "url(#arrowhead)");
+
+        // Add nodes group
+        const nodeGroup = g.append("g")
+            .selectAll("g")
+            .data(nodes)
+            .join("g")
             .call(d3.drag()
                 .on("start", dragstarted)
                 .on("drag", dragged)
                 .on("end", dragended));
 
-        // Add labels
-        const label = svg.append("g")
-            .selectAll("text")
-            .data(nodes)
-            .join("text")
+        // Draw shapes based on BVSS specification
+        nodeGroup.each(function(d) {
+            const group = d3.select(this);
+            const nodeColor = color(d.group);
+            
+            switch(d.shape) {
+                case "circle":
+                    group.append("circle")
+                        .attr("r", 25)
+                        .attr("fill", "none")
+                        .attr("stroke", nodeColor)
+                        .attr("stroke-width", 3);
+                    break;
+                case "dashed-circle":
+                    group.append("circle")
+                        .attr("r", 25)
+                        .attr("fill", "none")
+                        .attr("stroke", nodeColor)
+                        .attr("stroke-width", 3)
+                        .attr("stroke-dasharray", "5,5");
+                    break;
+                case "diamond":
+                    group.append("polygon")
+                        .attr("points", "0,-25 25,0 0,25 -25,0")
+                        .attr("fill", "none")
+                        .attr("stroke", nodeColor)
+                        .attr("stroke-width", 3);
+                    break;
+                case "rect":
+                    group.append("rect")
+                        .attr("x", -25)
+                        .attr("y", -15)
+                        .attr("width", 50)
+                        .attr("height", 30)
+                        .attr("fill", "none")
+                        .attr("stroke", nodeColor)
+                        .attr("stroke-width", 3);
+                    break;
+                case "rounded-rect":
+                    group.append("rect")
+                        .attr("x", -25)
+                        .attr("y", -15)
+                        .attr("width", 50)
+                        .attr("height", 30)
+                        .attr("rx", 5)
+                        .attr("fill", "none")
+                        .attr("stroke", nodeColor)
+                        .attr("stroke-width", 3);
+                    break;
+            }
+        });
+
+        // Add labels to node groups
+        nodeGroup.append("text")
             .text(d => d.name)
-            .attr("font-size", "10px")
+            .attr("font-size", "9px")
             .attr("text-anchor", "middle")
             .attr("fill", "#f3f4f6")
+            .attr("dy", "0.35em")
             .style("pointer-events", "none");
 
         // Update positions on tick
@@ -155,13 +263,29 @@
                 .attr("x2", d => d.target.x)
                 .attr("y2", d => d.target.y);
 
-            node
-                .attr("cx", d => d.x)
-                .attr("cy", d => d.y);
+            nodeGroup
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
 
-            label
-                .attr("x", d => d.x)
-                .attr("y", d => d.y + 5);
+        // Control buttons
+        document.getElementById('reset-zoom').addEventListener('click', () => {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+        });
+
+        document.getElementById('center-graph').addEventListener('click', () => {
+            const bounds = g.node().getBBox();
+            const centerX = bounds.x + bounds.width / 2;
+            const centerY = bounds.y + bounds.height / 2;
+            const scale = 0.9 / Math.max(bounds.width / width, bounds.height / height);
+            const translate = [width / 2 - scale * centerX, height / 2 - scale * centerY];
+            
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+            );
         });
 
         // Drag functions
