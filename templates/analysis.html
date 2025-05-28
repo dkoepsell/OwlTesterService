@@ -82,6 +82,16 @@
                         
                         <h6><i class="fas fa-chart-line me-2"></i>Complexity: </h6>
                         <p class="ms-4">{{ analysis.axiom_count if analysis.axiom_count is not none else 0 }} axioms</p>
+                        
+                        <h6><i class="fas fa-eye me-2"></i>Visualizations: </h6>
+                        <div class="ms-4">
+                            <a href="{{ url_for('generate_diagram', filename=file.filename) }}" class="btn btn-outline-primary btn-sm me-2">
+                                <i class="fas fa-sitemap me-1"></i>Interactive Diagram
+                            </a>
+                            <a href="{{ url_for('bvss_visualize', filename=file.filename) }}" class="btn btn-outline-info btn-sm">
+                                <i class="fas fa-project-diagram me-1"></i>BVSS View
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
