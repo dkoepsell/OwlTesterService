@@ -1680,7 +1680,7 @@ def bvss_visualize(filename):
         # Extract BVSS graph data
         bvss_data = extract_bvss_graph(file_path)
         
-        return render_template('bvss_visualize.html', 
+        return render_template('bvss_simple.html', 
                              file=file_record,
                              filename=filename,
                              bvss_data=bvss_data)

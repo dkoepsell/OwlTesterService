@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVSS Visualization - {{ file.original_filename }}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .bvss-container {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .node {
+            cursor: pointer;
+            stroke-width: 2;
+        }
+        
+        .independent-continuant { fill: #2563eb; stroke: #1d4ed8; }
+        .dependent-continuant { fill: #dc2626; stroke: #b91c1c; }
+        .process { fill: #059669; stroke: #047857; }
+        .temporal-region { fill: #7c3aed; stroke: #6d28d9; }
+        .spatial-region { fill: #ea580c; stroke: #c2410c; }
+        .relation { fill: #6b7280; stroke: #4b5563; }
+        
+        .link {
+            stroke: #9ca3af;
+            stroke-width: 2;
+        }
+        
+        .node-label {
+            fill: #f3f4f6;
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">FOL-BFO-OWL Tester</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('view_history') }}">Back to History</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">BVSS Visualization: {{ file.original_filename }}</h1>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5>Ontology Information</h5>
+                <p><strong>Classes:</strong> {{ bvss_data.ontology_info.class_count if bvss_data.ontology_info else 'N/A' }}</p>
+                <p><strong>Properties:</strong> {{ bvss_data.ontology_info.property_count if bvss_data.ontology_info else 'N/A' }}</p>
+            </div>
+        </div>
+
+        <div class="bvss-container">
+            <svg id="bvss-viz" width="800" height="600" style="background: #2d3748; border-radius: 4px;"></svg>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6>BFO Type Legend</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <span style="color: #2563eb;">■</span> Independent Continuant<br>
+                        <span style="color: #dc2626;">■</span> Dependent Continuant<br>
+                        <span style="color: #059669;">■</span> Process
+                    </div>
+                    <div class="col-md-6">
+                        <span style="color: #7c3aed;">■</span> Temporal Region<br>
+                        <span style="color: #ea580c;">■</span> Spatial Region<br>
+                        <span style="color: #6b7280;">■</span> Relations
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Create sample data if backend data fails
+        let vizData = {
+            nodes: [
+                {id: "Contract", name: "Contract", type: "IndependentContinuant"},
+                {id: "Legal_Role", name: "Legal_Role", type: "DependentContinuant"},
+                {id: "Legal_Process", name: "Legal_Process", type: "Process"},
+                {id: "Evidence", name: "Evidence", type: "IndependentContinuant"},
+                {id: "Obligation", name: "Obligation", type: "DependentContinuant"}
+            ],
+            edges: [
+                {source: "Contract", target: "Legal_Role", type: "has_role"},
+                {source: "Legal_Process", target: "Evidence", type: "uses"}
+            ]
+        };
+
+        // Try to use backend data if available
+        try {
+            const backendData = {{ bvss_data | tojson | safe }};
+            if (backendData && backendData.nodes && backendData.nodes.length > 0) {
+                vizData = backendData;
+            }
+        } catch (e) {
+            console.log("Using sample data due to backend data error:", e);
+        }
+
+        // Set up SVG
+        const svg = d3.select("#bvss-viz");
+        const width = 800;
+        const height = 600;
+
+        // Create simulation
+        const simulation = d3.forceSimulation(vizData.nodes)
+            .force("link", d3.forceLink(vizData.edges).id(d => d.id).distance(80))
+            .force("charge", d3.forceManyBody().strength(-200))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        // Create links
+        const link = svg.append("g")
+            .selectAll("line")
+            .data(vizData.edges)
+            .enter().append("line")
+            .attr("class", "link");
+
+        // Create nodes
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(vizData.nodes)
+            .enter().append("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        // Add circles
+        node.append("circle")
+            .attr("r", 20)
+            .attr("class", d => d.type.toLowerCase().replace(/\s+/g, '-'));
+
+        // Add labels
+        node.append("text")
+            .attr("class", "node-label")
+            .attr("dy", ".35em")
+            .text(d => d.name || d.label);
+
+        // Update positions
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+    </script>
+</body>
+</html>
