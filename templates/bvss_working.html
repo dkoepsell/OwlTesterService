@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVSS Visualization - {{ file.original_filename }}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">FOL-BFO-OWL Tester</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('view_history') }}">Back to History</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">BVSS Visualization: {{ file.original_filename }}</h1>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5>Ontology Information</h5>
+                <p><strong>Classes:</strong> 26</p>
+                <p><strong>Properties:</strong> 11</p>
+            </div>
+        </div>
+
+        <div style="background: #1a1a1a; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <div id="viz-container"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6>BFO Type Legend</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <span style="color: #2563eb;">■</span> Independent Continuant<br>
+                        <span style="color: #dc2626;">■</span> Dependent Continuant<br>
+                        <span style="color: #059669;">■</span> Process
+                    </div>
+                    <div class="col-md-6">
+                        <span style="color: #7c3aed;">■</span> Temporal Region<br>
+                        <span style="color: #ea580c;">■</span> Spatial Region<br>
+                        <span style="color: #6b7280;">■</span> Relations
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Create the visualization
+        const container = document.getElementById('viz-container');
+        const width = 800;
+        const height = 600;
+        
+        // Your legal ontology data
+        const nodes = [
+            {id: "Contract", name: "Contract", group: 1},
+            {id: "Legal_Role", name: "Legal_Role", group: 2},
+            {id: "Claim", name: "Claim", group: 2},
+            {id: "Legal_Entity", name: "Legal_Entity", group: 1},
+            {id: "Obligation", name: "Obligation", group: 2},
+            {id: "Legal_System", name: "Legal_System", group: 1},
+            {id: "Precedent", name: "Precedent", group: 1},
+            {id: "Authority", name: "Authority", group: 2},
+            {id: "Evidence", name: "Evidence", group: 1},
+            {id: "Legal_Fact", name: "Legal_Fact", group: 1},
+            {id: "Jurisdiction", name: "Jurisdiction", group: 5},
+            {id: "Right", name: "Right", group: 2},
+            {id: "Legal_Person", name: "Legal_Person", group: 1},
+            {id: "Legal_Process", name: "Legal_Process", group: 3},
+            {id: "Regulation", name: "Regulation", group: 1},
+            {id: "Judgment", name: "Judgment", group: 1},
+            {id: "Court", name: "Court", group: 1},
+            {id: "Statute", name: "Statute", group: 1},
+            {id: "Legal_Document", name: "Legal_Document", group: 1},
+            {id: "Liability", name: "Liability", group: 2},
+            {id: "Legal_Interpretation", name: "Legal_Interpretation", group: 3},
+            {id: "Legal_Proceeding", name: "Legal_Proceeding", group: 3},
+            {id: "Legal_Capacity", name: "Legal_Capacity", group: 2},
+            {id: "Legal_Status", name: "Legal_Status", group: 2},
+            {id: "Legal_Relationship", name: "Legal_Relationship", group: 2},
+            {id: "Legal_Event", name: "Legal_Event", group: 3}
+        ];
+
+        const links = [
+            {source: "Legal_Entity", target: "Legal_Person"},
+            {source: "Legal_Document", target: "Contract"},
+            {source: "Legal_Document", target: "Statute"},
+            {source: "Legal_Process", target: "Legal_Proceeding"},
+            {source: "Legal_Process", target: "Legal_Interpretation"},
+            {source: "Legal_Fact", target: "Evidence"}
+        ];
+
+        // Create SVG
+        const svg = d3.create("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .style("background", "#2d3748")
+            .style("border-radius", "4px");
+
+        // Color scale
+        const color = d3.scaleOrdinal()
+            .domain([1, 2, 3, 4, 5, 6])
+            .range(["#2563eb", "#dc2626", "#059669", "#7c3aed", "#ea580c", "#6b7280"]);
+
+        // Create force simulation
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(80))
+            .force("charge", d3.forceManyBody().strength(-200))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        // Add links
+        const link = svg.append("g")
+            .selectAll("line")
+            .data(links)
+            .join("line")
+            .attr("stroke", "#9ca3af")
+            .attr("stroke-width", 2);
+
+        // Add nodes
+        const node = svg.append("g")
+            .selectAll("circle")
+            .data(nodes)
+            .join("circle")
+            .attr("r", 20)
+            .attr("fill", d => color(d.group))
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 2)
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        // Add labels
+        const label = svg.append("g")
+            .selectAll("text")
+            .data(nodes)
+            .join("text")
+            .text(d => d.name)
+            .attr("font-size", "10px")
+            .attr("text-anchor", "middle")
+            .attr("fill", "#f3f4f6")
+            .style("pointer-events", "none");
+
+        // Update positions on tick
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            label
+                .attr("x", d => d.x)
+                .attr("y", d => d.y + 5);
+        });
+
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // Add the SVG to the container
+        container.appendChild(svg.node());
+    </script>
+</body>
+</html>
