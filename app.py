@@ -27,6 +27,7 @@ from improved_openai_utils import suggest_ontology_classes, suggest_ontology_pro
 from openai_utils import generate_real_world_implications
 # Import the preprocess_expression function for handling comma-separated quantifiers
 from owl_preprocessor import preprocess_expression
+from bvss_model import extract_bvss_graph
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -1660,6 +1661,65 @@ def api_generate_diagram(filename):
     """Legacy API endpoint - redirects to the new interactive diagram."""
     # Redirect to the new interactive diagram
     return redirect(url_for('generate_diagram', filename=filename))
+
+@app.route('/analyze/<filename>/bvss')
+def bvss_visualize(filename):
+    """Generate a BVSS visualization for an ontology file."""
+    try:
+        # Find the file in the database
+        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        
+        # Get the file path
+        file_path = file_record.file_path
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            flash(f"Ontology file not found: {filename}", 'error')
+            return redirect(url_for('view_history'))
+        
+        # Extract BVSS graph data
+        bvss_data = extract_bvss_graph(file_path)
+        
+        return render_template('bvss_visualize.html', 
+                             file=file_record,
+                             filename=filename,
+                             bvss_data=bvss_data)
+            
+    except Exception as e:
+        app.logger.error(f"Error generating BVSS visualization: {str(e)}")
+        flash(f"Error generating BVSS visualization: {str(e)}", 'error')
+        return redirect(url_for('view_history'))
+
+@app.route('/api/bvss/<filename>')
+def api_bvss_data(filename):
+    """API endpoint to get BVSS visualization data in JSON format."""
+    try:
+        # Find the file in the database
+        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        
+        # Get the file path
+        file_path = file_record.file_path
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return jsonify({
+                'error': 'File not found',
+                'nodes': [],
+                'edges': []
+            }), 404
+        
+        # Extract BVSS graph data
+        bvss_data = extract_bvss_graph(file_path)
+        
+        return jsonify(bvss_data)
+        
+    except Exception as e:
+        app.logger.error(f"Error getting BVSS data: {str(e)}")
+        return jsonify({
+            'error': str(e),
+            'nodes': [],
+            'edges': []
+        }), 500
 
 # Error handlers
 @app.errorhandler(404)

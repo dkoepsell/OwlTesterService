@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVSS Visualization - {{ file.original_filename }}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .bvss-container {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .bvss-svg {
+            background: #2d3748;
+            border-radius: 4px;
+            border: 1px solid #4a5568;
+        }
+        
+        /* BVSS Node Styles */
+        .node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .node:hover {
+            stroke-width: 3px;
+        }
+        
+        /* BFO Type-specific styles */
+        .independent-continuant {
+            fill: #2563eb;
+            stroke: #1d4ed8;
+        }
+        
+        .dependent-continuant {
+            fill: #dc2626;
+            stroke: #b91c1c;
+            stroke-dasharray: 5,5;
+        }
+        
+        .process {
+            fill: #059669;
+            stroke: #047857;
+        }
+        
+        .temporal-region {
+            fill: #7c3aed;
+            stroke: #6d28d9;
+        }
+        
+        .spatial-region {
+            fill: #ea580c;
+            stroke: #c2410c;
+        }
+        
+        .relation {
+            fill: #6b7280;
+            stroke: #4b5563;
+            stroke-width: 2;
+        }
+        
+        /* Edge styles */
+        .link {
+            stroke: #9ca3af;
+            stroke-width: 2;
+            marker-end: url(#arrowhead);
+        }
+        
+        .link.inheritance {
+            stroke: #3b82f6;
+            stroke-width: 3;
+        }
+        
+        .link.domain {
+            stroke: #10b981;
+            stroke-dasharray: 3,3;
+        }
+        
+        .link.range {
+            stroke: #f59e0b;
+            stroke-dasharray: 3,3;
+        }
+        
+        /* Text labels */
+        .node-label {
+            fill: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+        
+        .legend {
+            background: #374151;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+        
+        .control-panel {
+            background: #374151;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: #1f2937;
+            color: #f3f4f6;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #4b5563;
+            pointer-events: none;
+            font-size: 12px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">FOL-BFO-OWL Tester</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+                <a class="nav-link" href="{{ url_for('view_history') }}">History</a>
+                <a class="nav-link" href="{{ url_for('analyze_owl', filename=filename) }}">Back to Analysis</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">BVSS Visualization: {{ file.original_filename }}</h1>
+                
+                <!-- Ontology Information -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Ontology Information</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Name:</strong> {{ bvss_data.ontology_info.name }}</p>
+                                <p><strong>Base IRI:</strong> <small>{{ bvss_data.ontology_info.base_iri }}</small></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Classes:</strong> {{ bvss_data.ontology_info.class_count }}</p>
+                                <p><strong>Properties:</strong> {{ bvss_data.ontology_info.property_count }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Panel -->
+                <div class="control-panel">
+                    <h6>Visualization Controls</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <button id="resetZoom" class="btn btn-secondary btn-sm">Reset Zoom</button>
+                            <button id="centerGraph" class="btn btn-secondary btn-sm">Center Graph</button>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="nodeSize" class="form-label">Node Size:</label>
+                            <input type="range" class="form-range" id="nodeSize" min="10" max="50" value="25">
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="showLabels" checked>
+                                <label class="form-check-label" for="showLabels">Show Labels</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BVSS Visualization -->
+                <div class="bvss-container">
+                    <svg id="bvss-visualization" class="bvss-svg" width="100%" height="600"></svg>
+                </div>
+
+                <!-- Legend -->
+                <div class="legend">
+                    <h6>BFO Type Legend</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="legend-item">
+                                <div class="legend-color independent-continuant"></div>
+                                <span>Independent Continuant (Objects, Entities)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color dependent-continuant"></div>
+                                <span>Dependent Continuant (Roles, Qualities)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color process"></div>
+                                <span>Process (Events, Activities)</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="legend-item">
+                                <div class="legend-color temporal-region"></div>
+                                <span>Temporal Region (Time intervals)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color spatial-region"></div>
+                                <span>Spatial Region (Locations)</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color relation"></div>
+                                <span>Relations (Properties)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip" style="display: none;"></div>
+
+    <script>
+        // BVSS data from Flask
+        const bvssData = {{ bvss_data | tojson }};
+        
+        // Set up the SVG and dimensions
+        const svg = d3.select("#bvss-visualization");
+        const container = svg.node().parentNode;
+        const width = container.clientWidth;
+        const height = 600;
+        
+        svg.attr("width", width).attr("height", height);
+        
+        // Create main group for zoom/pan
+        const g = svg.append("g");
+        
+        // Create arrow marker for edges
+        svg.append("defs").append("marker")
+            .attr("id", "arrowhead")
+            .attr("viewBox", "-0 -5 10 10")
+            .attr("refX", 20)
+            .attr("refY", 0)
+            .attr("orient", "auto")
+            .attr("markerWidth", 8)
+            .attr("markerHeight", 8)
+            .append("path")
+            .attr("d", "M 0,-5 L 10,0 L 0,5")
+            .attr("fill", "#9ca3af");
+        
+        // Set up force simulation
+        const simulation = d3.forceSimulation(bvssData.nodes)
+            .force("link", d3.forceLink(bvssData.edges).id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(30));
+        
+        // Create links
+        const link = g.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(bvssData.edges)
+            .enter().append("line")
+            .attr("class", d => `link ${d.type}`);
+        
+        // Create nodes
+        const node = g.append("g")
+            .attr("class", "nodes")
+            .selectAll("g")
+            .data(bvssData.nodes)
+            .enter().append("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+        
+        // Add circles to nodes
+        const circles = node.append("circle")
+            .attr("r", 25)
+            .attr("class", d => d.type.toLowerCase().replace(/\s+/g, '-'))
+            .on("mouseover", function(event, d) {
+                showTooltip(event, d);
+            })
+            .on("mouseout", function() {
+                hideTooltip();
+            });
+        
+        // Add labels to nodes
+        const labels = node.append("text")
+            .attr("class", "node-label")
+            .attr("dy", ".35em")
+            .text(d => d.label || d.name);
+        
+        // Update positions on simulation tick
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+            
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+        
+        // Zoom and pan functionality
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on("zoom", function(event) {
+                g.attr("transform", event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Control panel event handlers
+        document.getElementById("resetZoom").addEventListener("click", () => {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+        });
+        
+        document.getElementById("centerGraph").addEventListener("click", () => {
+            simulation.alpha(1).restart();
+        });
+        
+        document.getElementById("nodeSize").addEventListener("input", (e) => {
+            const size = parseInt(e.target.value);
+            circles.attr("r", size);
+            simulation.force("collision").radius(size + 5).alpha(1).restart();
+        });
+        
+        document.getElementById("showLabels").addEventListener("change", (e) => {
+            labels.style("display", e.target.checked ? "block" : "none");
+        });
+        
+        // Tooltip functions
+        function showTooltip(event, d) {
+            const tooltip = d3.select("#tooltip");
+            tooltip.style("display", "block")
+                .html(`
+                    <strong>${d.name}</strong><br>
+                    <em>Type:</em> ${d.type}<br>
+                    <em>Description:</em> ${d.description || 'No description available'}<br>
+                    ${d.temporal ? '<em>Temporal aspects:</em> Yes' : ''}
+                `)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 10) + "px");
+        }
+        
+        function hideTooltip() {
+            d3.select("#tooltip").style("display", "none");
+        }
+        
+        // Drag functions
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        // Handle window resize
+        window.addEventListener("resize", () => {
+            const newWidth = container.clientWidth;
+            svg.attr("width", newWidth);
+            simulation.force("center", d3.forceCenter(newWidth / 2, height / 2));
+            simulation.alpha(1).restart();
+        });
+    </script>
+</body>
+</html>
