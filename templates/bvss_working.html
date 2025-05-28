@@ -44,58 +44,107 @@
 
         <div class="card">
             <div class="card-body">
-                <h6>Official BFO Visual Syntax (BVSS) Legend</h6>
+                <h6>Complete BFO Visual Syntax (BVSS) Legend</h6>
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-2">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Entity Types</h6>
+                        <div class="d-flex align-items-center mb-1">
                             <svg width="20" height="20" class="me-2">
                                 <circle cx="10" cy="10" r="8" fill="none" stroke="#000000" stroke-width="2"/>
                             </svg>
-                            <strong>●</strong> Independent Continuant
+                            <small><strong>●</strong> Independent continuant</small>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <rect x="2" y="2" width="16" height="16" fill="#808080" stroke="#000000" stroke-width="2"/>
-                            </svg>
-                            <strong>■</strong> Material Entity
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <rect x="2" y="2" width="16" height="16" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="3,3"/>
-                            </svg>
-                            <strong>□</strong> Immaterial Entity
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-1">
                             <svg width="20" height="20" class="me-2">
                                 <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
                             </svg>
-                            <strong>◌</strong> Dependent Continuant
+                            <small><strong>◌</strong> Dependent continuant</small>
                         </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <rect x="4" y="2" width="12" height="16" fill="none" stroke="#000000" stroke-width="2"/>
+                                <line x1="6" y1="6" x2="14" y2="6" stroke="#000000" stroke-width="1"/>
+                                <line x1="6" y1="10" x2="14" y2="10" stroke="#000000" stroke-width="1"/>
+                                <line x1="6" y1="14" x2="14" y2="14" stroke="#000000" stroke-width="1"/>
+                            </svg>
+                            <small><strong>📄</strong> Generically dependent</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
                             <svg width="20" height="20" class="me-2">
                                 <polygon points="2,10 15,6 15,8 18,10 15,12 15,14" fill="#000000"/>
                             </svg>
-                            <strong>⟶</strong> Process (Occurrent)
+                            <small><strong>⟶</strong> Process</small>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <line x1="2" y1="10" x2="18" y2="10" stroke="#000000" stroke-width="2"/>
+                                <polygon points="2,10 6,8 6,12" fill="#000000"/>
+                                <polygon points="18,10 14,8 14,12" fill="#000000"/>
+                            </svg>
+                            <small><strong>⟷</strong> Temporal region</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-success">Relations</h6>
+                        <div class="d-flex align-items-center mb-1">
                             <svg width="20" height="20" class="me-2">
                                 <line x1="2" y1="10" x2="18" y2="10" stroke="#000000" stroke-width="3"/>
                             </svg>
-                            <strong>↑</strong> is_a (solid line)
+                            <small><strong>↑</strong> is_a</small>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-1">
                             <svg width="20" height="20" class="me-2">
-                                <line x1="2" y1="10" x2="18" y2="10" stroke="#666666" stroke-width="2" stroke-dasharray="3,3"/>
+                                <line x1="2" y1="10" x2="18" y2="10" stroke="#000000" stroke-width="3"/>
+                                <circle cx="8" cy="10" r="2" fill="#000000"/>
                             </svg>
-                            <strong>→</strong> has_role (dashed)
+                            <small><strong>—●</strong> Connected via</small>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-1">
                             <svg width="20" height="20" class="me-2">
-                                <line x1="2" y1="10" x2="18" y2="10" stroke="#555555" stroke-width="4"/>
+                                <circle cx="4" cy="10" r="2" fill="none" stroke="#000000" stroke-width="1"/>
+                                <line x1="6" y1="10" x2="18" y2="10" stroke="#000000" stroke-width="2"/>
                             </svg>
-                            <strong>⇨</strong> participates_in
+                            <small><strong>○→</strong> Inherent in</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <line x1="2" y1="10" x2="18" y2="10" stroke="#000000" stroke-width="2" stroke-dasharray="4,2"/>
+                            </svg>
+                            <small><strong>---→</strong> Realized by</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <line x1="2" y1="8" x2="18" y2="8" stroke="#000000" stroke-width="2"/>
+                                <line x1="2" y1="12" x2="18" y2="12" stroke="#000000" stroke-width="2"/>
+                            </svg>
+                            <small><strong>⇨</strong> Participates in</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-warning">Logic Operators</h6>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <text x="10" y="14" text-anchor="middle" font-size="14" fill="#000000">×</text>
+                            </svg>
+                            <small><strong>×</strong> implies</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <text x="10" y="14" text-anchor="middle" font-size="12" fill="#000000">⇐</text>
+                            </svg>
+                            <small><strong>⇐</strong> iff</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <text x="10" y="14" text-anchor="middle" font-size="14" fill="#000000">×</text>
+                            </svg>
+                            <small><strong>×</strong> negation</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <text x="10" y="14" text-anchor="middle" font-size="10" fill="#000000">I S ≠ ⟶ S ×</text>
+                            </svg>
+                            <small>Formula notation</small>
                         </div>
                     </div>
                 </div>
@@ -122,34 +171,35 @@
             {id: "GenericallyDependentContinuant", name: "Generically Dependent Continuant", shape: "small-dashed-circle-migrate", group: 3, bfo: true, bfoType: "generic-dependent"}
         ];
 
-        // Your legal ontology data with proper BVSS classification
+        // Your legal ontology data with complete BVSS classification
         const legalNodes = [
-            {id: "Contract", name: "Contract", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
+            {id: "Contract", name: "Contract", shape: "generically-dependent", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
             {id: "Legal_Role", name: "Legal_Role", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
             {id: "Claim", name: "Claim", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
             {id: "Legal_Entity", name: "Legal_Entity", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
             {id: "Obligation", name: "Obligation", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
             {id: "Legal_System", name: "Legal_System", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
-            {id: "Precedent", name: "Precedent", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
+            {id: "Precedent", name: "Precedent", shape: "generically-dependent", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
             {id: "Authority", name: "Authority", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
-            {id: "Evidence", name: "Evidence", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
+            {id: "Evidence", name: "Evidence", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
             {id: "Legal_Fact", name: "Legal_Fact", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
             {id: "Jurisdiction", name: "Jurisdiction", shape: "hollow-square", group: 5, parent: "SpatialRegion", bfoType: "spatial"},
             {id: "Right", name: "Right", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
             {id: "Legal_Person", name: "Legal_Person", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
             {id: "Legal_Process", name: "Legal_Process", shape: "arrow", group: 4, parent: "Process", bfoType: "process"},
-            {id: "Regulation", name: "Regulation", shape: "small-dashed-circle-migrate", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
-            {id: "Judgment", name: "Judgment", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
+            {id: "Regulation", name: "Regulation", shape: "generically-dependent", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
+            {id: "Judgment", name: "Judgment", shape: "generically-dependent", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
             {id: "Court", name: "Court", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
-            {id: "Statute", name: "Statute", shape: "small-dashed-circle-migrate", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
-            {id: "Legal_Document", name: "Legal_Document", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
+            {id: "Statute", name: "Statute", shape: "generically-dependent", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
+            {id: "Legal_Document", name: "Legal_Document", shape: "generically-dependent", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
             {id: "Liability", name: "Liability", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
             {id: "Legal_Interpretation", name: "Legal_Interpretation", shape: "arrow", group: 4, parent: "Process", bfoType: "process"},
             {id: "Legal_Proceeding", name: "Legal_Proceeding", shape: "arrow", group: 4, parent: "Process", bfoType: "process"},
             {id: "Legal_Capacity", name: "Legal_Capacity", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
             {id: "Legal_Status", name: "Legal_Status", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
             {id: "Legal_Relationship", name: "Legal_Relationship", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
-            {id: "Legal_Event", name: "Legal_Event", shape: "arrow", group: 4, parent: "Process", bfoType: "process"}
+            {id: "Legal_Event", name: "Legal_Event", shape: "arrow", group: 4, parent: "Process", bfoType: "process"},
+            {id: "TrialPeriod", name: "Trial Period", shape: "temporal-region", group: 6, parent: "TemporalRegion", bfoType: "temporal"}
         ];
 
         const nodes = [...bfoNodes, ...legalNodes];
@@ -175,7 +225,7 @@
                 type: "inheritance"
             }));
 
-        // Domain-specific relationships using BVSS relation symbols
+        // Domain-specific relationships using complete BVSS relation symbols
         const domainLinks = [
             {source: "Legal_Entity", target: "Legal_Person", label: "is_a", type: "is_a"},
             {source: "Legal_Document", target: "Contract", label: "is_a", type: "is_a"},
@@ -183,11 +233,12 @@
             {source: "Legal_Process", target: "Legal_Proceeding", label: "is_a", type: "is_a"},
             {source: "Legal_Process", target: "Legal_Interpretation", label: "is_a", type: "is_a"},
             {source: "Legal_Fact", target: "Evidence", label: "is_a", type: "is_a"},
-            {source: "Court", target: "Judgment", label: "produces", type: "participates_in"},
-            {source: "Legal_Person", target: "Legal_Role", label: "has_role", type: "has_role"},
-            {source: "Contract", target: "Obligation", label: "creates", type: "realizes"},
-            {source: "Legal_Process", target: "Legal_Event", label: "realizes", type: "realizes"},
-            {source: "Authority", target: "Regulation", label: "establishes", type: "has_participant"}
+            {source: "Court", target: "Judgment", label: "determines", type: "connected_via"},
+            {source: "Legal_Person", target: "Legal_Role", label: "has_role", type: "inherent_in"},
+            {source: "Contract", target: "Obligation", label: "creates", type: "realized_by"},
+            {source: "Legal_Process", target: "Legal_Event", label: "realizes", type: "participates_in"},
+            {source: "Authority", target: "Regulation", label: "establishes", type: "realized_by"},
+            {source: "Legal_Proceeding", target: "TrialPeriod", label: "occurs_during", type: "connected_via"}
         ];
 
         const links = [...bfoLinks, ...inheritanceLinks, ...domainLinks];
@@ -234,32 +285,36 @@
         const simulation = d3.forceSimulation(nodes)
             .force("link", d3.forceLink(links).id(d => d.id).distance(100))
             .force("charge", d3.forceManyBody().strength(-300))
-            .force("center", d3.forceCenter(width / 2, height / 2));
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collision", d3.forceCollide().radius(40));
 
-        // Add links with BVSS relation styling
+        // Add links with complete BVSS relation styling
         const link = g.append("g")
             .selectAll("line")
             .data(links)
             .join("line")
             .attr("stroke", d => {
                 switch(d.type) {
-                    case "is_a": return "#000000"; // Solid line for taxonomic
-                    case "has_role": return "#666666"; // Small arrow
-                    case "realizes": return "#333333"; // Curved arrow style
-                    case "participates_in": return "#555555"; // Double line style
+                    case "is_a": return "#000000"; // ↑ solid line
+                    case "connected_via": return "#000000"; // —● Connected via
+                    case "inherent_in": return "#666666"; // ○→ Inherent in
+                    case "realized_by": return "#333333"; // ---→ Realized by
+                    case "participates_in": return "#000000"; // ⇨ Participates in
                     default: return "#9ca3af";
                 }
             })
             .attr("stroke-width", d => {
                 switch(d.type) {
-                    case "is_a": return 3; // Thicker for taxonomic
-                    case "participates_in": return 4; // Thickest for participation
+                    case "is_a": return 4; // Thicker for taxonomic
+                    case "participates_in": return 5; // Double line style
+                    case "connected_via": return 3; // Medium for connected via
                     default: return 2;
                 }
             })
             .attr("stroke-dasharray", d => {
                 switch(d.type) {
-                    case "has_role": return "5,5"; // Dashed for roles
+                    case "inherent_in": return "2,2"; // Small dashes for inherent
+                    case "realized_by": return "6,3"; // Longer dashes for realized by
                     default: return "none";
                 }
             })
@@ -337,6 +392,43 @@
                         .attr("stroke", nodeColor)
                         .attr("stroke-width", 1);
                     break;
+                case "generically-dependent": // 📄 Generically Dependent Continuant
+                    group.append("rect")
+                        .attr("x", -18)
+                        .attr("y", -22)
+                        .attr("width", 36)
+                        .attr("height", 44)
+                        .attr("rx", 2)
+                        .attr("fill", "none")
+                        .attr("stroke", nodeColor)
+                        .attr("stroke-width", strokeWidth);
+                    // Add lines to simulate document
+                    for(let i = 0; i < 3; i++) {
+                        group.append("line")
+                            .attr("x1", -12)
+                            .attr("y1", -10 + i * 8)
+                            .attr("x2", 12)
+                            .attr("y2", -10 + i * 8)
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", 1);
+                    }
+                    break;
+                case "temporal-region": // ⟷ Temporal Region
+                    group.append("line")
+                        .attr("x1", -25)
+                        .attr("y1", 0)
+                        .attr("x2", 25)
+                        .attr("y2", 0)
+                        .attr("stroke", nodeColor)
+                        .attr("stroke-width", strokeWidth);
+                    // Add arrows on both ends
+                    group.append("polygon")
+                        .attr("points", "-25,0 -20,-5 -20,5")
+                        .attr("fill", nodeColor);
+                    group.append("polygon")
+                        .attr("points", "25,0 20,-5 20,5")
+                        .attr("fill", nodeColor);
+                    break;
             }
         });
 
@@ -349,13 +441,26 @@
             .attr("dy", "0.35em")
             .style("pointer-events", "none");
 
-        // Enable dragging on nodes - must be after all elements are added
-        const dragHandler = d3.drag()
-            .on("start", dragstarted)
-            .on("drag", dragged)
-            .on("end", dragended);
-        
-        nodeGroup.call(dragHandler);
+        // Enable dragging on nodes with proper event handling
+        nodeGroup
+            .style("cursor", "grab")
+            .call(d3.drag()
+                .on("start", function(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                    d3.select(this).style("cursor", "grabbing");
+                })
+                .on("drag", function(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on("end", function(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                    d3.select(this).style("cursor", "grab");
+                }));
 
         // Add relationship labels
         const linkLabels = g.append("g")
