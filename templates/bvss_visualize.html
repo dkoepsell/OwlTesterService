@@ -238,7 +238,17 @@
 
     <script>
         // BVSS data from Flask
-        const bvssData = {{ bvss_data | tojson }};
+        const bvssData = {{ bvss_data | tojson | safe }};
+        
+        // Debug: log the data to see what we received
+        console.log('BVSS data:', bvssData);
+        
+        // Check if we have valid data
+        if (!bvssData || !bvssData.nodes || !bvssData.edges) {
+            console.error('Invalid BVSS data structure');
+            document.getElementById('bvss-visualization').innerHTML = '<text x="50" y="50" fill="white">Error: No visualization data available</text>';
+            return;
+        }
         
         // Set up the SVG and dimensions
         const svg = d3.select("#bvss-visualization");
