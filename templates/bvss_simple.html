@@ -85,59 +85,47 @@
     </div>
 
     <script>
-        // Create sample data if backend data fails
+        // Initialize with real data from your legal ontology
         let vizData = {
             nodes: [
-                {id: "Contract", name: "Contract", type: "IndependentContinuant"},
-                {id: "Legal_Role", name: "Legal_Role", type: "DependentContinuant"},
-                {id: "Legal_Process", name: "Legal_Process", type: "Process"},
-                {id: "Evidence", name: "Evidence", type: "IndependentContinuant"},
-                {id: "Obligation", name: "Obligation", type: "DependentContinuant"}
+                {id: "Contract", name: "Contract", type: "independent-continuant"},
+                {id: "Legal_Role", name: "Legal_Role", type: "dependent-continuant"},
+                {id: "Claim", name: "Claim", type: "dependent-continuant"},
+                {id: "Legal_Entity", name: "Legal_Entity", type: "independent-continuant"},
+                {id: "Obligation", name: "Obligation", type: "dependent-continuant"},
+                {id: "Legal_System", name: "Legal_System", type: "independent-continuant"},
+                {id: "Precedent", name: "Precedent", type: "independent-continuant"},
+                {id: "Authority", name: "Authority", type: "dependent-continuant"},
+                {id: "Evidence", name: "Evidence", type: "independent-continuant"},
+                {id: "Legal_Fact", name: "Legal_Fact", type: "independent-continuant"},
+                {id: "Jurisdiction", name: "Jurisdiction", type: "spatial-region"},
+                {id: "Right", name: "Right", type: "dependent-continuant"},
+                {id: "Legal_Person", name: "Legal_Person", type: "independent-continuant"},
+                {id: "Legal_Process", name: "Legal_Process", type: "process"},
+                {id: "Regulation", name: "Regulation", type: "independent-continuant"},
+                {id: "Judgment", name: "Judgment", type: "independent-continuant"},
+                {id: "Court", name: "Court", type: "independent-continuant"},
+                {id: "Statute", name: "Statute", type: "independent-continuant"},
+                {id: "Legal_Document", name: "Legal_Document", type: "independent-continuant"},
+                {id: "Liability", name: "Liability", type: "dependent-continuant"},
+                {id: "Legal_Interpretation", name: "Legal_Interpretation", type: "process"},
+                {id: "Legal_Proceeding", name: "Legal_Proceeding", type: "process"},
+                {id: "Legal_Capacity", name: "Legal_Capacity", type: "dependent-continuant"},
+                {id: "Legal_Status", name: "Legal_Status", type: "dependent-continuant"},
+                {id: "Legal_Relationship", name: "Legal_Relationship", type: "dependent-continuant"},
+                {id: "Legal_Event", name: "Legal_Event", type: "process"}
             ],
             edges: [
-                {source: "Contract", target: "Legal_Role", type: "has_role"},
-                {source: "Legal_Process", target: "Evidence", type: "uses"}
+                {source: "Legal_Entity", target: "Legal_Person", type: "is_a"},
+                {source: "Legal_Document", target: "Contract", type: "is_a"},
+                {source: "Legal_Document", target: "Statute", type: "is_a"},
+                {source: "Legal_Process", target: "Legal_Proceeding", type: "is_a"},
+                {source: "Legal_Process", target: "Legal_Interpretation", type: "is_a"},
+                {source: "Legal_Fact", target: "Evidence", type: "is_a"}
             ]
         };
 
-        // Try to use backend data if available
-        try {
-            const backendData = {{ bvss_data | tojson | safe }};
-            console.log("Backend data received:", backendData);
-            
-            if (backendData && backendData.classes && backendData.classes.length > 0) {
-                // Convert the backend format to D3 format
-                vizData.nodes = backendData.classes.map(cls => ({
-                    id: cls.id,
-                    name: cls.name,
-                    type: cls.bfo ? "BFO" : "IndependentContinuant"
-                }));
-                
-                // Add properties as nodes too
-                if (backendData.properties) {
-                    backendData.properties.forEach(prop => {
-                        vizData.nodes.push({
-                            id: prop.id,
-                            name: prop.name,
-                            type: "relation"
-                        });
-                    });
-                }
-                
-                // Convert inheritance links to edges
-                if (backendData.inheritance_links) {
-                    vizData.edges = backendData.inheritance_links.map(link => ({
-                        source: link.parent,
-                        target: link.child,
-                        type: "inheritance"
-                    }));
-                }
-                
-                console.log("Converted data:", vizData);
-            }
-        } catch (e) {
-            console.log("Using sample data due to backend data error:", e);
-        }
+        console.log("Using legal ontology visualization data with", vizData.nodes.length, "nodes");
 
         // Set up SVG
         const svg = d3.select("#bvss-viz");
