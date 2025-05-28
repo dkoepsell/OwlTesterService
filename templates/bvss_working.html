@@ -123,12 +123,17 @@
         ];
 
         const links = [
-            {source: "Legal_Entity", target: "Legal_Person"},
-            {source: "Legal_Document", target: "Contract"},
-            {source: "Legal_Document", target: "Statute"},
-            {source: "Legal_Process", target: "Legal_Proceeding"},
-            {source: "Legal_Process", target: "Legal_Interpretation"},
-            {source: "Legal_Fact", target: "Evidence"}
+            {source: "Legal_Entity", target: "Legal_Person", label: "is_a"},
+            {source: "Legal_Document", target: "Contract", label: "is_a"},
+            {source: "Legal_Document", target: "Statute", label: "is_a"},
+            {source: "Legal_Process", target: "Legal_Proceeding", label: "is_a"},
+            {source: "Legal_Process", target: "Legal_Interpretation", label: "is_a"},
+            {source: "Legal_Fact", target: "Evidence", label: "is_a"},
+            {source: "Court", target: "Judgment", label: "produces"},
+            {source: "Legal_Person", target: "Legal_Role", label: "has_role"},
+            {source: "Contract", target: "Obligation", label: "creates"},
+            {source: "Legal_Process", target: "Legal_Event", label: "realizes"},
+            {source: "Authority", target: "Regulation", label: "establishes"}
         ];
 
         // Create SVG with zoom and pan
@@ -255,6 +260,18 @@
             .attr("dy", "0.35em")
             .style("pointer-events", "none");
 
+        // Add relationship labels
+        const linkLabels = g.append("g")
+            .selectAll("text")
+            .data(links)
+            .join("text")
+            .text(d => d.label)
+            .attr("font-size", "8px")
+            .attr("text-anchor", "middle")
+            .attr("fill", "#cbd5e1")
+            .attr("dy", "-2px")
+            .style("pointer-events", "none");
+
         // Update positions on tick
         simulation.on("tick", () => {
             link
@@ -265,6 +282,10 @@
 
             nodeGroup
                 .attr("transform", d => `translate(${d.x},${d.y})`);
+
+            linkLabels
+                .attr("x", d => (d.source.x + d.target.x) / 2)
+                .attr("y", d => (d.source.y + d.target.y) / 2);
         });
 
         // Control buttons
