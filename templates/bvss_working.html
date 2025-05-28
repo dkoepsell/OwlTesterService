@@ -349,11 +349,13 @@
             .attr("dy", "0.35em")
             .style("pointer-events", "none");
 
-        // Enable dragging on nodes
-        nodeGroup.call(d3.drag()
+        // Enable dragging on nodes - must be after all elements are added
+        const dragHandler = d3.drag()
             .on("start", dragstarted)
             .on("drag", dragged)
-            .on("end", dragended));
+            .on("end", dragended);
+        
+        nodeGroup.call(dragHandler);
 
         // Add relationship labels
         const linkLabels = g.append("g")
@@ -421,6 +423,9 @@
             d.fx = null;
             d.fy = null;
         }
+
+        // Make sure dragging is enabled on all node elements
+        nodeGroup.selectAll("*").style("pointer-events", "all");
 
         // Add the SVG to the container
         container.appendChild(svg.node());
