@@ -103,8 +103,37 @@
         // Try to use backend data if available
         try {
             const backendData = {{ bvss_data | tojson | safe }};
-            if (backendData && backendData.nodes && backendData.nodes.length > 0) {
-                vizData = backendData;
+            console.log("Backend data received:", backendData);
+            
+            if (backendData && backendData.classes && backendData.classes.length > 0) {
+                // Convert the backend format to D3 format
+                vizData.nodes = backendData.classes.map(cls => ({
+                    id: cls.id,
+                    name: cls.name,
+                    type: cls.bfo ? "BFO" : "IndependentContinuant"
+                }));
+                
+                // Add properties as nodes too
+                if (backendData.properties) {
+                    backendData.properties.forEach(prop => {
+                        vizData.nodes.push({
+                            id: prop.id,
+                            name: prop.name,
+                            type: "relation"
+                        });
+                    });
+                }
+                
+                // Convert inheritance links to edges
+                if (backendData.inheritance_links) {
+                    vizData.edges = backendData.inheritance_links.map(link => ({
+                        source: link.parent,
+                        target: link.child,
+                        type: "inheritance"
+                    }));
+                }
+                
+                console.log("Converted data:", vizData);
             }
         } catch (e) {
             console.log("Using sample data due to backend data error:", e);
