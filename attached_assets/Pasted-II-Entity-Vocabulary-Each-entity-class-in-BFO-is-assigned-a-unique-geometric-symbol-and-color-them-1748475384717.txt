@@ -1,0 +1,244 @@
+II. Entity Vocabulary
+
+Each entity class in BFO is assigned a unique geometric symbol and color theme (optional for grayscale rendering).
+
+BFO Class
+
+Symbol
+
+Style
+
+Example Label
+
+Independent Continuant
+
+● (Circle)
+
+Solid, black outline
+
+Agent, Molecule
+
+Material Entity
+
+■ (Square)
+
+Filled gray
+
+Rock, Cell
+
+Immaterial Entity
+
+□ (Hollow Square)
+
+Dashed outline
+
+Spatial Region
+
+Object Aggregate
+
+⬛ (Large Square)
+
+Thick border
+
+Team, Flock
+
+Fiat Object Part
+
+▭ (Open rectangle)
+
+Diagonal hatch
+
+Hemisphere
+
+Dependent Continuant
+
+◌ (Small dashed circle)
+
+Dashed outline
+
+Color, Role
+
+├ Specifically Dependent
+
+◌ + anchor
+
+Attached to 1 host
+
+Hue of Red Apple
+
+├ Generically Dependent
+
+◌ + ↺
+
+Can migrate hosts
+
+License Text
+
+Quality
+
+◦ (Tiny dot)
+
+Embeds in host object
+
+Redness
+
+Function/Disposition
+
+⚒ (Hammer)
+
+Icon inside host circle
+
+Fragility, Digestion
+
+Process (Occurrent)
+
+⟶ (Arrow)
+
+Directional flow
+
+Digestion
+
+Process Aggregate
+
+⟶⟶ (Double arrow)
+
+Two parallel flows
+
+Symphony Performance
+
+Spatiotemporal Region
+
+◬ (Ring)
+
+Ring overlay
+
+Interval t0-t2
+
+Temporal Instant
+
+
+
+(Tick)
+
+On time axis
+
+t1
+
+III. Relation Vocabulary
+
+BVSS includes stylized lines and arrows to represent BFO and common domain-specific relations.
+
+Relation
+
+Symbol
+
+Description
+
+is_a
+
+↑ solid line
+
+Taxonomic subtype
+
+part_of
+
+→ dashed line
+
+Mereological part
+
+participates_in
+
+⇨ double line
+
+Continuant involved in process
+
+has_role / has_quality
+
+→ small arrow
+
+Dependent continuant relation
+
+inheres_in
+
+⇒ thin arrow
+
+Quality inheres in material entity
+
+located_in
+
+→ with pinhead
+
+Spatial/temporal inclusion
+
+realizes / is_realized_by
+
+↻ curved arrow
+
+Function or disposition realized by process
+
+has_participant
+
+⇐ arrow back
+
+Process includes participant
+
+IV. Legend Layout
+
+BVSS diagrams include a top-left or sidebar legend with all used icons, temporal key (timeline axis), and optional metadata:
+
+Time Axis: Horizontal (left-to-right) or vertical (top-down)
+
+Color Legend: Optional
+
+Role tags (e.g., Plaintiff, Buyer) using ◌ + label within or beside ●
+
+V. Use Cases by Domain
+
+A. Legal Domain: Criminal Trial Lifecycle
+
+● Court (Independent Continuant)
+
+◌ Due Process Right (Role)
+
+⟶ Trial Opening (Process)
+
+■ Complaint Document (Generically Dependent Content Entity)
+
+⟶⟶ Trial Phase (Process Aggregate)
+
+→ Evidence supports Legal Fact
+
+B. Biomedical Domain: Enzymatic Reaction
+
+● Enzyme (Protein)
+
+◌ Catalytic Activity (Disposition)
+
+⟶ Hydrolysis Process
+
+→ Substrate is_part_of reaction
+
+↻ Catalytic activity realized in Hydrolysis
+
+C. Engineering Domain: Machine Lifecycle
+
+● Robot Arm (Material Entity)
+
+◌ Gripping Function (Function)
+
+⟶ Object Transfer (Process)
+
+→ is_a Gripper is_a Tool is_a Device
+
+D. Education Domain: Classroom Setting
+
+● Student (Independent Continuant)
+
+◌ Learner Role
+
+⟶ Lecture Event (Occurrent)
+
+■ Syllabus Document (Information Artifact)
+
+→ participates_in(Student ⟶ Lecture)
+
