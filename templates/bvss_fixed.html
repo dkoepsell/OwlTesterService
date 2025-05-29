@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVSS Visualization - {{ file.original_filename }}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">FOL-BFO-OWL Tester</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/history">Back to History</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">BFO Visual Syntax System (BVSS)</h1>
+        <p class="text-muted mb-4">{{ file.original_filename }}</p>
+        
+        <div class="alert alert-info">
+            <p class="mb-0">The BFO Visual Syntax System (BVSS) provides a standardized, intuitive, and expressive visual language for representing the full set of Basic Formal Ontology (BFO) entities and relations across domains.</p>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5>Ontology Information</h5>
+                        <p><strong>Classes:</strong> <span id="class-count">0</span></p>
+                        <p><strong>Properties:</strong> <span id="property-count">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="background: #1a1a1a; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <div class="mb-3">
+                <button class="btn btn-secondary btn-sm" onclick="resetView()">Reset View</button>
+                <button class="btn btn-secondary btn-sm" onclick="centerGraph()">Center Graph</button>
+                <span class="ms-3 text-light">Drag nodes to rearrange • Scroll to zoom • Click and drag background to pan</span>
+            </div>
+            <svg id="bvss-svg" width="100%" height="600"></svg>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6>Complete BFO Visual Syntax (BVSS) Legend</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-primary">Entity Types</h6>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="8" fill="#4a90e2" stroke="#ffffff" stroke-width="2"/>
+                            </svg>
+                            <small><strong>●</strong> Independent continuant</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="8" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="4,2"/>
+                            </svg>
+                            <small><strong>◌</strong> Dependent continuant</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <rect x="2" y="2" width="16" height="16" fill="#6b7280" stroke="#ffffff" stroke-width="2"/>
+                            </svg>
+                            <small><strong>■</strong> Generically dependent</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <path d="M2,10 L18,10 M14,6 L18,10 L14,14" stroke="#10b981" stroke-width="2" fill="none"/>
+                            </svg>
+                            <small><strong>⟶</strong> Process</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <path d="M4,4 L16,4 L16,16 L4,16 Z" stroke="#ea580c" stroke-width="2" fill="none"/>
+                            </svg>
+                            <small><strong>⟷</strong> Temporal region</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-success">Relations</h6>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <path d="M10,16 L10,4 M6,8 L10,4 L14,8" stroke="#3b82f6" stroke-width="2" fill="none"/>
+                            </svg>
+                            <small><strong>↑</strong> is_a</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <path d="M2,10 L18,10 M14,6 L18,10 L14,14" stroke="#9ca3af" stroke-width="2" stroke-dasharray="4,2" fill="none"/>
+                            </svg>
+                            <small><strong>→</strong> Connected via</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="8" r="3" fill="none" stroke="#f59e0b" stroke-width="2"/>
+                                <path d="M10,11 L10,17 M6,15 L10,17 L14,15" stroke="#f59e0b" stroke-width="2" fill="none"/>
+                            </svg>
+                            <small><strong>◯→</strong> Inherent in</small>
+                        </div>
+                        <div class="d-flex align-items-center mb-1">
+                            <svg width="20" height="20" class="me-2">
+                                <path d="M2,8 L18,8 M2,12 L18,12 M14,4 L18,8 L14,12" stroke="#10b981" stroke-width="2" fill="none"/>
+                            </svg>
+                            <small><strong>⇨</strong> Participates in</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fetch visualization data
+            fetch('/api/bvss/{{ filename }}')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('BVSS data received:', data);
+                    createBVSSVisualization(data);
+                })
+                .catch(error => {
+                    console.error('Error loading BVSS data:', error);
+                    // Show error in the SVG
+                    d3.select('#bvss-svg')
+                        .append('text')
+                        .attr('x', '50%')
+                        .attr('y', '50%')
+                        .attr('text-anchor', 'middle')
+                        .attr('fill', 'white')
+                        .text('Error loading visualization data');
+                });
+
+            function createBVSSVisualization(data) {
+                const classes = data.classes || [];
+                const properties = data.properties || [];
+                const inheritance = data.inheritance || [];
+                
+                // Update counts
+                document.getElementById('class-count').textContent = classes.length;
+                document.getElementById('property-count').textContent = properties.length;
+
+                const svg = d3.select('#bvss-svg');
+                const width = 800;
+                const height = 600;
+                
+                svg.attr('width', width).attr('height', height);
+                
+                // Clear any existing content
+                svg.selectAll('*').remove();
+
+                // Create container group
+                const container = svg.append('g');
+
+                // Set up zoom
+                const zoom = d3.zoom()
+                    .scaleExtent([0.1, 4])
+                    .on('zoom', function(event) {
+                        container.attr('transform', event.transform);
+                    });
+
+                svg.call(zoom);
+
+                // Create nodes
+                const nodes = [];
+                
+                // Add BFO root nodes first
+                const bfoNodes = [
+                    {id: 'Entity', name: 'Entity', type: 'bfo', bfoCategory: 'entity', x: width/2, y: 50},
+                    {id: 'Continuant', name: 'Continuant', type: 'bfo', bfoCategory: 'continuant', x: width/3, y: 150},
+                    {id: 'Occurrent', name: 'Occurrent', type: 'bfo', bfoCategory: 'process', x: 2*width/3, y: 150},
+                    {id: 'IndependentContinuant', name: 'Independent Continuant', type: 'bfo', bfoCategory: 'independent', x: width/6, y: 250},
+                    {id: 'DependentContinuant', name: 'Dependent Continuant', type: 'bfo', bfoCategory: 'dependent', x: width/2, y: 250},
+                    {id: 'Process', name: 'Process', type: 'bfo', bfoCategory: 'process', x: 5*width/6, y: 250}
+                ];
+                
+                nodes.push(...bfoNodes);
+
+                // Add class nodes
+                classes.forEach((cls, i) => {
+                    const angle = (i / classes.length) * 2 * Math.PI;
+                    const radius = 200;
+                    nodes.push({
+                        id: cls.id,
+                        name: cls.name,
+                        type: 'class',
+                        bfoCategory: classifyBFOCategory(cls.name),
+                        x: width/2 + radius * Math.cos(angle),
+                        y: height/2 + radius * Math.sin(angle)
+                    });
+                });
+
+                // Add property nodes
+                properties.forEach((prop, i) => {
+                    const angle = (i / properties.length) * 2 * Math.PI;
+                    const radius = 150;
+                    nodes.push({
+                        id: prop.id,
+                        name: prop.name,
+                        type: 'property',
+                        bfoCategory: 'relation',
+                        x: width/2 + radius * Math.cos(angle),
+                        y: height/2 + radius * Math.sin(angle)
+                    });
+                });
+
+                // Create links
+                const links = [];
+                
+                // BFO hierarchy
+                links.push(
+                    {source: 'Entity', target: 'Continuant', type: 'subsumption'},
+                    {source: 'Entity', target: 'Occurrent', type: 'subsumption'},
+                    {source: 'Continuant', target: 'IndependentContinuant', type: 'subsumption'},
+                    {source: 'Continuant', target: 'DependentContinuant', type: 'subsumption'},
+                    {source: 'Occurrent', target: 'Process', type: 'subsumption'}
+                );
+
+                // Create force simulation
+                const simulation = d3.forceSimulation(nodes)
+                    .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+                    .force('charge', d3.forceManyBody().strength(-300))
+                    .force('center', d3.forceCenter(width / 2, height / 2))
+                    .force('collision', d3.forceCollide().radius(30));
+
+                // Create links
+                const link = container.selectAll('.link')
+                    .data(links)
+                    .enter()
+                    .append('line')
+                    .attr('class', 'link')
+                    .attr('stroke', '#666')
+                    .attr('stroke-width', 2);
+
+                // Create node groups
+                const node = container.selectAll('.node')
+                    .data(nodes)
+                    .enter()
+                    .append('g')
+                    .attr('class', 'node')
+                    .call(d3.drag()
+                        .on('start', dragstarted)
+                        .on('drag', dragged)
+                        .on('end', dragended));
+
+                // Add BVSS symbols based on BFO category
+                node.each(function(d) {
+                    const g = d3.select(this);
+                    
+                    switch(d.bfoCategory) {
+                        case 'independent':
+                        case 'entity':
+                        case 'continuant':
+                            // Solid circle ●
+                            g.append('circle')
+                                .attr('r', 20)
+                                .attr('fill', '#4a90e2')
+                                .attr('stroke', '#fff')
+                                .attr('stroke-width', 2);
+                            break;
+                            
+                        case 'dependent':
+                            // Dashed circle ◌
+                            g.append('circle')
+                                .attr('r', 20)
+                                .attr('fill', 'none')
+                                .attr('stroke', '#dc2626')
+                                .attr('stroke-width', 2)
+                                .attr('stroke-dasharray', '5,5');
+                            break;
+                            
+                        case 'process':
+                            // Arrow ⟶
+                            g.append('path')
+                                .attr('d', 'M-20,0 L20,0 M15,-5 L20,0 L15,5')
+                                .attr('stroke', '#10b981')
+                                .attr('stroke-width', 3)
+                                .attr('fill', 'none');
+                            break;
+                            
+                        case 'generic-dependent':
+                            // Square ■
+                            g.append('rect')
+                                .attr('x', -15)
+                                .attr('y', -15)
+                                .attr('width', 30)
+                                .attr('height', 30)
+                                .attr('fill', '#6b7280')
+                                .attr('stroke', '#fff')
+                                .attr('stroke-width', 2);
+                            break;
+                            
+                        case 'relation':
+                            // Diamond
+                            g.append('path')
+                                .attr('d', 'M0,-15 L15,0 L0,15 L-15,0 Z')
+                                .attr('fill', '#f59e0b')
+                                .attr('stroke', '#fff')
+                                .attr('stroke-width', 2);
+                            break;
+                            
+                        default:
+                            // Default circle
+                            g.append('circle')
+                                .attr('r', 15)
+                                .attr('fill', '#6b7280')
+                                .attr('stroke', '#fff')
+                                .attr('stroke-width', 2);
+                    }
+                });
+
+                // Add labels
+                node.append('text')
+                    .attr('dy', 35)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#fff')
+                    .attr('font-size', '12px')
+                    .text(d => d.name);
+
+                // Update positions on tick
+                simulation.on('tick', () => {
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    node
+                        .attr('transform', d => `translate(${d.x},${d.y})`);
+                });
+
+                // Drag functions
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+
+                function dragged(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }
+
+                // Global functions for controls
+                window.resetView = function() {
+                    svg.transition().duration(750).call(
+                        zoom.transform,
+                        d3.zoomIdentity
+                    );
+                };
+
+                window.centerGraph = function() {
+                    const bounds = container.node().getBBox();
+                    const fullWidth = width;
+                    const fullHeight = height;
+                    const width_calc = bounds.width;
+                    const height_calc = bounds.height;
+                    const midX = bounds.x + width_calc / 2;
+                    const midY = bounds.y + height_calc / 2;
+                    
+                    const scale = Math.min(fullWidth / width_calc, fullHeight / height_calc) * 0.8;
+                    const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
+                    
+                    svg.transition().duration(750).call(
+                        zoom.transform,
+                        d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+                    );
+                };
+            }
+
+            function classifyBFOCategory(className) {
+                const name = className.toLowerCase();
+                
+                // Legal domain specific classification
+                if (name.includes('agent') || name.includes('person') || name.includes('court') || name.includes('entity')) {
+                    return 'independent';
+                }
+                if (name.includes('role') || name.includes('right') || name.includes('obligation') || name.includes('authority')) {
+                    return 'dependent';
+                }
+                if (name.includes('document') || name.includes('contract') || name.includes('statute') || name.includes('regulation')) {
+                    return 'generic-dependent';
+                }
+                if (name.includes('trial') || name.includes('process') || name.includes('adjudication') || name.includes('proceeding')) {
+                    return 'process';
+                }
+                
+                return 'independent'; // Default
+            }
+        });
+    </script>
+</body>
+</html>
