@@ -141,53 +141,78 @@
                 
                 if (bvssData && bvssData.nodes) {
                     // Add BFO core nodes
-                    nodes = [
+                    const bfoNodes = [
                         {id: "Entity", name: "Entity", shape: "circle", group: 0, bfo: true},
                         {id: "Continuant", name: "Continuant", shape: "circle", group: 0, bfo: true},
                         {id: "Occurrent", name: "Occurrent", shape: "arrow", group: 0, bfo: true},
                         {id: "IndependentContinuant", name: "Independent Continuant", shape: "circle", group: 1, bfo: true},
+                        {id: "MaterialEntity", name: "Material Entity", shape: "square", group: 1, bfo: true},
                         {id: "DependentContinuant", name: "Dependent Continuant", shape: "small-dashed-circle", group: 2, bfo: true},
-                        {id: "Process", name: "Process", shape: "arrow", group: 4, bfo: true}
+                        {id: "SpatialRegion", name: "Spatial Region", shape: "hollow-square", group: 5, bfo: true},
+                        {id: "Process", name: "Process", shape: "arrow", group: 4, bfo: true},
+                        {id: "GenericallyDependentContinuant", name: "Generically Dependent Continuant", shape: "small-dashed-circle-migrate", group: 3, bfo: true}
                     ];
                     
-                    // Add ontology nodes
+                    // Add ontology nodes with proper extraction
                     const ontologyNodes = bvssData.nodes
                         .filter(node => node.type !== "Relation")
-                        .map(node => ({
-                            id: node.name || node.id,
-                            name: node.name || node.label || node.id,
-                            shape: classifyShape(node.name || node.label || node.id),
-                            group: classifyGroup(node.name || node.label || node.id),
-                            bfo: false
-                        }));
+                        .map(node => {
+                            const nodeName = extractName(node.name || node.label || node.id);
+                            return {
+                                id: nodeName,
+                                name: nodeName,
+                                shape: classifyShape(nodeName),
+                                group: classifyGroup(nodeName),
+                                bfo: false
+                            };
+                        });
                     
-                    nodes = [...nodes, ...ontologyNodes];
+                    nodes = [...bfoNodes, ...ontologyNodes];
                     
-                    // Add inheritance links
+                    // Add BFO hierarchy links
                     links = [
                         {source: "Entity", target: "Continuant", type: "is_a"},
                         {source: "Entity", target: "Occurrent", type: "is_a"},
                         {source: "Continuant", target: "IndependentContinuant", type: "is_a"},
                         {source: "Continuant", target: "DependentContinuant", type: "is_a"},
+                        {source: "Continuant", target: "SpatialRegion", type: "is_a"},
+                        {source: "IndependentContinuant", target: "MaterialEntity", type: "is_a"},
+                        {source: "DependentContinuant", target: "GenericallyDependentContinuant", type: "is_a"},
                         {source: "Occurrent", target: "Process", type: "is_a"}
                     ];
                     
+                    // Add ontology inheritance links
                     if (bvssData.edges) {
-                        const ontologyLinks = bvssData.edges
+                        bvssData.edges
                             .filter(edge => edge.type === "inheritance")
-                            .map(edge => ({
-                                source: extractName(edge.source),
-                                target: extractName(edge.target),
-                                type: "is_a"
-                            }))
-                            .filter(link => {
-                                // Only include links where both source and target exist in our nodes
-                                const sourceExists = nodes.some(n => n.id === link.source);
-                                const targetExists = nodes.some(n => n.id === link.target);
-                                return sourceExists && targetExists;
+                            .forEach(edge => {
+                                const sourceId = extractName(edge.source);
+                                const targetId = extractName(edge.target);
+                                
+                                // Check if both nodes exist
+                                const sourceExists = nodes.some(n => n.id === sourceId);
+                                const targetExists = nodes.some(n => n.id === targetId);
+                                
+                                if (sourceExists && targetExists) {
+                                    links.push({
+                                        source: sourceId,
+                                        target: targetId,
+                                        type: "is_a"
+                                    });
+                                } else {
+                                    // Connect ontology classes to appropriate BFO classes
+                                    if (targetExists && !sourceExists) {
+                                        const bfoParent = classifyBFOParent(targetId);
+                                        if (bfoParent) {
+                                            links.push({
+                                                source: bfoParent,
+                                                target: targetId,
+                                                type: "is_a"
+                                            });
+                                        }
+                                    }
+                                }
                             });
-                        
-                        links = [...links, ...ontologyLinks];
                     }
                 }
                 
@@ -234,6 +259,16 @@
             if (n.includes('regulation') || n.includes('statute')) return 3;
             if (n.includes('role') || n.includes('claim') || n.includes('right')) return 2;
             return 1;
+        }
+        
+        function classifyBFOParent(name) {
+            const n = name.toLowerCase();
+            if (n.includes('process') || n.includes('trial') || n.includes('adjudication')) return 'Process';
+            if (n.includes('jurisdiction') || n.includes('region')) return 'SpatialRegion';
+            if (n.includes('document') || n.includes('contract') || n.includes('evidence') || n.includes('judgment')) return 'MaterialEntity';
+            if (n.includes('regulation') || n.includes('statute')) return 'GenericallyDependentContinuant';
+            if (n.includes('role') || n.includes('claim') || n.includes('right') || n.includes('obligation') || n.includes('liability')) return 'DependentContinuant';
+            return 'IndependentContinuant'; // Default for entities, persons, institutions, etc.
         }
         
         function createVisualization() {
