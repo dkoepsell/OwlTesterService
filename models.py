@@ -44,6 +44,7 @@ class OntologyFile(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # Can be null for legacy files
     from_sandbox = db.Column(db.Boolean, default=False)  # Flag to indicate if the file came from sandbox
     sandbox_ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=True)  # Link to source sandbox if applicable
+    archived = db.Column(db.Boolean, default=False)  # Flag to indicate if the file is archived
     
     # Relationship with analysis results
     analyses = db.relationship('OntologyAnalysis', backref='ontology_file', lazy=True, cascade="all, delete-orphan")
