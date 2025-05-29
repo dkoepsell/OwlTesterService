@@ -319,13 +319,13 @@
         }
         
         function getBVSSRelationSymbol(relation) {
-            if (!relation) return "⇧"; // Up arrow for is_a
+            if (!relation) return "is_a";
             const r = relation.toLowerCase();
-            if (r.includes("participates")) return "⇨"; // Double arrow for participation
-            if (r.includes("inheres")) return "⇒"; // Double arrow for inherence
-            if (r.includes("realizes")) return "↻"; // Circular arrow for realization
-            if (r.includes("is_a") || r.includes("inheritance")) return "⇧"; // Up arrow
-            return "→"; // Default arrow
+            if (r.includes("participates")) return "participates_in";
+            if (r.includes("inheres")) return "inheres_in";
+            if (r.includes("realizes")) return "realizes";
+            if (r.includes("is_a") || r.includes("inheritance")) return "is_a";
+            return relation; // Return the actual relation name
         }
         
         function createVisualization() {
@@ -372,18 +372,20 @@
             // Define BVSS arrow markers
             const defs = svg.append("defs");
             
-            // Standard is_a arrow (⇧)
+            // Standard is_a arrow (⇧) - larger and more visible
             defs.append("marker")
                 .attr("id", "arrow-isa")
-                .attr("viewBox", "0 -5 10 10")
-                .attr("refX", 8)
+                .attr("viewBox", "0 -8 16 16")
+                .attr("refX", 14)
                 .attr("refY", 0)
-                .attr("markerWidth", 6)
-                .attr("markerHeight", 6)
+                .attr("markerWidth", 8)
+                .attr("markerHeight", 8)
                 .attr("orient", "auto")
                 .append("path")
-                .attr("d", "M0,-5L10,0L0,5")
-                .attr("fill", "#999");
+                .attr("d", "M0,-6L14,0L0,6L3,0Z")
+                .attr("fill", "#999")
+                .attr("stroke", "#333")
+                .attr("stroke-width", 1);
             
             // Participation arrow (⇨)
             defs.append("marker")
