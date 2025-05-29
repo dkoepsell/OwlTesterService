@@ -179,7 +179,13 @@
                                 source: extractName(edge.source),
                                 target: extractName(edge.target),
                                 type: "is_a"
-                            }));
+                            }))
+                            .filter(link => {
+                                // Only include links where both source and target exist in our nodes
+                                const sourceExists = nodes.some(n => n.id === link.source);
+                                const targetExists = nodes.some(n => n.id === link.target);
+                                return sourceExists && targetExists;
+                            });
                         
                         links = [...links, ...ontologyLinks];
                     }
