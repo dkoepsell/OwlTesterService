@@ -284,6 +284,50 @@
             return colors[group] || "#6b7280"; // Default gray
         }
         
+        function getBVSSArrowType(relation) {
+            if (!relation) return "isa";
+            const r = relation.toLowerCase();
+            if (r.includes("participates") || r.includes("participant")) return "participates";
+            if (r.includes("inheres") || r.includes("inherence")) return "inheres";
+            if (r.includes("realizes") || r.includes("realization")) return "realizes";
+            return "isa"; // Default to is_a
+        }
+        
+        function getBVSSArrowColor(relation) {
+            if (!relation) return "#999";
+            const r = relation.toLowerCase();
+            if (r.includes("participates")) return "#ff6b35"; // Orange for participation
+            if (r.includes("inheres")) return "#dc2626"; // Red for inherence
+            if (r.includes("realizes")) return "#16a34a"; // Green for realization
+            return "#999"; // Gray for is_a
+        }
+        
+        function getBVSSArrowWidth(relation) {
+            if (!relation) return 2;
+            const r = relation.toLowerCase();
+            if (r.includes("participates")) return 3;
+            if (r.includes("inheres")) return 2.5;
+            if (r.includes("realizes")) return 2;
+            return 2; // Default width
+        }
+        
+        function getBVSSArrowDash(relation) {
+            if (!relation) return "none";
+            const r = relation.toLowerCase();
+            if (r.includes("realizes")) return "5,5"; // Dashed for realization
+            return "none"; // Solid for others
+        }
+        
+        function getBVSSRelationSymbol(relation) {
+            if (!relation) return "⇧"; // Up arrow for is_a
+            const r = relation.toLowerCase();
+            if (r.includes("participates")) return "⇨"; // Double arrow for participation
+            if (r.includes("inheres")) return "⇒"; // Double arrow for inherence
+            if (r.includes("realizes")) return "↻"; // Circular arrow for realization
+            if (r.includes("is_a") || r.includes("inheritance")) return "⇧"; // Up arrow
+            return "→"; // Default arrow
+        }
+        
         function createVisualization() {
             // Clear existing visualization
             d3.select("#viz-container").selectAll("*").remove();
@@ -314,28 +358,89 @@
             // Create link group for lines and labels
             const linkGroup = container.append("g");
             
-            // Create links
+            // Create links with BVSS-specific styling
             const link = linkGroup
                 .selectAll("line")
                 .data(links)
                 .join("line")
-                .attr("stroke", "#999")
+                .attr("stroke", d => getBVSSArrowColor(d.relation))
                 .attr("stroke-opacity", 0.8)
-                .attr("stroke-width", d => d.type === "is_a" ? 2 : 1)
-                .attr("stroke-dasharray", d => d.type === "is_a" ? "none" : "3,3");
+                .attr("stroke-width", d => getBVSSArrowWidth(d.relation))
+                .attr("stroke-dasharray", d => getBVSSArrowDash(d.relation))
+                .attr("marker-end", d => `url(#arrow-${getBVSSArrowType(d.relation)})`);
             
-            // Create link labels
+            // Define BVSS arrow markers
+            const defs = svg.append("defs");
+            
+            // Standard is_a arrow (⇧)
+            defs.append("marker")
+                .attr("id", "arrow-isa")
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 8)
+                .attr("refY", 0)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-5L10,0L0,5")
+                .attr("fill", "#999");
+            
+            // Participation arrow (⇨)
+            defs.append("marker")
+                .attr("id", "arrow-participates")
+                .attr("viewBox", "0 -5 15 10")
+                .attr("refX", 12)
+                .attr("refY", 0)
+                .attr("markerWidth", 8)
+                .attr("markerHeight", 8)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-3L8,0L0,3 M6,-3L12,0L6,3")
+                .attr("fill", "none")
+                .attr("stroke", "#ff6b35")
+                .attr("stroke-width", 1.5);
+            
+            // Inherence arrow (⇒)
+            defs.append("marker")
+                .attr("id", "arrow-inheres")
+                .attr("viewBox", "0 -5 12 10")
+                .attr("refX", 10)
+                .attr("refY", 0)
+                .attr("markerWidth", 7)
+                .attr("markerHeight", 7)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-4L8,0L0,4 M3,-2L8,0L3,2")
+                .attr("fill", "#dc2626");
+            
+            // Realization arrow (↻)
+            defs.append("marker")
+                .attr("id", "arrow-realizes")
+                .attr("viewBox", "0 -8 16 16")
+                .attr("refX", 12)
+                .attr("refY", 0)
+                .attr("markerWidth", 10)
+                .attr("markerHeight", 10)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M2,0 A6,6 0 1,1 12,0 M8,-3L12,0L8,3")
+                .attr("fill", "none")
+                .attr("stroke", "#16a34a")
+                .attr("stroke-width", 2);
+            
+            // Create link labels with BVSS symbols
             const linkLabels = linkGroup
                 .selectAll("text")
                 .data(links)
                 .join("text")
                 .attr("class", "link-label")
-                .attr("font-size", "10px")
+                .attr("font-size", "11px")
+                .attr("font-weight", "bold")
                 .attr("fill", "#ffffff")
                 .attr("text-anchor", "middle")
                 .attr("stroke", "#000000")
-                .attr("stroke-width", 0.5)
-                .text(d => d.type || "is_a");
+                .attr("stroke-width", 0.8)
+                .text(d => getBVSSRelationSymbol(d.relation));
             
             // Create node groups
             const node = container.append("g")
