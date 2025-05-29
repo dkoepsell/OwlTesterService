@@ -164,29 +164,35 @@
             const backendData = {{ bvss_data | tojson | safe }};
             console.log("BVSS data loaded:", backendData);
             
-            if (backendData && backendData.classes && backendData.classes.length > 0) {
-                // Convert backend classes to BVSS nodes with proper classification
-                actualNodes = backendData.classes.map(cls => {
-                    return {
-                        id: cls.id,
-                        name: cls.name,
-                        shape: classifyBFOShape(cls.name),
-                        group: classifyBFOGroup(cls.name),
-                        bfoType: classifyBFOType(cls.name),
-                        temporal: assignTemporalIfProcess(cls.name)
-                    };
-                });
+            if (backendData && backendData.nodes && backendData.nodes.length > 0) {
+                // Convert backend nodes to BVSS format with proper classification
+                actualNodes = backendData.nodes
+                    .filter(node => node.type !== "Relation") // Exclude relation nodes
+                    .map(node => {
+                        return {
+                            id: node.id,
+                            name: node.name || node.label,
+                            shape: classifyBFOShape(node.name || node.label),
+                            group: classifyBFOGroup(node.name || node.label),
+                            bfoType: classifyBFOType(node.name || node.label),
+                            temporal: assignTemporalIfProcess(node.name || node.label)
+                        };
+                    });
                 
-                // Convert inheritance links to BVSS edges
-                if (backendData.inheritance_links) {
-                    actualLinks = backendData.inheritance_links.map(link => ({
-                        source: link.parent,
-                        target: link.child,
-                        label: "is_a",
-                        type: "is_a",
-                        symbol: "↑"
-                    }));
+                // Convert edges to BVSS links
+                if (backendData.edges) {
+                    actualLinks = backendData.edges
+                        .filter(edge => edge.type === "inheritance") // Focus on inheritance relationships
+                        .map(edge => ({
+                            source: edge.source,
+                            target: edge.target,
+                            label: edge.relation || "is_a",
+                            type: edge.relation || "is_a",
+                            symbol: "↑"
+                        }));
                 }
+                
+                console.log(`Loaded ${actualNodes.length} nodes and ${actualLinks.length} links from ontology`);
             }
         } catch (e) {
             console.log("Error loading backend data:", e);
