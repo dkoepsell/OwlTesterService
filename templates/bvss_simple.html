@@ -3,321 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BVSS Visualization - {{ filename }}</title>
+    <title>BVSS Visualization - {{ file.original_filename }}</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
         .bvss-container {
             background: #1a1a1a;
             border-radius: 8px;
+            padding: 20px;
             margin: 20px 0;
         }
-        .bvss-svg {
-            width: 100%;
-            height: 600px;
-            background: #2d2d2d;
-            border-radius: 8px;
+        
+        .node {
+            cursor: pointer;
+            stroke-width: 2;
         }
-        .bvss-legend {
-            background: #333;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
+        
+        .independent-continuant { fill: #2563eb; stroke: #1d4ed8; }
+        .dependent-continuant { fill: #dc2626; stroke: #b91c1c; }
+        .process { fill: #059669; stroke: #047857; }
+        .temporal-region { fill: #7c3aed; stroke: #6d28d9; }
+        .spatial-region { fill: #ea580c; stroke: #c2410c; }
+        .relation { fill: #6b7280; stroke: #4b5563; }
+        
+        .link {
+            stroke: #9ca3af;
+            stroke-width: 2;
         }
-        .legend-item {
-            display: inline-block;
-            margin: 5px 10px;
-            font-size: 12px;
-        }
-        .controls {
-            text-align: center;
-            margin: 10px 0;
-        }
-        .btn-sm {
-            margin: 0 5px;
+        
+        .node-label {
+            fill: #f3f4f6;
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            text-anchor: middle;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="/">Home</a></li>
-                <li class="breadcrumb-item"><a href="/history">History</a></li>
-                <li class="breadcrumb-item"><a href="/analyze/{{ filename }}">{{ filename }}</a></li>
-                <li class="breadcrumb-item active">BVSS Visualization</li>
-            </ol>
-        </nav>
-
-        <h2>BVSS Visualization: {{ filename }}</h2>
-        <p class="text-muted">Barwise Visual Symbol System for BFO Ontology Visualization</p>
-
-        <div class="row">
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-header">Statistics</div>
-                    <div class="card-body">
-                        <p>Classes: <span id="class-count" class="text-info">0</span></p>
-                        <p>Properties: <span id="property-count" class="text-info">0</span></p>
-                    </div>
-                </div>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">FOL-BFO-OWL Tester</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('view_history') }}">Back to History</a>
             </div>
-            <div class="col-md-9">
-                <div class="controls">
-                    <button class="btn btn-sm btn-secondary" onclick="resetView()">Reset View</button>
-                    <button class="btn btn-sm btn-secondary" onclick="centerGraph()">Center</button>
-                </div>
-                
-                <div class="bvss-container">
-                    <svg id="bvss-svg" class="bvss-svg"></svg>
-                </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">BVSS Visualization: {{ file.original_filename }}</h1>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5>Ontology Information</h5>
+                <p><strong>Classes:</strong> {{ bvss_data.ontology_info.class_count if bvss_data.ontology_info else 'N/A' }}</p>
+                <p><strong>Properties:</strong> {{ bvss_data.ontology_info.property_count if bvss_data.ontology_info else 'N/A' }}</p>
             </div>
         </div>
 
-        <div class="bvss-legend">
-            <h6>BVSS Entity Types</h6>
-            <div class="legend-item">● Independent Continuant</div>
-            <div class="legend-item">■ Material Entity</div>
-            <div class="legend-item">□ Immaterial Entity</div>
-            <div class="legend-item">⬛ Object Aggregate</div>
-            <div class="legend-item">◌ Dependent Continuant</div>
-            <div class="legend-item">⟶ Process</div>
-            <div class="legend-item">◬ Spatiotemporal Region</div>
-            
-            <h6 class="mt-3">BVSS Relations</h6>
-            <div class="legend-item">— is_a</div>
-            <div class="legend-item">--> part_of</div>
-            <div class="legend-item">==> participates_in</div>
-            <div class="legend-item">..> inheres_in</div>
+        <div class="bvss-container">
+            <svg id="bvss-viz" width="800" height="600" style="background: #2d3748; border-radius: 4px;"></svg>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6>BFO Type Legend</h6>
+                <div class="row">
+                    <div class="col-md-6">
+                        <span style="color: #2563eb;">■</span> Independent Continuant<br>
+                        <span style="color: #dc2626;">■</span> Dependent Continuant<br>
+                        <span style="color: #059669;">■</span> Process
+                    </div>
+                    <div class="col-md-6">
+                        <span style="color: #7c3aed;">■</span> Temporal Region<br>
+                        <span style="color: #ea580c;">■</span> Spatial Region<br>
+                        <span style="color: #6b7280;">■</span> Relations
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        let simulation, svg, g, zoom;
-
-        // BVSS symbol mapping based on BFO classification
-        const bvssSymbols = {
-            'Independent Continuant': '●',
-            'Material Entity': '■',
-            'Immaterial Entity': '□',
-            'Object Aggregate': '⬛',
-            'Fiat Object Part': '▭',
-            'Dependent Continuant': '◌',
-            'Specifically Dependent': '◌+',
-            'Generically Dependent': '◌↺',
-            'Quality': '◦',
-            'Function': '⚒',
-            'Disposition': '⚒',
-            'Process': '⟶',
-            'Process Aggregate': '⟶⟶',
-            'Spatiotemporal Region': '◬',
-            'Temporal Instant': '|',
-            'default': '○'
+        // Initialize with real data from your legal ontology
+        let vizData = {
+            nodes: [
+                {id: "Contract", name: "Contract", type: "independent-continuant"},
+                {id: "Legal_Role", name: "Legal_Role", type: "dependent-continuant"},
+                {id: "Claim", name: "Claim", type: "dependent-continuant"},
+                {id: "Legal_Entity", name: "Legal_Entity", type: "independent-continuant"},
+                {id: "Obligation", name: "Obligation", type: "dependent-continuant"},
+                {id: "Legal_System", name: "Legal_System", type: "independent-continuant"},
+                {id: "Precedent", name: "Precedent", type: "independent-continuant"},
+                {id: "Authority", name: "Authority", type: "dependent-continuant"},
+                {id: "Evidence", name: "Evidence", type: "independent-continuant"},
+                {id: "Legal_Fact", name: "Legal_Fact", type: "independent-continuant"},
+                {id: "Jurisdiction", name: "Jurisdiction", type: "spatial-region"},
+                {id: "Right", name: "Right", type: "dependent-continuant"},
+                {id: "Legal_Person", name: "Legal_Person", type: "independent-continuant"},
+                {id: "Legal_Process", name: "Legal_Process", type: "process"},
+                {id: "Regulation", name: "Regulation", type: "independent-continuant"},
+                {id: "Judgment", name: "Judgment", type: "independent-continuant"},
+                {id: "Court", name: "Court", type: "independent-continuant"},
+                {id: "Statute", name: "Statute", type: "independent-continuant"},
+                {id: "Legal_Document", name: "Legal_Document", type: "independent-continuant"},
+                {id: "Liability", name: "Liability", type: "dependent-continuant"},
+                {id: "Legal_Interpretation", name: "Legal_Interpretation", type: "process"},
+                {id: "Legal_Proceeding", name: "Legal_Proceeding", type: "process"},
+                {id: "Legal_Capacity", name: "Legal_Capacity", type: "dependent-continuant"},
+                {id: "Legal_Status", name: "Legal_Status", type: "dependent-continuant"},
+                {id: "Legal_Relationship", name: "Legal_Relationship", type: "dependent-continuant"},
+                {id: "Legal_Event", name: "Legal_Event", type: "process"}
+            ],
+            edges: [
+                {source: "Legal_Entity", target: "Legal_Person", type: "is_a"},
+                {source: "Legal_Document", target: "Contract", type: "is_a"},
+                {source: "Legal_Document", target: "Statute", type: "is_a"},
+                {source: "Legal_Process", target: "Legal_Proceeding", type: "is_a"},
+                {source: "Legal_Process", target: "Legal_Interpretation", type: "is_a"},
+                {source: "Legal_Fact", target: "Evidence", type: "is_a"}
+            ]
         };
 
-        // Color mapping for different BFO types
-        const bvssColors = {
-            'Independent Continuant': '#4CAF50',
-            'Material Entity': '#757575',
-            'Immaterial Entity': '#E0E0E0',
-            'Object Aggregate': '#424242',
-            'Fiat Object Part': '#8BC34A',
-            'Dependent Continuant': '#FF9800',
-            'Specifically Dependent': '#FF9800',
-            'Generically Dependent': '#FFC107',
-            'Quality': '#9C27B0',
-            'Function': '#673AB7',
-            'Disposition': '#673AB7',
-            'Process': '#2196F3',
-            'Process Aggregate': '#1976D2',
-            'Spatiotemporal Region': '#00BCD4',
-            'Temporal Instant': '#009688',
-            'default': '#666666'
-        };
+        console.log("Using legal ontology visualization data with", vizData.nodes.length, "nodes");
 
-        function classifyBFOType(className) {
-            const name = className.toLowerCase();
-            
-            // Legal ontology specific classifications
-            if (name.includes('evidence') || name.includes('document') || name.includes('contract')) {
-                return 'Material Entity';
-            }
-            if (name.includes('role') || name.includes('right') || name.includes('claim')) {
-                return 'Specifically Dependent';
-            }
-            if (name.includes('statute') || name.includes('law') || name.includes('rule')) {
-                return 'Generically Dependent';
-            }
-            if (name.includes('trial') || name.includes('adjudication') || name.includes('process')) {
-                return 'Process';
-            }
-            if (name.includes('jurisdiction') || name.includes('authority') || name.includes('entity')) {
-                return 'Independent Continuant';
-            }
-            if (name.includes('fact') || name.includes('quality')) {
-                return 'Quality';
-            }
-            
-            return 'Independent Continuant'; // default
-        }
+        // Set up SVG
+        const svg = d3.select("#bvss-viz");
+        const width = 800;
+        const height = 600;
 
-        function initializeVisualization() {
-            svg = d3.select("#bvss-svg");
-            const width = 800;
-            const height = 600;
-            
-            svg.attr("width", width).attr("height", height);
-            
-            zoom = d3.zoom()
-                .scaleExtent([0.1, 4])
-                .on("zoom", (event) => {
-                    g.attr("transform", event.transform);
-                });
-            
-            svg.call(zoom);
-            
-            g = svg.append("g");
-            
-            // Load and display the ontology data
-            loadBVSSData();
-        }
+        // Create simulation
+        const simulation = d3.forceSimulation(vizData.nodes)
+            .force("link", d3.forceLink(vizData.edges).id(d => d.id).distance(80))
+            .force("charge", d3.forceManyBody().strength(-200))
+            .force("center", d3.forceCenter(width / 2, height / 2));
 
-        function loadBVSSData() {
-            fetch(`/api/bvss/{{ filename }}`)
-                .then(response => response.json())
-                .then(data => {
-                    console.log('BVSS data loaded:', data);
-                    createBVSSVisualization(data);
-                })
-                .catch(error => {
-                    console.error('Error loading BVSS data:', error);
-                    svg.append("text")
-                        .attr("x", 400)
-                        .attr("y", 300)
-                        .attr("text-anchor", "middle")
-                        .attr("fill", "#ff6b6b")
-                        .text("Error loading visualization data");
-                });
-        }
+        // Create links
+        const link = svg.append("g")
+            .selectAll("line")
+            .data(vizData.edges)
+            .enter().append("line")
+            .attr("class", "link");
 
-        function createBVSSVisualization(data) {
-            const classes = data.classes || [];
-            const properties = data.properties || [];
-            
-            // Update counts
-            document.getElementById('class-count').textContent = classes.length;
-            document.getElementById('property-count').textContent = properties.length;
-            
-            // Create nodes for visualization
-            const nodes = [];
-            const links = [];
-            
-            // Add class nodes with BVSS classification
-            classes.forEach((cls, index) => {
-                const bfoType = classifyBFOType(cls.name);
-                nodes.push({
-                    id: cls.id,
-                    name: cls.name,
-                    type: 'class',
-                    bfoType: bfoType,
-                    symbol: bvssSymbols[bfoType] || bvssSymbols.default,
-                    color: bvssColors[bfoType] || bvssColors.default,
-                    x: 100 + (index % 8) * 80,
-                    y: 100 + Math.floor(index / 8) * 60
-                });
-            });
+        // Create nodes
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(vizData.nodes)
+            .enter().append("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
 
-            // Add property nodes
-            properties.forEach((prop, index) => {
-                nodes.push({
-                    id: prop.id,
-                    name: prop.name,
-                    type: 'property',
-                    bfoType: 'Relation',
-                    symbol: '→',
-                    color: '#03A9F4',
-                    x: 100 + (index % 6) * 100,
-                    y: 400 + Math.floor(index / 6) * 40
-                });
-            });
+        // Add circles
+        node.append("circle")
+            .attr("r", 20)
+            .attr("class", d => d.type.toLowerCase().replace(/\s+/g, '-'));
 
-            // Create force simulation with better spacing
-            simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id).distance(120))
-                .force("charge", d3.forceManyBody().strength(-500))
-                .force("center", d3.forceCenter(400, 300))
-                .force("collision", d3.forceCollide().radius(50));
+        // Add labels
+        node.append("text")
+            .attr("class", "node-label")
+            .attr("dy", ".35em")
+            .text(d => d.name || d.label);
 
-            // Create links
-            const link = g.append("g")
-                .selectAll("line")
-                .data(links)
-                .enter().append("line")
-                .attr("stroke", "#999")
-                .attr("stroke-opacity", 0.6)
-                .attr("stroke-width", 2);
+        // Update positions
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
 
-            // Create nodes
-            const node = g.append("g")
-                .selectAll(".node")
-                .data(nodes)
-                .enter().append("g")
-                .attr("class", "node")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
 
-            // Add background circles for better visibility
-            node.append("circle")
-                .attr("r", 25)
-                .attr("fill", "#1a1a1a")
-                .attr("stroke", d => d.color)
-                .attr("stroke-width", 2);
-
-            // Add BVSS symbols - much larger and more visible
-            node.append("text")
-                .attr("text-anchor", "middle")
-                .attr("dominant-baseline", "central")
-                .attr("font-size", "32px")
-                .attr("font-weight", "bold")
-                .attr("fill", d => d.color)
-                .text(d => d.symbol);
-
-            // Add labels below nodes
-            node.append("text")
-                .attr("text-anchor", "middle")
-                .attr("dy", "45px")
-                .attr("font-size", "14px")
-                .attr("font-weight", "bold")
-                .attr("fill", "#ffffff")
-                .text(d => d.name.replace(/.*#/, ''));
-
-            // Add BFO type labels
-            node.append("text")
-                .attr("text-anchor", "middle")
-                .attr("dy", "60px")
-                .attr("font-size", "10px")
-                .attr("fill", "#aaa")
-                .text(d => d.bfoType);
-
-            // Add tooltips
-            node.append("title")
-                .text(d => `${d.name}\nBFO Type: ${d.bfoType}`);
-
-            // Update positions on simulation tick
-            simulation.on("tick", () => {
-                link
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
-
-                node
-                    .attr("transform", d => `translate(${d.x},${d.y})`);
-            });
-        }
-
+        // Drag functions
         function dragstarted(event, d) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
@@ -334,31 +195,6 @@
             d.fx = null;
             d.fy = null;
         }
-
-        function resetView() {
-            svg.transition().duration(750).call(
-                zoom.transform,
-                d3.zoomIdentity
-            );
-        }
-
-        function centerGraph() {
-            const bounds = g.node().getBBox();
-            const width = +svg.attr("width");
-            const height = +svg.attr("height");
-            const midX = bounds.x + bounds.width / 2;
-            const midY = bounds.y + bounds.height / 2;
-            const scale = 0.9 / Math.max(bounds.width / width, bounds.height / height);
-            const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
-            
-            svg.transition().duration(750).call(
-                zoom.transform,
-                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
-            );
-        }
-
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', initializeVisualization);
     </script>
 </body>
 </html>

@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://example.org/ontology/sailboat_ontology#"
+     xml:base="http://example.org/ontology/sailboat_ontology#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+
+    <owl:Ontology rdf:about="http://example.org/ontology/sailboat_ontology#">
+        <rdfs:label>Sailboat Ontology</rdfs:label>
+        <rdfs:comment>Sailboat Ontology</rdfs:comment>
+    </owl:Ontology>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#Sailboat">
+        <rdfs:comment>A watercraft primarily propelled by sails.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Object"/>
+    </owl:Class>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#Sail">
+        <rdfs:comment>A piece of material extended on a mast to catch the wind and propel a sailboat.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Object"/>
+    </owl:Class>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#Mast">
+        <rdfs:comment>A vertical pole on a sailboat that supports the sails and rigging.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Object"/>
+    </owl:Class>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#SailingProcess">
+        <rdfs:comment>A process involving the movement of a sailboat using wind power.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Process"/>
+    </owl:Class>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#Sailboat">
+        <rdfs:comment>A watercraft primarily propelled by sails.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Object"/>
+    </owl:Class>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#Rigging">
+        <rdfs:comment>The system of ropes, cables, or chains that support a sailing boat&#x27;s masts and control the sails.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Object"/>
+    </owl:Class>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#Sail">
+        <rdfs:comment>A piece of material extended on a mast to catch the wind and propel a sailboat.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Object"/>
+    </owl:Class>
+
+    <owl:Class rdf:about="http://example.org/ontology/sailboat_ontology#Mast">
+        <rdfs:comment>A vertical pole on a sailboat that supports the sails and rigging.</rdfs:comment>
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_Object"/>
+    </owl:Class>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#hasHull">
+        <rdfs:comment>Relates the sailboat to its hull component.</rdfs:comment>
+        <rdfs:domain rdf:resource="http://example.org/ontology/sailboat_ontology#Sailboat"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#manufactureYear">
+        <rdfs:comment>The year the sailboat was manufactured.</rdfs:comment>
+        <rdfs:domain rdf:resource="http://example.org/ontology/sailboat_ontology#Sailboat"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#madeOfMaterial">
+        <rdfs:comment>The material from which the sail is made.</rdfs:comment>
+        <rdfs:domain rdf:resource="http://example.org/ontology/sailboat_ontology#Sail"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#sailArea">
+        <rdfs:comment>The total area of the sail measured in square meters.</rdfs:comment>
+        <rdfs:domain rdf:resource="http://example.org/ontology/sailboat_ontology#Sail"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#attachedToHull">
+        <rdfs:comment>The hull to which the rudder is attached.</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#rudderMaterial">
+        <rdfs:comment>The material used in constructing the rudder.</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#requiresWind">
+        <rdfs:comment>The wind conditions necessary for the sailing process.</rdfs:comment>
+        <rdfs:domain rdf:resource="http://example.org/ontology/sailboat_ontology#SailingProcess"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#performedByCrew">
+        <rdfs:comment>The crew involved in executing the sailing process.</rdfs:comment>
+        <rdfs:domain rdf:resource="http://example.org/ontology/sailboat_ontology#SailingProcess"/>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#hasLength">
+        <rdfs:comment>The length of the hull measured in meters.</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <owl:ObjectProperty rdf:about="http://example.org/ontology/sailboat_ontology#constructedOf">
+        <rdfs:comment>The materials used in the construction of the hull.</rdfs:comment>
+    </owl:ObjectProperty>
+
+</rdf:RDF>

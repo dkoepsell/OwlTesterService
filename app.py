@@ -855,13 +855,6 @@ def view_history():
         # Get all ontology files with their analyses, ordered by upload date (newest first)
         ontologies = OntologyFile.query.order_by(OntologyFile.upload_date.desc()).all()
         
-        # Check file existence and add status indicator
-        for ontology in ontologies:
-            if not os.path.exists(ontology.file_path):
-                ontology.file_missing = True
-            else:
-                ontology.file_missing = False
-        
         # Get all FOL expressions, ordered by test date (newest first)
         expressions = FOLExpression.query.order_by(FOLExpression.test_date.desc()).limit(20).all()
         
@@ -1389,80 +1382,6 @@ def delete_file(file_id):
         flash(f"Error deleting file: {str(e)}", 'error')
         return redirect(url_for('view_history'))
 
-@app.route('/bulk_file_action', methods=['POST'])
-def bulk_file_action():
-    """Handle bulk actions on multiple files (archive, unarchive, delete)."""
-    try:
-        data = request.get_json()
-        action = data.get('action')
-        file_ids = data.get('file_ids', [])
-        
-        if not action or not file_ids:
-            return jsonify({'success': False, 'message': 'Invalid request data'})
-        
-        # Get the files
-        files = OntologyFile.query.filter(OntologyFile.id.in_(file_ids)).all()
-        
-        if not files:
-            return jsonify({'success': False, 'message': 'No files found'})
-        
-        if action == 'archive':
-            # Archive files
-            for file in files:
-                file.archived = True
-            db.session.commit()
-            return jsonify({'success': True, 'message': f'{len(files)} file(s) archived successfully'})
-            
-        elif action == 'unarchive':
-            # Unarchive files
-            for file in files:
-                file.archived = False
-            db.session.commit()
-            return jsonify({'success': True, 'message': f'{len(files)} file(s) restored successfully'})
-            
-        elif action == 'delete':
-            # Delete files permanently
-            file_paths = []
-            filenames = []
-            deleted_count = 0
-            
-            for file in files:
-                try:
-                    file_paths.append(file.file_path)
-                    filenames.append(file.original_filename)
-                    
-                    # Delete related analyses first (should cascade automatically, but let's be explicit)
-                    from models import OntologyAnalysis
-                    OntologyAnalysis.query.filter_by(ontology_file_id=file.id).delete()
-                    
-                    # Now delete the file
-                    db.session.delete(file)
-                    db.session.flush()  # Flush each delete individually
-                    deleted_count += 1
-                except Exception as e:
-                    logger.error(f"Error deleting file {file.original_filename}: {str(e)}")
-                    continue
-            
-            db.session.commit()
-            
-            # Try to delete physical files
-            for file_path in file_paths:
-                try:
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
-                except Exception as e:
-                    logger.warning(f"Could not delete physical file {file_path}: {str(e)}")
-            
-            return jsonify({'success': True, 'message': f'{deleted_count} file(s) deleted successfully'})
-            
-        else:
-            return jsonify({'success': False, 'message': f'Unknown action: {action}'})
-            
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error in bulk file action: {str(e)}")
-        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
-
 # UML Diagram generation with D3.js
 @app.route('/analyze/<filename>/diagram')
 def generate_diagram(filename):
@@ -1761,7 +1680,7 @@ def bvss_visualize(filename):
         # Extract BVSS graph data
         bvss_data = extract_bvss_graph(file_path)
         
-        return render_template('bvss_simple.html', 
+        return render_template('bvss_working.html', 
                              file=file_record,
                              filename=filename,
                              bvss_data=bvss_data)
@@ -1783,50 +1702,16 @@ def api_bvss_data(filename):
         
         # Check if file exists
         if not os.path.exists(file_path):
-            # Try to use analysis data if available
-            if file_record.analyses:
-                app.logger.info(f"Using fallback visualization from analysis data for {filename}")
-                latest_analysis = max(file_record.analyses, key=lambda a: a.created_at)
-                
-                # Convert analysis data to BVSS format
-                classes = latest_analysis.class_list or []
-                properties = latest_analysis.property_list or []
-                
-                app.logger.info(f"Classes: {len(classes)}, Object Properties: {len(properties)}")
-                
-                # Build visualization data from stored analysis
-                vis_data = {
-                    'classes': [{'id': cls.get('name', 'Unknown'), 'name': cls.get('name', 'Unknown'), 'bfo': False} for cls in classes],
-                    'properties': [{'id': prop.get('name', 'Unknown'), 'name': prop.get('name', 'Unknown'), 'type': 'ObjectProperty'} for prop in properties],
-                    'inheritance': [],
-                    'individuals': []
-                }
-                
-                app.logger.info(f"Returning visualization data with {len(vis_data['classes'])} classes, {len(vis_data['inheritance'])} inheritance links, and {len(vis_data['properties'])} properties")
-                return jsonify(vis_data)
-            else:
-                return jsonify({
-                    'error': 'File not found and no analysis data available',
-                    'classes': [],
-                    'properties': [],
-                    'inheritance': [],
-                    'individuals': []
-                }), 404
+            return jsonify({
+                'error': 'File not found',
+                'nodes': [],
+                'edges': []
+            }), 404
         
         # Extract BVSS graph data
         bvss_data = extract_bvss_graph(file_path)
         
-        # Return the complete BVSS data with all authentic relationships
-        converted_data = {
-            'classes': bvss_data.get('classes', []),
-            'properties': bvss_data.get('properties', []),
-            'nodes': bvss_data.get('nodes', []),
-            'edges': bvss_data.get('edges', []),
-            'inheritance': bvss_data.get('inheritance', []),
-            'individuals': []
-        }
-        
-        return jsonify(converted_data)
+        return jsonify(bvss_data)
         
     except Exception as e:
         app.logger.error(f"Error getting BVSS data: {str(e)}")
