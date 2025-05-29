@@ -89,7 +89,9 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if ontology.archived %}
+                                {% if ontology.file_missing %}
+                                <span class="badge bg-danger"><i class="fas fa-exclamation-triangle me-1"></i>File Missing</span>
+                                {% elif ontology.archived %}
                                 <span class="badge bg-warning"><i class="fas fa-archive me-1"></i>Archived</span>
                                 {% else %}
                                 <span class="badge bg-success"><i class="fas fa-check me-1"></i>Active</span>

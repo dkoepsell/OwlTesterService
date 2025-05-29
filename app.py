@@ -855,6 +855,13 @@ def view_history():
         # Get all ontology files with their analyses, ordered by upload date (newest first)
         ontologies = OntologyFile.query.order_by(OntologyFile.upload_date.desc()).all()
         
+        # Check file existence and add status indicator
+        for ontology in ontologies:
+            if not os.path.exists(ontology.file_path):
+                ontology.file_missing = True
+            else:
+                ontology.file_missing = False
+        
         # Get all FOL expressions, ordered by test date (newest first)
         expressions = FOLExpression.query.order_by(FOLExpression.test_date.desc()).limit(20).all()
         
