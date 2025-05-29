@@ -310,14 +310,31 @@
             
             svg.call(zoom);
             
+            // Create link group for lines and labels
+            const linkGroup = container.append("g");
+            
             // Create links
-            const link = container.append("g")
+            const link = linkGroup
                 .selectAll("line")
                 .data(links)
                 .join("line")
                 .attr("stroke", "#999")
-                .attr("stroke-opacity", 0.6)
-                .attr("stroke-width", 2);
+                .attr("stroke-opacity", 0.8)
+                .attr("stroke-width", d => d.type === "is_a" ? 2 : 1)
+                .attr("stroke-dasharray", d => d.type === "is_a" ? "none" : "3,3");
+            
+            // Create link labels
+            const linkLabels = linkGroup
+                .selectAll("text")
+                .data(links)
+                .join("text")
+                .attr("class", "link-label")
+                .attr("font-size", "10px")
+                .attr("fill", "#ffffff")
+                .attr("text-anchor", "middle")
+                .attr("stroke", "#000000")
+                .attr("stroke-width", 0.5)
+                .text(d => d.type || "is_a");
             
             // Create node groups
             const node = container.append("g")
@@ -433,14 +450,17 @@
                 }
             });
             
-            // Add labels
+            // Add labels with better styling
             node.append("text")
                 .text(d => d.name)
                 .attr("x", 0)
-                .attr("y", 30)
+                .attr("y", 35)
                 .attr("text-anchor", "middle")
-                .attr("font-size", "10px")
-                .attr("fill", "#333");
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .attr("fill", "#ffffff")
+                .attr("stroke", "#000000")
+                .attr("stroke-width", 0.5);
             
             // Update positions on tick
             simulation.on("tick", () => {
@@ -449,6 +469,11 @@
                     .attr("y1", d => d.source.y)
                     .attr("x2", d => d.target.x)
                     .attr("y2", d => d.target.y);
+                
+                // Update link labels to be positioned at the midpoint of each link
+                linkLabels
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
                 
                 node.attr("transform", d => `translate(${d.x},${d.y})`);
             });
