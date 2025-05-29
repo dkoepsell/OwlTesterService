@@ -119,7 +119,7 @@
         console.log('DOM fully loaded');
         
         // Get visualization data
-        fetch('/api/bvss_data/{{ filename }}')
+        fetch('/api/bvss/{{ filename }}')
             .then(response => response.json())
             .then(data => {
                 console.log('Visualization data received:', data);
