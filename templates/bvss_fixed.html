@@ -292,43 +292,84 @@
                     {source: 'SpatiotemporalRegion', target: 'TemporalInstant', type: 'subsumption'}
                 );
                 
-                // Add ontology relationships from the data
-                if (properties && properties.length > 0) {
-                    properties.forEach(prop => {
-                        // Add property relationships between classes
-                        if (prop.domain && prop.range) {
+                // Use authentic relationships from the ontology
+                if (edges && edges.length > 0) {
+                    edges.forEach(edge => {
+                        let linkType = 'subsumption'; // default
+                        
+                        // Map authentic relationship types to BVSS relations
+                        switch(edge.relation) {
+                            case 'is_a':
+                            case 'inheritance':
+                                linkType = 'subsumption';
+                                break;
+                            case 'part_of':
+                                linkType = 'part_of';
+                                break;
+                            case 'participates_in':
+                                linkType = 'participates_in';
+                                break;
+                            case 'has_role':
+                            case 'has_quality':
+                                linkType = 'has_role';
+                                break;
+                            case 'inheres_in':
+                                linkType = 'inheres_in';
+                                break;
+                            case 'located_in':
+                                linkType = 'located_in';
+                                break;
+                            case 'realizes':
+                            case 'is_realized_by':
+                                linkType = 'realizes';
+                                break;
+                            case 'has_participant':
+                                linkType = 'has_participant';
+                                break;
+                            case 'has_property':
+                            case 'domain':
+                            case 'range':
+                            case 'points_to':
+                                linkType = 'property_relation';
+                                break;
+                            default:
+                                linkType = 'subsumption';
+                        }
+                        
+                        links.push({
+                            source: edge.source,
+                            target: edge.target,
+                            type: linkType,
+                            relation: edge.relation,
+                            label: edge.relation
+                        });
+                    });
+                } else {
+                    // Fallback: extract from properties if no edges provided
+                    if (properties && properties.length > 0) {
+                        properties.forEach(prop => {
+                            if (prop.domain && prop.range) {
+                                links.push({
+                                    source: prop.domain,
+                                    target: prop.range,
+                                    type: 'property_relation',
+                                    label: prop.name
+                                });
+                            }
+                        });
+                    }
+                    
+                    // Extract subclass relationships
+                    classes.forEach(cls => {
+                        if (cls.parent && cls.parent !== cls.id) {
                             links.push({
-                                source: prop.domain,
-                                target: prop.range,
-                                type: 'property',
-                                label: prop.name
+                                source: cls.parent,
+                                target: cls.id,
+                                type: 'subsumption'
                             });
                         }
                     });
                 }
-                
-                // Add subclass relationships if available
-                classes.forEach(cls => {
-                    if (cls.parent && cls.parent !== cls.id) {
-                        links.push({
-                            source: cls.parent,
-                            target: cls.id,
-                            type: 'subsumption'
-                        });
-                    }
-                });
-                
-                // Map legal concepts to BFO categories and create inheritance links
-                classes.forEach(cls => {
-                    const bfoParent = getBFOParent(cls.name);
-                    if (bfoParent) {
-                        links.push({
-                            source: bfoParent,
-                            target: cls.id,
-                            type: 'instantiation'
-                        });
-                    }
-                });
 
                 // Create force simulation
                 const simulation = d3.forceSimulation(nodes)
