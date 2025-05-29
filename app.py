@@ -1816,7 +1816,15 @@ def api_bvss_data(filename):
         # Extract BVSS graph data
         bvss_data = extract_bvss_graph(file_path)
         
-        return jsonify(bvss_data)
+        # Convert to the format expected by the frontend
+        converted_data = {
+            'classes': [{'id': node['id'], 'name': node['name']} for node in bvss_data.get('nodes', []) if node.get('type') != 'Relation'],
+            'properties': [{'id': node['id'], 'name': node['name']} for node in bvss_data.get('nodes', []) if node.get('type') == 'Relation'],
+            'inheritance': [edge for edge in bvss_data.get('edges', []) if edge.get('type') == 'inheritance'],
+            'individuals': []
+        }
+        
+        return jsonify(converted_data)
         
     except Exception as e:
         app.logger.error(f"Error getting BVSS data: {str(e)}")
