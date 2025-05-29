@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}BVSS Visualization: {{ filename }}{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2>BVSS Visualization: {{ filename }}</h2>
+                <div class="alert alert-info">
+                    <h6>BFO Visual Syntax System (BVSS)</h6>
+                    <p>The BFO Visual Syntax System (BVSS) provides a standardized, intuitive, and expressive visual language for representing the full set of Basic Formal Ontology (BFO) entities and relations across domains. It enables the creation of legible, interoperable diagrams that support teaching, modeling, and ontology validation.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h6>Ontology Information</h6>
+                <p id="ontology-stats"><strong>Classes:</strong> <span id="class-count">Loading...</span> | <strong>Properties:</strong> <span id="property-count">Loading...</span></p>
+                
+                <div class="btn-group mb-3" role="group">
+                    <button type="button" class="btn btn-outline-secondary" onclick="resetView()">Reset View</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="centerGraph()">Center Graph</button>
+                </div>
+                <div id="viz-container"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6>Enhanced BFO Visual Syntax (BVSS) Legend</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Entity Types</h6>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="8" fill="none" stroke="#000000" stroke-width="2"/>
+                            </svg>
+                            <strong>●</strong> Independent Continuant
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <rect x="2" y="2" width="16" height="16" fill="#808080" stroke="#000000" stroke-width="2"/>
+                            </svg>
+                            <strong>■</strong> Material Entity
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <rect x="2" y="2" width="16" height="16" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="3,3"/>
+                            </svg>
+                            <strong>□</strong> Immaterial Entity
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <polygon points="2,10 15,6 15,8 18,10 15,12 15,14" fill="#000000"/>
+                            </svg>
+                            <strong>⟶</strong> Process (Occurrent)
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Dependent Types</h6>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
+                            </svg>
+                            <strong>◌</strong> Dependent Continuant
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
+                                <text x="10" y="5" font-size="8" text-anchor="middle" fill="#000000">⚒</text>
+                            </svg>
+                            <strong>⚒</strong> Function
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
+                                <text x="10" y="5" font-size="8" text-anchor="middle" fill="#000000">⚏</text>
+                            </svg>
+                            <strong>⚏</strong> Disposition
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
+                                <text x="15" y="6" font-size="10" text-anchor="middle" fill="#000000">↺</text>
+                            </svg>
+                            <strong>↺</strong> Generic Dependent
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted">Relations</h6>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <line x1="2" y1="10" x2="18" y2="10" stroke="#000000" stroke-width="3"/>
+                            </svg>
+                            <strong>↑</strong> is_a (taxonomic)
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <line x1="2" y1="10" x2="18" y2="10" stroke="#666666" stroke-width="2" stroke-dasharray="3,3"/>
+                            </svg>
+                            <strong>→</strong> has_role
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <line x1="2" y1="10" x2="18" y2="10" stroke="#555555" stroke-width="4"/>
+                            </svg>
+                            <strong>⇨</strong> participates_in
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <svg width="20" height="20" class="me-2">
+                                <path d="M2,10 Q10,5 18,10" fill="none" stroke="#333333" stroke-width="2"/>
+                            </svg>
+                            <strong>↻</strong> realizes
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // Global variables
+        let simulation, svg, container, nodes, links;
+        const width = 800;
+        const height = 600;
+
+        // Initialize visualization
+        function initVisualization() {
+            try {
+                console.log("Initializing BVSS visualization...");
+                
+                // Load ontology data
+                const bvssData = {{ bvss_data | tojson | safe }};
+                console.log("Raw BVSS data:", bvssData);
+                
+                // Process nodes
+                nodes = [];
+                links = [];
+                
+                if (bvssData && bvssData.nodes) {
+                    // Add BFO core nodes
+                    nodes = [
+                        {id: "Entity", name: "Entity", shape: "circle", group: 0, bfo: true},
+                        {id: "Continuant", name: "Continuant", shape: "circle", group: 0, bfo: true},
+                        {id: "Occurrent", name: "Occurrent", shape: "arrow", group: 0, bfo: true},
+                        {id: "IndependentContinuant", name: "Independent Continuant", shape: "circle", group: 1, bfo: true},
+                        {id: "DependentContinuant", name: "Dependent Continuant", shape: "small-dashed-circle", group: 2, bfo: true},
+                        {id: "Process", name: "Process", shape: "arrow", group: 4, bfo: true}
+                    ];
+                    
+                    // Add ontology nodes
+                    const ontologyNodes = bvssData.nodes
+                        .filter(node => node.type !== "Relation")
+                        .map(node => ({
+                            id: node.name || node.id,
+                            name: node.name || node.label || node.id,
+                            shape: classifyShape(node.name || node.label || node.id),
+                            group: classifyGroup(node.name || node.label || node.id),
+                            bfo: false
+                        }));
+                    
+                    nodes = [...nodes, ...ontologyNodes];
+                    
+                    // Add inheritance links
+                    links = [
+                        {source: "Entity", target: "Continuant", type: "is_a"},
+                        {source: "Entity", target: "Occurrent", type: "is_a"},
+                        {source: "Continuant", target: "IndependentContinuant", type: "is_a"},
+                        {source: "Continuant", target: "DependentContinuant", type: "is_a"},
+                        {source: "Occurrent", target: "Process", type: "is_a"}
+                    ];
+                    
+                    if (bvssData.edges) {
+                        const ontologyLinks = bvssData.edges
+                            .filter(edge => edge.type === "inheritance")
+                            .map(edge => ({
+                                source: extractName(edge.source),
+                                target: extractName(edge.target),
+                                type: "is_a"
+                            }));
+                        
+                        links = [...links, ...ontologyLinks];
+                    }
+                }
+                
+                console.log(`Processed ${nodes.length} nodes and ${links.length} links`);
+                
+                // Update stats
+                const classCount = nodes.filter(n => !n.bfo).length;
+                document.getElementById('class-count').textContent = classCount;
+                document.getElementById('property-count').textContent = bvssData?.ontology_info?.property_count || 0;
+                
+                // Create visualization
+                createVisualization();
+                
+            } catch (error) {
+                console.error("Error initializing visualization:", error);
+                document.getElementById('viz-container').innerHTML = 
+                    '<div class="alert alert-danger">Error loading visualization: ' + error.message + '</div>';
+            }
+        }
+        
+        function extractName(uri) {
+            if (!uri) return "Unknown";
+            if (uri.includes('#')) return uri.split('#').pop();
+            if (uri.includes('/')) return uri.split('/').pop();
+            return uri;
+        }
+        
+        function classifyShape(name) {
+            const n = name.toLowerCase();
+            if (n.includes('process') || n.includes('trial') || n.includes('adjudication')) return 'arrow';
+            if (n.includes('role') || n.includes('authority')) return 'role-circle';
+            if (n.includes('obligation') || n.includes('disposition')) return 'disposition-circle';
+            if (n.includes('jurisdiction') || n.includes('region')) return 'hollow-square';
+            if (n.includes('document') || n.includes('contract') || n.includes('evidence') || n.includes('judgment')) return 'square';
+            if (n.includes('claim') || n.includes('right') || n.includes('liability')) return 'small-dashed-circle';
+            if (n.includes('regulation') || n.includes('statute')) return 'small-dashed-circle-migrate';
+            return 'circle';
+        }
+        
+        function classifyGroup(name) {
+            const n = name.toLowerCase();
+            if (n.includes('process') || n.includes('trial')) return 4;
+            if (n.includes('jurisdiction')) return 5;
+            if (n.includes('regulation') || n.includes('statute')) return 3;
+            if (n.includes('role') || n.includes('claim') || n.includes('right')) return 2;
+            return 1;
+        }
+        
+        function createVisualization() {
+            // Clear existing visualization
+            d3.select("#viz-container").selectAll("*").remove();
+            
+            // Create SVG
+            svg = d3.select("#viz-container")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+            
+            container = svg.append("g");
+            
+            // Create simulation
+            simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-300))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+            
+            // Add zoom
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 4])
+                .on("zoom", (event) => {
+                    container.attr("transform", event.transform);
+                });
+            
+            svg.call(zoom);
+            
+            // Create links
+            const link = container.append("g")
+                .selectAll("line")
+                .data(links)
+                .join("line")
+                .attr("stroke", "#999")
+                .attr("stroke-opacity", 0.6)
+                .attr("stroke-width", 2);
+            
+            // Create node groups
+            const node = container.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .join("g")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+            
+            // Draw shapes
+            node.each(function(d) {
+                const group = d3.select(this);
+                const color = d.bfo ? "#000" : "#0066cc";
+                const strokeWidth = d.bfo ? 3 : 2;
+                
+                switch(d.shape) {
+                    case "circle":
+                        group.append("circle")
+                            .attr("r", 20)
+                            .attr("fill", "none")
+                            .attr("stroke", color)
+                            .attr("stroke-width", strokeWidth);
+                        break;
+                    case "square":
+                        group.append("rect")
+                            .attr("x", -20)
+                            .attr("y", -20)
+                            .attr("width", 40)
+                            .attr("height", 40)
+                            .attr("fill", "#d1d5db")
+                            .attr("stroke", color)
+                            .attr("stroke-width", strokeWidth);
+                        break;
+                    case "hollow-square":
+                        group.append("rect")
+                            .attr("x", -20)
+                            .attr("y", -20)
+                            .attr("width", 40)
+                            .attr("height", 40)
+                            .attr("fill", "none")
+                            .attr("stroke", color)
+                            .attr("stroke-width", strokeWidth)
+                            .attr("stroke-dasharray", "4,4");
+                        break;
+                    case "small-dashed-circle":
+                        group.append("circle")
+                            .attr("r", 15)
+                            .attr("fill", "none")
+                            .attr("stroke", color)
+                            .attr("stroke-width", strokeWidth)
+                            .attr("stroke-dasharray", "3,3");
+                        break;
+                    case "arrow":
+                        group.append("polygon")
+                            .attr("points", "-20,0 15,-8 15,-3 25,0 15,3 15,8")
+                            .attr("fill", color);
+                        break;
+                    default:
+                        group.append("circle")
+                            .attr("r", 18)
+                            .attr("fill", "none")
+                            .attr("stroke", color)
+                            .attr("stroke-width", strokeWidth);
+                }
+            });
+            
+            // Add labels
+            node.append("text")
+                .text(d => d.name)
+                .attr("x", 0)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("font-size", "10px")
+                .attr("fill", "#333");
+            
+            // Update positions on tick
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+        }
+        
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        function resetView() {
+            svg.transition().duration(750).call(
+                d3.zoom().transform,
+                d3.zoomIdentity
+            );
+        }
+        
+        function centerGraph() {
+            const bounds = container.node().getBBox();
+            const fullWidth = width;
+            const fullHeight = height;
+            const scale = Math.min(fullWidth / bounds.width, fullHeight / bounds.height) * 0.9;
+            const translate = [fullWidth / 2 - scale * (bounds.x + bounds.width / 2), 
+                             fullHeight / 2 - scale * (bounds.y + bounds.height / 2)];
+            
+            svg.transition().duration(750).call(
+                d3.zoom().transform,
+                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+            );
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', initVisualization);
+    </script>
+{% endblock %}
