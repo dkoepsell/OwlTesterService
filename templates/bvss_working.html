@@ -156,7 +156,89 @@
         const width = 800;
         const height = 600;
         
-        // BFO root classes following official BVSS specification
+        // Load actual ontology data from backend
+        let actualNodes = [];
+        let actualLinks = [];
+        
+        try {
+            const backendData = {{ bvss_data | tojson | safe }};
+            console.log("BVSS data loaded:", backendData);
+            
+            if (backendData && backendData.classes && backendData.classes.length > 0) {
+                // Convert backend classes to BVSS nodes with proper classification
+                actualNodes = backendData.classes.map(cls => {
+                    return {
+                        id: cls.id,
+                        name: cls.name,
+                        shape: classifyBFOShape(cls.name),
+                        group: classifyBFOGroup(cls.name),
+                        bfoType: classifyBFOType(cls.name),
+                        temporal: assignTemporalIfProcess(cls.name)
+                    };
+                });
+                
+                // Convert inheritance links to BVSS edges
+                if (backendData.inheritance_links) {
+                    actualLinks = backendData.inheritance_links.map(link => ({
+                        source: link.parent,
+                        target: link.child,
+                        label: "is_a",
+                        type: "is_a",
+                        symbol: "↑"
+                    }));
+                }
+            }
+        } catch (e) {
+            console.log("Error loading backend data:", e);
+        }
+        
+        // BFO classification functions
+        function classifyBFOShape(className) {
+            const name = className.toLowerCase();
+            if (name.includes('role') || name.includes('authority')) return 'role-dashed-circle';
+            if (name.includes('obligation') || name.includes('disposition')) return 'disposition-circle';
+            if (name.includes('capacity') || name.includes('function')) return 'function-circle';
+            if (name.includes('process') || name.includes('event') || name.includes('interpretation') || name.includes('proceeding')) return 'arrow';
+            if (name.includes('jurisdiction') || name.includes('region')) return 'hollow-square';
+            if (name.includes('document') || name.includes('contract') || name.includes('evidence') || name.includes('judgment')) return 'square';
+            if (name.includes('claim') || name.includes('right') || name.includes('liability') || name.includes('status') || name.includes('relationship')) return 'small-dashed-circle';
+            if (name.includes('regulation') || name.includes('statute')) return 'small-dashed-circle-migrate';
+            return 'circle'; // Default to Independent Continuant
+        }
+        
+        function classifyBFOGroup(className) {
+            const name = className.toLowerCase();
+            if (name.includes('process') || name.includes('event')) return 4;
+            if (name.includes('jurisdiction') || name.includes('region')) return 5;
+            if (name.includes('regulation') || name.includes('statute')) return 3;
+            if (name.includes('role') || name.includes('claim') || name.includes('right') || name.includes('obligation')) return 2;
+            return 1; // Default to Independent Continuant group
+        }
+        
+        function classifyBFOType(className) {
+            const name = className.toLowerCase();
+            if (name.includes('role')) return 'role';
+            if (name.includes('obligation') || name.includes('disposition')) return 'disposition';
+            if (name.includes('capacity') || name.includes('function')) return 'function';
+            if (name.includes('process') || name.includes('event')) return 'process';
+            if (name.includes('jurisdiction') || name.includes('region')) return 'spatial';
+            if (name.includes('document') || name.includes('contract') || name.includes('evidence')) return 'material';
+            if (name.includes('regulation') || name.includes('statute')) return 'generic-dependent';
+            if (name.includes('claim') || name.includes('right') || name.includes('liability')) return 'dependent';
+            return 'independent';
+        }
+        
+        function assignTemporalIfProcess(className) {
+            const name = className.toLowerCase();
+            if (name.includes('process')) return 't0-t2';
+            if (name.includes('event')) return 't1-t2';
+            if (name.includes('proceeding')) return 't0-t3';
+            if (name.includes('judgment')) return 't1';
+            if (name.includes('contract')) return 't0-t1';
+            return null;
+        }
+        
+        // BFO root classes (always included for context)
         const bfoNodes = [
             {id: "Entity", name: "Entity", shape: "circle", group: 0, bfo: true, bfoType: "entity"},
             {id: "Continuant", name: "Continuant", shape: "circle", group: 0, bfo: true, bfoType: "continuant"},
@@ -169,37 +251,7 @@
             {id: "GenericallyDependentContinuant", name: "Generically Dependent Continuant", shape: "small-dashed-circle-migrate", group: 3, bfo: true, bfoType: "generic-dependent"}
         ];
 
-        // Your legal ontology data with enhanced BVSS classification
-        const legalNodes = [
-            {id: "Contract", name: "Contract", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material", temporal: "t0-t1"},
-            {id: "Legal_Role", name: "Legal_Role", shape: "role-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "role"},
-            {id: "Claim", name: "Claim", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
-            {id: "Legal_Entity", name: "Legal_Entity", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
-            {id: "Obligation", name: "Obligation", shape: "disposition-circle", group: 2, parent: "DependentContinuant", bfoType: "disposition"},
-            {id: "Legal_System", name: "Legal_System", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
-            {id: "Precedent", name: "Precedent", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
-            {id: "Authority", name: "Authority", shape: "role-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "role"},
-            {id: "Evidence", name: "Evidence", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
-            {id: "Legal_Fact", name: "Legal_Fact", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
-            {id: "Jurisdiction", name: "Jurisdiction", shape: "hollow-square", group: 5, parent: "SpatialRegion", bfoType: "spatial"},
-            {id: "Right", name: "Right", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
-            {id: "Legal_Person", name: "Legal_Person", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
-            {id: "Legal_Process", name: "Legal_Process", shape: "arrow", group: 4, parent: "Process", bfoType: "process", temporal: "t0-t2"},
-            {id: "Regulation", name: "Regulation", shape: "small-dashed-circle-migrate", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
-            {id: "Judgment", name: "Judgment", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material", temporal: "t1"},
-            {id: "Court", name: "Court", shape: "circle", group: 1, parent: "IndependentContinuant", bfoType: "independent"},
-            {id: "Statute", name: "Statute", shape: "small-dashed-circle-migrate", group: 3, parent: "GenericallyDependentContinuant", bfoType: "generic-dependent"},
-            {id: "Legal_Document", name: "Legal_Document", shape: "square", group: 1, parent: "MaterialEntity", bfoType: "material"},
-            {id: "Liability", name: "Liability", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
-            {id: "Legal_Interpretation", name: "Legal_Interpretation", shape: "arrow", group: 4, parent: "Process", bfoType: "process"},
-            {id: "Legal_Proceeding", name: "Legal_Proceeding", shape: "arrow", group: 4, parent: "Process", bfoType: "process", temporal: "t0-t3"},
-            {id: "Legal_Capacity", name: "Legal_Capacity", shape: "function-circle", group: 2, parent: "DependentContinuant", bfoType: "function"},
-            {id: "Legal_Status", name: "Legal_Status", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
-            {id: "Legal_Relationship", name: "Legal_Relationship", shape: "small-dashed-circle", group: 2, parent: "DependentContinuant", bfoType: "dependent"},
-            {id: "Legal_Event", name: "Legal_Event", shape: "arrow", group: 4, parent: "Process", bfoType: "process", temporal: "t1-t2"}
-        ];
-
-        const nodes = [...bfoNodes, ...legalNodes];
+        const nodes = actualNodes.length > 0 ? [...bfoNodes, ...actualNodes] : [...bfoNodes];
 
         // BFO hierarchy links
         const bfoLinks = [
@@ -222,24 +274,8 @@
                 type: "inheritance"
             }));
 
-        // Domain-specific relationships with enhanced BVSS symbols
-        const domainLinks = [
-            {source: "Legal_Entity", target: "Legal_Person", label: "is_a", type: "is_a", symbol: "↑"},
-            {source: "Legal_Document", target: "Contract", label: "is_a", type: "is_a", symbol: "↑"},
-            {source: "Legal_Document", target: "Statute", label: "is_a", type: "is_a", symbol: "↑"},
-            {source: "Legal_Process", target: "Legal_Proceeding", label: "is_a", type: "is_a", symbol: "↑"},
-            {source: "Legal_Process", target: "Legal_Interpretation", label: "is_a", type: "is_a", symbol: "↑"},
-            {source: "Legal_Fact", target: "Evidence", label: "is_a", type: "is_a", symbol: "↑"},
-            {source: "Court", target: "Judgment", label: "produces", type: "participates_in", symbol: "⇨"},
-            {source: "Legal_Person", target: "Legal_Role", label: "has_role", type: "has_role", symbol: "→"},
-            {source: "Contract", target: "Obligation", label: "creates", type: "realizes", symbol: "↻"},
-            {source: "Legal_Process", target: "Legal_Event", label: "realizes", type: "realizes", symbol: "↻"},
-            {source: "Authority", target: "Regulation", label: "establishes", type: "has_participant", symbol: "⇐"},
-            {source: "Legal_Role", target: "Legal_Person", label: "inheres_in", type: "inheres_in", symbol: "⇒"},
-            {source: "Obligation", target: "Contract", label: "inheres_in", type: "inheres_in", symbol: "⇒"}
-        ];
-
-        const links = [...bfoLinks, ...inheritanceLinks, ...domainLinks];
+        // Create links from actual data and BFO hierarchy
+        const links = [...bfoLinks, ...actualLinks];
 
         // Create SVG with zoom and pan
         const svg = d3.create("svg")
