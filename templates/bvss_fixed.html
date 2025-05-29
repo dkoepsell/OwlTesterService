@@ -141,6 +141,8 @@
                 const classes = data.classes || [];
                 const properties = data.properties || [];
                 const inheritance = data.inheritance || [];
+                const nodes = data.nodes || [];
+                const edges = data.edges || [];
                 
                 // Update counts
                 document.getElementById('class-count').textContent = classes.length;
@@ -289,6 +291,32 @@
                     {source: 'Process', target: 'ProcessAggregate', type: 'subsumption'},
                     {source: 'SpatiotemporalRegion', target: 'TemporalInstant', type: 'subsumption'}
                 );
+                
+                // Add ontology relationships from the data
+                if (properties && properties.length > 0) {
+                    properties.forEach(prop => {
+                        // Add property relationships between classes
+                        if (prop.domain && prop.range) {
+                            links.push({
+                                source: prop.domain,
+                                target: prop.range,
+                                type: 'property',
+                                label: prop.name
+                            });
+                        }
+                    });
+                }
+                
+                // Add subclass relationships if available
+                classes.forEach(cls => {
+                    if (cls.parent && cls.parent !== cls.id) {
+                        links.push({
+                            source: cls.parent,
+                            target: cls.id,
+                            type: 'subsumption'
+                        });
+                    }
+                });
                 
                 // Map legal concepts to BFO categories and create inheritance links
                 classes.forEach(cls => {
