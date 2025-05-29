@@ -1417,11 +1417,24 @@ def bulk_file_action():
             # Delete files permanently
             file_paths = []
             filenames = []
+            deleted_count = 0
             
             for file in files:
-                file_paths.append(file.file_path)
-                filenames.append(file.original_filename)
-                db.session.delete(file)
+                try:
+                    file_paths.append(file.file_path)
+                    filenames.append(file.original_filename)
+                    
+                    # Delete related analyses first (should cascade automatically, but let's be explicit)
+                    from models import OntologyAnalysis
+                    OntologyAnalysis.query.filter_by(ontology_file_id=file.id).delete()
+                    
+                    # Now delete the file
+                    db.session.delete(file)
+                    db.session.flush()  # Flush each delete individually
+                    deleted_count += 1
+                except Exception as e:
+                    logger.error(f"Error deleting file {file.original_filename}: {str(e)}")
+                    continue
             
             db.session.commit()
             
@@ -1433,7 +1446,7 @@ def bulk_file_action():
                 except Exception as e:
                     logger.warning(f"Could not delete physical file {file_path}: {str(e)}")
             
-            return jsonify({'success': True, 'message': f'{len(files)} file(s) deleted successfully'})
+            return jsonify({'success': True, 'message': f'{deleted_count} file(s) deleted successfully'})
             
         else:
             return jsonify({'success': False, 'message': f'Unknown action: {action}'})
