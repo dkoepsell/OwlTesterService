@@ -241,12 +241,12 @@
                 });
             });
 
-            // Create force simulation
+            // Create force simulation with better spacing
             simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id).distance(80))
-                .force("charge", d3.forceManyBody().strength(-300))
+                .force("link", d3.forceLink(links).id(d => d.id).distance(120))
+                .force("charge", d3.forceManyBody().strength(-500))
                 .force("center", d3.forceCenter(400, 300))
-                .force("collision", d3.forceCollide().radius(30));
+                .force("collision", d3.forceCollide().radius(50));
 
             // Create links
             const link = g.append("g")
@@ -268,22 +268,38 @@
                     .on("drag", dragged)
                     .on("end", dragended));
 
-            // Add BVSS symbols
+            // Add background circles for better visibility
+            node.append("circle")
+                .attr("r", 25)
+                .attr("fill", "#1a1a1a")
+                .attr("stroke", d => d.color)
+                .attr("stroke-width", 2);
+
+            // Add BVSS symbols - much larger and more visible
             node.append("text")
                 .attr("text-anchor", "middle")
                 .attr("dominant-baseline", "central")
-                .attr("font-size", "24px")
+                .attr("font-size", "32px")
                 .attr("font-weight", "bold")
                 .attr("fill", d => d.color)
                 .text(d => d.symbol);
 
-            // Add labels
+            // Add labels below nodes
             node.append("text")
                 .attr("text-anchor", "middle")
-                .attr("dy", "25px")
-                .attr("font-size", "10px")
+                .attr("dy", "45px")
+                .attr("font-size", "14px")
+                .attr("font-weight", "bold")
                 .attr("fill", "#ffffff")
                 .text(d => d.name.replace(/.*#/, ''));
+
+            // Add BFO type labels
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", "60px")
+                .attr("font-size", "10px")
+                .attr("fill", "#aaa")
+                .text(d => d.bfoType);
 
             // Add tooltips
             node.append("title")
