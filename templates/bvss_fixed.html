@@ -169,7 +169,7 @@
 
                 svg.call(zoom);
 
-                // Add pattern definitions for hatching
+                // Add pattern definitions for hatching and arrowheads
                 const defs = svg.append('defs');
                 defs.append('pattern')
                     .attr('id', 'hatch')
@@ -181,10 +181,68 @@
                     .attr('stroke', '#9ca3af')
                     .attr('stroke-width', 1);
 
-                // Create nodes
-                const nodes = [];
+                // Add authentic BVSS arrowhead markers
+                const arrowheads = [
+                    {id: 'arrowhead-subsumption', color: '#3b82f6', size: 8},
+                    {id: 'arrowhead-part-of', color: '#9ca3af', size: 6},
+                    {id: 'arrowhead-participates', color: '#f59e0b', size: 10},
+                    {id: 'arrowhead-small', color: '#7c3aed', size: 4},
+                    {id: 'arrowhead-thin', color: '#dc2626', size: 6},
+                    {id: 'arrowhead-pinhead', color: '#10b981', size: 5},
+                    {id: 'arrowhead-curved', color: '#ea580c', size: 7},
+                    {id: 'arrowhead-reverse', color: '#6b7280', size: 6},
+                    {id: 'arrowhead-default', color: '#666', size: 6}
+                ];
+
+                arrowheads.forEach(arrow => {
+                    defs.append('marker')
+                        .attr('id', arrow.id)
+                        .attr('viewBox', '0 -5 10 10')
+                        .attr('refX', 10)
+                        .attr('refY', 0)
+                        .attr('markerWidth', arrow.size)
+                        .attr('markerHeight', arrow.size)
+                        .attr('orient', 'auto')
+                        .append('path')
+                        .attr('d', 'M0,-5L10,0L0,5')
+                        .attr('fill', arrow.color);
+                });
+
+                // Extract authentic nodes from your ontology
+                if (nodes && nodes.length > 0) {
+                    // Use the real extracted nodes from your ontology
+                    nodes.forEach(node => {
+                        ontologyNodes.push({
+                            id: node.id,
+                            name: node.name || node.label,
+                            type: node.type === 'Relation' ? 'property' : 'class',
+                            bfoCategory: node.type === 'Relation' ? 'relation' : classifyBFOCategory(node.name || node.label),
+                            description: node.description,
+                            temporal: node.temporal
+                        });
+                    });
+                } else {
+                    // Extract from classes and properties if nodes not available
+                    classes.forEach(cls => {
+                        ontologyNodes.push({
+                            id: cls.id,
+                            name: cls.name,
+                            type: 'class',
+                            bfoCategory: classifyBFOCategory(cls.name)
+                        });
+                    });
+                    
+                    properties.forEach(prop => {
+                        ontologyNodes.push({
+                            id: prop.id || prop.name,
+                            name: prop.name,
+                            type: 'property',
+                            bfoCategory: 'relation'
+                        });
+                    });
+                }
                 
-                // Complete BFO hierarchy with all entity types
+                // BFO scaffolding nodes
                 const bfoNodes = [
                     // Top level
                     {id: 'Entity', name: 'Entity', type: 'bfo', bfoCategory: 'entity', x: width/2, y: 50},
@@ -222,21 +280,8 @@
                     {id: 'TemporalInstant', name: 'Temporal Instant', type: 'bfo', bfoCategory: 'temporal-instant', x: 18*width/20, y: 330}
                 ];
                 
-                nodes.push(...bfoNodes);
-
-                // Add class nodes
-                classes.forEach((cls, i) => {
-                    const angle = (i / classes.length) * 2 * Math.PI;
-                    const radius = 200;
-                    nodes.push({
-                        id: cls.id,
-                        name: cls.name,
-                        type: 'class',
-                        bfoCategory: classifyBFOCategory(cls.name),
-                        x: width/2 + radius * Math.cos(angle),
-                        y: height/2 + radius * Math.sin(angle)
-                    });
-                });
+                // Combine all nodes for visualization  
+                const allNodes = [...bfoNodes, ...ontologyNodes];
 
                 // Add property nodes
                 properties.forEach((prop, i) => {
@@ -372,13 +417,13 @@
                 }
 
                 // Create force simulation
-                const simulation = d3.forceSimulation(nodes)
+                const simulation = d3.forceSimulation(allNodes)
                     .force('link', d3.forceLink(links).id(d => d.id).distance(100))
                     .force('charge', d3.forceManyBody().strength(-300))
                     .force('center', d3.forceCenter(width / 2, height / 2))
                     .force('collision', d3.forceCollide().radius(30));
 
-                // Create links with different styles for different relationship types
+                // Create links with authentic BVSS relation styles
                 const link = container.selectAll('.link')
                     .data(links)
                     .enter()
@@ -386,15 +431,48 @@
                     .attr('class', 'link')
                     .attr('stroke', d => {
                         switch(d.type) {
-                            case 'subsumption': return '#3b82f6';
+                            case 'subsumption': return '#3b82f6';  // is_a ↑ solid line
+                            case 'part_of': return '#9ca3af';      // part_of → dashed line
+                            case 'participates_in': return '#f59e0b';  // participates_in ⇨ double line
+                            case 'has_role': return '#7c3aed';     // has_role/has_quality → small arrow
+                            case 'inheres_in': return '#dc2626';   // inheres_in ⇒ thin arrow
+                            case 'located_in': return '#10b981';   // located_in → (pinhead)
+                            case 'realizes': return '#ea580c';     // realizes ↻ curved arrow
+                            case 'has_participant': return '#6b7280';  // has_participant ⇐ reverse arrow
+                            case 'property_relation': return '#f97316';
                             case 'instantiation': return '#10b981';
-                            case 'participates_in': return '#f59e0b';
-                            case 'part_of': return '#9ca3af';
                             default: return '#666';
                         }
                     })
-                    .attr('stroke-width', d => d.type === 'subsumption' ? 3 : 2)
-                    .attr('stroke-dasharray', d => d.type === 'part_of' ? '5,5' : null);
+                    .attr('stroke-width', d => {
+                        switch(d.type) {
+                            case 'subsumption': return 3;          // Solid line for is_a
+                            case 'participates_in': return 4;      // Double line effect
+                            case 'inheres_in': return 1;           // Thin arrow
+                            case 'part_of': return 2;              // Dashed line
+                            default: return 2;
+                        }
+                    })
+                    .attr('stroke-dasharray', d => {
+                        switch(d.type) {
+                            case 'part_of': return '8,4';          // Dashed for part_of
+                            case 'has_role': return '3,2';         // Small dash for has_role
+                            default: return null;
+                        }
+                    })
+                    .attr('marker-end', d => {
+                        switch(d.type) {
+                            case 'subsumption': return 'url(#arrowhead-subsumption)';
+                            case 'part_of': return 'url(#arrowhead-part-of)';
+                            case 'participates_in': return 'url(#arrowhead-participates)';
+                            case 'has_role': return 'url(#arrowhead-small)';
+                            case 'inheres_in': return 'url(#arrowhead-thin)';
+                            case 'located_in': return 'url(#arrowhead-pinhead)';
+                            case 'realizes': return 'url(#arrowhead-curved)';
+                            case 'has_participant': return 'url(#arrowhead-reverse)';
+                            default: return 'url(#arrowhead-default)';
+                        }
+                    });
 
                 // Create node groups
                 const node = container.selectAll('.node')
