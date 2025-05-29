@@ -167,6 +167,18 @@
 
                 svg.call(zoom);
 
+                // Add pattern definitions for hatching
+                const defs = svg.append('defs');
+                defs.append('pattern')
+                    .attr('id', 'hatch')
+                    .attr('patternUnits', 'userSpaceOnUse')
+                    .attr('width', 8)
+                    .attr('height', 8)
+                    .append('path')
+                    .attr('d', 'M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6')
+                    .attr('stroke', '#9ca3af')
+                    .attr('stroke-width', 1);
+
                 // Create nodes
                 const nodes = [];
                 
@@ -257,7 +269,7 @@
                         case 'independent':
                         case 'entity':
                         case 'continuant':
-                            // Solid circle ●
+                            // Independent Continuant: Solid circle ●
                             g.append('circle')
                                 .attr('r', 20)
                                 .attr('fill', '#4a90e2')
@@ -265,27 +277,8 @@
                                 .attr('stroke-width', 2);
                             break;
                             
-                        case 'dependent':
-                            // Dashed circle ◌
-                            g.append('circle')
-                                .attr('r', 20)
-                                .attr('fill', 'none')
-                                .attr('stroke', '#dc2626')
-                                .attr('stroke-width', 2)
-                                .attr('stroke-dasharray', '5,5');
-                            break;
-                            
-                        case 'process':
-                            // Arrow ⟶
-                            g.append('path')
-                                .attr('d', 'M-20,0 L20,0 M15,-5 L20,0 L15,5')
-                                .attr('stroke', '#10b981')
-                                .attr('stroke-width', 3)
-                                .attr('fill', 'none');
-                            break;
-                            
-                        case 'generic-dependent':
-                            // Square ■
+                        case 'material':
+                            // Material Entity: Filled gray square ■
                             g.append('rect')
                                 .attr('x', -15)
                                 .attr('y', -15)
@@ -296,8 +289,156 @@
                                 .attr('stroke-width', 2);
                             break;
                             
+                        case 'immaterial':
+                            // Immaterial Entity: Hollow square □
+                            g.append('rect')
+                                .attr('x', -15)
+                                .attr('y', -15)
+                                .attr('width', 30)
+                                .attr('height', 30)
+                                .attr('fill', 'none')
+                                .attr('stroke', '#9ca3af')
+                                .attr('stroke-width', 2);
+                            break;
+                            
+                        case 'object-aggregate':
+                            // Object Aggregate: Thick square ⬛
+                            g.append('rect')
+                                .attr('x', -18)
+                                .attr('y', -18)
+                                .attr('width', 36)
+                                .attr('height', 36)
+                                .attr('fill', '#374151')
+                                .attr('stroke', '#fff')
+                                .attr('stroke-width', 3);
+                            break;
+                            
+                        case 'fiat-object-part':
+                            // Fiat Object Part: Hatched rectangle ▭
+                            g.append('rect')
+                                .attr('x', -20)
+                                .attr('y', -12)
+                                .attr('width', 40)
+                                .attr('height', 24)
+                                .attr('fill', 'url(#hatch)')
+                                .attr('stroke', '#fff')
+                                .attr('stroke-width', 2);
+                            break;
+                            
+                        case 'dependent':
+                            // Dependent Continuant: Dashed circle ◌
+                            g.append('circle')
+                                .attr('r', 20)
+                                .attr('fill', 'none')
+                                .attr('stroke', '#dc2626')
+                                .attr('stroke-width', 2)
+                                .attr('stroke-dasharray', '5,5');
+                            break;
+                            
+                        case 'specifically-dependent':
+                            // Specifically Dependent: Dashed circle with anchor ◌+anchor
+                            g.append('circle')
+                                .attr('r', 20)
+                                .attr('fill', 'none')
+                                .attr('stroke', '#dc2626')
+                                .attr('stroke-width', 2)
+                                .attr('stroke-dasharray', '5,5');
+                            g.append('path')
+                                .attr('d', 'M0,20 L0,35 M-5,30 L0,35 L5,30')
+                                .attr('stroke', '#dc2626')
+                                .attr('stroke-width', 2)
+                                .attr('fill', 'none');
+                            break;
+                            
+                        case 'generic-dependent':
+                            // Generically Dependent: Dashed circle with migration symbol ◌+↺
+                            g.append('circle')
+                                .attr('r', 20)
+                                .attr('fill', 'none')
+                                .attr('stroke', '#dc2626')
+                                .attr('stroke-width', 2)
+                                .attr('stroke-dasharray', '5,5');
+                            g.append('path')
+                                .attr('d', 'M25,0 A15,15 0 1,1 25,-15')
+                                .attr('stroke', '#dc2626')
+                                .attr('stroke-width', 2)
+                                .attr('fill', 'none');
+                            g.append('path')
+                                .attr('d', 'M35,-5 L40,0 L35,5')
+                                .attr('stroke', '#dc2626')
+                                .attr('stroke-width', 2)
+                                .attr('fill', 'none');
+                            break;
+                            
+                        case 'quality':
+                            // Quality: Tiny dot ◦
+                            g.append('circle')
+                                .attr('r', 8)
+                                .attr('fill', '#7c3aed')
+                                .attr('stroke', '#fff')
+                                .attr('stroke-width', 1);
+                            break;
+                            
+                        case 'function':
+                        case 'disposition':
+                            // Function/Disposition: Hammer icon ⚒
+                            g.append('path')
+                                .attr('d', 'M-10,-15 L10,-5 M-5,-10 L5,0 M0,-15 L0,15 M-15,10 L15,10')
+                                .attr('stroke', '#ea580c')
+                                .attr('stroke-width', 2)
+                                .attr('fill', 'none');
+                            break;
+                            
+                        case 'process':
+                            // Process: Directed arrow ⟶
+                            g.append('path')
+                                .attr('d', 'M-20,0 L20,0 M15,-5 L20,0 L15,5')
+                                .attr('stroke', '#10b981')
+                                .attr('stroke-width', 3)
+                                .attr('fill', 'none');
+                            break;
+                            
+                        case 'process-aggregate':
+                            // Process Aggregate: Double arrows ⟶⟶
+                            g.append('path')
+                                .attr('d', 'M-20,-5 L20,-5 M15,-10 L20,-5 L15,0')
+                                .attr('stroke', '#10b981')
+                                .attr('stroke-width', 3)
+                                .attr('fill', 'none');
+                            g.append('path')
+                                .attr('d', 'M-20,5 L20,5 M15,0 L20,5 L15,10')
+                                .attr('stroke', '#10b981')
+                                .attr('stroke-width', 3)
+                                .attr('fill', 'none');
+                            break;
+                            
+                        case 'spatiotemporal-region':
+                            // Spatiotemporal Region: Ring overlay ◬
+                            g.append('circle')
+                                .attr('r', 20)
+                                .attr('fill', 'none')
+                                .attr('stroke', '#f59e0b')
+                                .attr('stroke-width', 3);
+                            g.append('circle')
+                                .attr('r', 12)
+                                .attr('fill', 'none')
+                                .attr('stroke', '#f59e0b')
+                                .attr('stroke-width', 2);
+                            break;
+                            
+                        case 'temporal-instant':
+                            // Temporal Instant: Timeline marker |
+                            g.append('line')
+                                .attr('x1', 0)
+                                .attr('y1', -20)
+                                .attr('x2', 0)
+                                .attr('y2', 20)
+                                .attr('stroke', '#f59e0b')
+                                .attr('stroke-width', 4);
+                            break;
+                            
                         case 'relation':
-                            // Diamond
+                            // Relations: Diamond
                             g.append('path')
                                 .attr('d', 'M0,-15 L15,0 L0,15 L-15,0 Z')
                                 .attr('fill', '#f59e0b')
