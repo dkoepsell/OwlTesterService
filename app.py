@@ -28,6 +28,7 @@ from openai_utils import generate_real_world_implications
 # Import the preprocess_expression function for handling comma-separated quantifiers
 from owl_preprocessor import preprocess_expression
 from bvss_model import extract_bvss_graph
+from bvss_validator import BVSSValidator
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -1719,6 +1720,45 @@ def api_bvss_data(filename):
             'error': str(e),
             'nodes': [],
             'edges': []
+        }), 500
+
+@app.route('/api/validate-bvss/<filename>')
+def api_validate_bvss(filename):
+    """API endpoint to validate BVSS graph for logical consistency."""
+    try:
+        # Find the file in the database
+        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        
+        # Get the file path
+        file_path = file_record.file_path
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return jsonify({
+                'errors': [{'type': 'file_error', 'description': 'File not found', 'entity': 'system'}],
+                'warnings': [],
+                'valid': []
+            }), 404
+        
+        # Extract BVSS graph data first
+        bvss_data = extract_bvss_graph(file_path)
+        
+        # Initialize validator and run validation
+        validator = BVSSValidator()
+        validation_results = validator.validate_ontology_graph(file_path, bvss_data)
+        
+        return jsonify(validation_results)
+        
+    except Exception as e:
+        app.logger.error(f"Error validating BVSS graph: {str(e)}")
+        return jsonify({
+            'errors': [{
+                'type': 'validation_error',
+                'description': f'Failed to validate ontology: {str(e)}',
+                'entity': 'system'
+            }],
+            'warnings': [],
+            'valid': []
         }), 500
 
 # Error handlers

@@ -22,6 +22,20 @@
                     <button type="button" class="btn btn-outline-secondary" onclick="resetView()">Reset View</button>
                     <button type="button" class="btn btn-outline-secondary" onclick="centerGraph()">Center Graph</button>
                     <button type="button" class="btn btn-outline-primary" onclick="downloadPNG()">Download PNG</button>
+                    <button type="button" class="btn btn-outline-warning" onclick="validateGraph()">Validate Logic</button>
+                </div>
+                
+                <!-- Validation Status Panel -->
+                <div id="validation-panel" class="card mt-3" style="display: none;">
+                    <div class="card-header d-flex justify-content-between">
+                        <h6 class="mb-0">Validation Results</h6>
+                        <button type="button" class="btn-close btn-sm" onclick="hideValidation()"></button>
+                    </div>
+                    <div class="card-body">
+                        <div id="validation-content">
+                            <!-- Validation results will be populated here -->
+                        </div>
+                    </div>
                 </div>
                 <div id="viz-container"></div>
             </div>
@@ -766,6 +780,131 @@
             };
             
             img.src = svgUrl;
+        }
+        
+        function validateGraph() {
+            const filename = "{{ filename }}";
+            const button = event.target;
+            const originalText = button.textContent;
+            
+            // Show loading state
+            button.textContent = "Validating...";
+            button.disabled = true;
+            
+            fetch(`/api/validate-bvss/${filename}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayValidationResults(data);
+                    applyValidationHighlights(data);
+                })
+                .catch(error => {
+                    console.error('Validation error:', error);
+                    displayValidationError(error.message);
+                })
+                .finally(() => {
+                    button.textContent = originalText;
+                    button.disabled = false;
+                });
+        }
+        
+        function displayValidationResults(data) {
+            const panel = document.getElementById('validation-panel');
+            const content = document.getElementById('validation-content');
+            
+            let html = '';
+            
+            // Display errors
+            if (data.errors && data.errors.length > 0) {
+                html += '<div class="alert alert-danger"><h6>Errors Found:</h6><ul class="mb-0">';
+                data.errors.forEach(error => {
+                    html += `<li><strong>${error.type}:</strong> ${error.description}`;
+                    if (error.source && error.target) {
+                        html += ` (${error.source} → ${error.target})`;
+                    }
+                    html += '</li>';
+                });
+                html += '</ul></div>';
+            }
+            
+            // Display warnings
+            if (data.warnings && data.warnings.length > 0) {
+                html += '<div class="alert alert-warning"><h6>Warnings:</h6><ul class="mb-0">';
+                data.warnings.forEach(warning => {
+                    html += `<li>${warning.description}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            // Display valid relations
+            if (data.valid && data.valid.length > 0) {
+                html += `<div class="alert alert-success"><h6>Valid Relations (${data.valid.length}):</h6>`;
+                html += '<small>These relationships passed all validation checks.</small></div>';
+            }
+            
+            // If no issues found
+            if ((!data.errors || data.errors.length === 0) && 
+                (!data.warnings || data.warnings.length === 0)) {
+                html += '<div class="alert alert-success">No logical violations detected. Ontology appears consistent with BFO constraints.</div>';
+            }
+            
+            content.innerHTML = html;
+            panel.style.display = 'block';
+        }
+        
+        function displayValidationError(message) {
+            const panel = document.getElementById('validation-panel');
+            const content = document.getElementById('validation-content');
+            
+            content.innerHTML = `<div class="alert alert-danger">Validation failed: ${message}</div>`;
+            panel.style.display = 'block';
+        }
+        
+        function applyValidationHighlights(data) {
+            // Reset all highlighting first
+            d3.selectAll('.validation-error').classed('validation-error', false);
+            d3.selectAll('.validation-warning').classed('validation-warning', false);
+            
+            // Apply error highlighting
+            if (data.errors) {
+                data.errors.forEach(error => {
+                    if (error.source && error.target && error.property) {
+                        // Highlight problematic edges
+                        d3.selectAll('line')
+                            .filter(d => d.source.name === error.source && d.target.name === error.target)
+                            .classed('validation-error', true)
+                            .attr('stroke', '#dc3545')
+                            .attr('stroke-width', 4)
+                            .attr('stroke-dasharray', '5,5');
+                    }
+                    
+                    if (error.entity) {
+                        // Highlight problematic nodes
+                        d3.selectAll('g')
+                            .filter(d => d.name === error.entity)
+                            .classed('validation-error', true)
+                            .select('circle, rect, polygon')
+                            .attr('stroke', '#dc3545')
+                            .attr('stroke-width', 4);
+                    }
+                });
+            }
+        }
+        
+        function hideValidation() {
+            document.getElementById('validation-panel').style.display = 'none';
+            // Reset highlighting
+            d3.selectAll('.validation-error').classed('validation-error', false);
+            d3.selectAll('.validation-warning').classed('validation-warning', false);
+            
+            // Restore original styles
+            d3.selectAll('line')
+                .attr('stroke', d => getBVSSArrowColor(d.relation))
+                .attr('stroke-width', d => getBVSSArrowWidth(d.relation))
+                .attr('stroke-dasharray', d => getBVSSArrowDash(d.relation));
+                
+            d3.selectAll('g').selectAll('circle, rect, polygon')
+                .attr('stroke', d => d.bfo ? "#000000" : getGroupColor(d.group))
+                .attr('stroke-width', d => d.bfo ? 3 : 2);
         }
         
         // Initialize when DOM is ready
