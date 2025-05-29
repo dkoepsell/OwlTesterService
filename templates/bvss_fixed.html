@@ -21,6 +21,7 @@
                 <div class="btn-group mb-3" role="group">
                     <button type="button" class="btn btn-outline-secondary" onclick="resetView()">Reset View</button>
                     <button type="button" class="btn btn-outline-secondary" onclick="centerGraph()">Center Graph</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="downloadPNG()">Download PNG</button>
                 </div>
                 <div id="viz-container"></div>
             </div>
@@ -515,6 +516,63 @@
                 d3.zoom().transform,
                 d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
             );
+        }
+        
+        function downloadPNG() {
+            const svg = document.querySelector("#viz-container svg");
+            if (!svg) {
+                alert("No visualization to download");
+                return;
+            }
+            
+            // Get the SVG dimensions
+            const svgRect = svg.getBoundingClientRect();
+            const svgWidth = svgRect.width;
+            const svgHeight = svgRect.height;
+            
+            // Create a canvas element
+            const canvas = document.createElement("canvas");
+            canvas.width = svgWidth * 2; // Higher resolution
+            canvas.height = svgHeight * 2;
+            const ctx = canvas.getContext("2d");
+            
+            // Scale for higher quality
+            ctx.scale(2, 2);
+            
+            // Set dark background to match theme
+            ctx.fillStyle = "#1f2937";
+            ctx.fillRect(0, 0, svgWidth, svgHeight);
+            
+            // Convert SVG to string
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const svgBlob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
+            const svgUrl = URL.createObjectURL(svgBlob);
+            
+            // Create an image and draw it to canvas
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
+                
+                // Convert canvas to PNG and download
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "bvss-ontology-visualization.png";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, "image/png");
+                
+                URL.revokeObjectURL(svgUrl);
+            };
+            
+            img.onerror = function() {
+                alert("PNG export failed. Please try screenshotting the visualization instead.");
+            };
+            
+            img.src = svgUrl;
         }
         
         // Initialize when DOM is ready
