@@ -1,8 +1,21 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVSS Visualization - {{ file.original_filename }}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
 
-{% block title %}BVSS Visualization - {{ file.original_filename }}{% endblock %}
-
-{% block content %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">
+            <i class="fas fa-project-diagram me-2"></i>FOL-BFO-OWL Tester
+        </a>
+    </div>
+</nav>
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
@@ -476,4 +489,6 @@ document.addEventListener('DOMContentLoaded', function() {
     border-radius: 8px;
 }
 </style>
-{% endblock %}
+</div>
+</body>
+</html>
