@@ -99,6 +99,9 @@ class BVSSConverter:
             return {
                 "nodes": nodes,
                 "edges": edges,
+                "classes": [{"id": n["id"], "name": n["name"]} for n in nodes if n["type"] != "Relation"],
+                "properties": [{"id": n["id"], "name": n["name"]} for n in nodes if n["type"] == "Relation"],
+                "inheritance": [{"source": e["source"], "target": e["target"], "relation": e["relation"]} for e in edges],
                 "ontology_info": {
                     "name": onto.name or "Unknown",
                     "base_iri": onto.base_iri,
