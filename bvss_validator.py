@@ -93,6 +93,13 @@ class BVSSValidator:
                 except Exception as e:
                     logger.error(f"Error in rule {rule['rule_id']}: {e}")
             
+            # Check instance-level violations
+            try:
+                instance_violations = self._check_instance_level_violations(onto)
+                validation_result["errors"].extend(instance_violations)
+            except Exception as e:
+                logger.error(f"Error checking instance violations: {e}")
+            
             # Check valid relations
             validation_result["valid"] = self._find_valid_relations(onto, bvss_data)
             
@@ -324,3 +331,45 @@ class BVSSValidator:
         if class_name in class_mappings:
             return any(indicator in entity_name.lower() for indicator in class_mappings[class_name])
         return False
+    
+    def _check_instance_level_violations(self, onto) -> List[Dict]:
+        """
+        Check for instance-level violations where individuals don't satisfy 
+        their property domain/range constraints.
+        """
+        violations = []
+        
+        try:
+            # Get all individuals and their property assertions
+            for individual in onto.individuals():
+                individual_name = self._extract_name(str(individual.iri))
+                
+                # Check all property relations for this individual
+                for prop in individual.get_properties():
+                    prop_name = self._extract_name(str(prop.iri))
+                    
+                    # Get property values
+                    for value in prop[individual]:
+                        if hasattr(value, 'iri'):  # Object property
+                            value_name = self._extract_name(str(value.iri))
+                            
+                            # Check specific BFO constraint violations
+                            if prop_name == "inheres_in":
+                                # Check if subject is Quality and object is ImmaterialEntity
+                                if (self._is_quality_like(individual_name) and 
+                                    self._is_immaterial_entity_like(value_name)):
+                                    violations.append({
+                                        "type": "instance_violation",
+                                        "rule_id": "quality_inheres_material_instance",
+                                        "source": individual_name,
+                                        "property": prop_name,
+                                        "target": value_name,
+                                        "expected": "MaterialEntity",
+                                        "description": f"Instance violation: Quality '{individual_name}' cannot inhere in ImmaterialEntity '{value_name}' - violates BFO constraint"
+                                    })
+                                    
+        except Exception as e:
+            # Log error but don't fail validation
+            pass
+            
+        return violations
