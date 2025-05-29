@@ -222,12 +222,18 @@
             });
         }
 
-        // Checkbox management
+        // Checkbox management - check if elements exist first
         const selectAllCheckbox = document.getElementById('selectAllCheckbox');
         const fileCheckboxes = document.querySelectorAll('.file-checkbox');
         const selectAllBtn = document.getElementById('selectAllBtn');
         const archiveSelectedBtn = document.getElementById('archiveSelectedBtn');
         const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+
+        // Only proceed if elements exist
+        if (!selectAllCheckbox || !selectAllBtn || !archiveSelectedBtn || !deleteSelectedBtn) {
+            console.log('Some bulk action elements not found on page');
+            return;
+        }
 
         // Select/Deselect all functionality
         selectAllCheckbox.addEventListener('change', function() {
