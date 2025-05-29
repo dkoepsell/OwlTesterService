@@ -733,24 +733,76 @@
                 };
             }
 
-            function classifyBFOCategory(className) {
+            function classifyDetailedBFOCategory(className) {
                 const name = className.toLowerCase();
                 
-                // Legal domain specific classification
-                if (name.includes('agent') || name.includes('person') || name.includes('court') || name.includes('entity')) {
-                    return 'independent';
+                // Complete BFO classification for all 14 entity types
+                // Material entities
+                if (name.includes('cell') || name.includes('rock') || name.includes('molecule') || name.includes('evidence') || name.includes('fact')) {
+                    return 'material';
                 }
-                if (name.includes('role') || name.includes('right') || name.includes('obligation') || name.includes('authority')) {
-                    return 'dependent';
+                
+                // Object aggregates
+                if (name.includes('team') || name.includes('flock') || name.includes('group') || name.includes('institution')) {
+                    return 'object-aggregate';
                 }
-                if (name.includes('document') || name.includes('contract') || name.includes('statute') || name.includes('regulation')) {
+                
+                // Fiat object parts
+                if (name.includes('hemisphere') || name.includes('part') || name.includes('component')) {
+                    return 'fiat-object-part';
+                }
+                
+                // Immaterial entities / Spatial regions
+                if (name.includes('region') || name.includes('jurisdiction') || name.includes('space')) {
+                    return 'immaterial';
+                }
+                
+                // Specifically dependent continuants
+                if (name.includes('role') || name.includes('right') || name.includes('obligation')) {
+                    return 'specifically-dependent';
+                }
+                
+                // Generically dependent continuants
+                if (name.includes('document') || name.includes('contract') || name.includes('statute') || name.includes('regulation') || name.includes('text') || name.includes('license')) {
                     return 'generic-dependent';
                 }
-                if (name.includes('trial') || name.includes('process') || name.includes('adjudication') || name.includes('proceeding')) {
+                
+                // Qualities
+                if (name.includes('color') || name.includes('redness') || name.includes('quality') || name.includes('normativity')) {
+                    return 'quality';
+                }
+                
+                // Functions and dispositions
+                if (name.includes('authority') || name.includes('function') || name.includes('disposition') || name.includes('fragility') || name.includes('digestion')) {
+                    return 'function';
+                }
+                
+                // Process aggregates
+                if (name.includes('symphony') || name.includes('performance') || name.includes('phase')) {
+                    return 'process-aggregate';
+                }
+                
+                // Processes
+                if (name.includes('trial') || name.includes('process') || name.includes('adjudication') || name.includes('proceeding') || name.includes('enforcement')) {
                     return 'process';
                 }
                 
-                return 'independent'; // Default
+                // Spatiotemporal regions
+                if (name.includes('interval') || name.includes('period') || name.includes('temporally')) {
+                    return 'spatiotemporal-region';
+                }
+                
+                // Temporal instants
+                if (name.includes('instant') || name.includes('moment') || name.includes('time')) {
+                    return 'temporal-instant';
+                }
+                
+                // Independent continuants (agents, persons, courts)
+                if (name.includes('agent') || name.includes('person') || name.includes('court') || name.includes('entity')) {
+                    return 'independent';
+                }
+                
+                return 'independent'; // Default for legal entities
             }
 
             function getBFOParent(className) {
