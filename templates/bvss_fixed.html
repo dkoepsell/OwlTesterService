@@ -208,7 +208,7 @@
                         .attr('fill', arrow.color);
                 });
 
-                // Extract authentic nodes from your ontology
+                // Extract authentic nodes from your ontology with proper BFO classification
                 if (nodes && nodes.length > 0) {
                     // Use the real extracted nodes from your ontology
                     nodes.forEach(node => {
@@ -216,7 +216,7 @@
                             id: node.id,
                             name: node.name || node.label,
                             type: node.type === 'Relation' ? 'property' : 'class',
-                            bfoCategory: node.type === 'Relation' ? 'relation' : classifyBFOCategory(node.name || node.label),
+                            bfoCategory: node.type === 'Relation' ? 'relation' : classifyDetailedBFOCategory(node.name || node.label),
                             description: node.description,
                             temporal: node.temporal
                         });
@@ -228,7 +228,7 @@
                             id: cls.id,
                             name: cls.name,
                             type: 'class',
-                            bfoCategory: classifyBFOCategory(cls.name)
+                            bfoCategory: classifyDetailedBFOCategory(cls.name)
                         });
                     });
                     
