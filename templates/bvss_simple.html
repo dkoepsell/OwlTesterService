@@ -252,31 +252,39 @@
                 nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
             });
 
-            // Global functions for buttons
-            window.resetView = function() {
-                svg.transition().duration(750).call(
-                    zoom.transform,
-                    d3.zoomIdentity
-                );
-            };
+        }
 
-            window.centerGraph = function() {
-                const bounds = container.node().getBBox();
-                const fullWidth = svg.node().clientWidth;
-                const fullHeight = svg.node().clientHeight;
-                const width = bounds.width;
-                const height = bounds.height;
-                const midX = bounds.x + width / 2;
-                const midY = bounds.y + height / 2;
-                
-                const scale = Math.min(fullWidth / width, fullHeight / height) * 0.8;
-                const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
-                
-                svg.transition().duration(750).call(
-                    zoom.transform,
-                    d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
-                );
-            };
+        // Global functions for buttons
+        window.resetView = function() {
+            const svg = d3.select('#bvss-svg');
+            const zoom = d3.zoom().scaleExtent([0.1, 4]);
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+        };
+
+        window.centerGraph = function() {
+            const svg = d3.select('#bvss-svg');
+            const container = svg.select('g');
+            if (container.empty()) return;
+            
+            const bounds = container.node().getBBox();
+            const fullWidth = svg.node().clientWidth;
+            const fullHeight = svg.node().clientHeight;
+            const width = bounds.width;
+            const height = bounds.height;
+            const midX = bounds.x + width / 2;
+            const midY = bounds.y + height / 2;
+            
+            const scale = Math.min(fullWidth / width, fullHeight / height) * 0.8;
+            const translate = [fullWidth / 2 - scale * midX, fullHeight / 2 - scale * midY];
+            
+            const zoom = d3.zoom().scaleExtent([0.1, 4]);
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+            );
         }
 
         function getBFOGroup(className) {

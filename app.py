@@ -1783,11 +1783,35 @@ def api_bvss_data(filename):
         
         # Check if file exists
         if not os.path.exists(file_path):
-            return jsonify({
-                'error': 'File not found',
-                'nodes': [],
-                'edges': []
-            }), 404
+            # Try to use analysis data if available
+            if file_record.analyses:
+                app.logger.info(f"Using fallback visualization from analysis data for {filename}")
+                latest_analysis = max(file_record.analyses, key=lambda a: a.created_at)
+                
+                # Convert analysis data to BVSS format
+                classes = latest_analysis.class_list or []
+                properties = latest_analysis.property_list or []
+                
+                app.logger.info(f"Classes: {len(classes)}, Object Properties: {len(properties)}")
+                
+                # Build visualization data from stored analysis
+                vis_data = {
+                    'classes': [{'id': cls.get('name', 'Unknown'), 'name': cls.get('name', 'Unknown'), 'bfo': False} for cls in classes],
+                    'properties': [{'id': prop.get('name', 'Unknown'), 'name': prop.get('name', 'Unknown'), 'type': 'ObjectProperty'} for prop in properties],
+                    'inheritance': [],
+                    'individuals': []
+                }
+                
+                app.logger.info(f"Returning visualization data with {len(vis_data['classes'])} classes, {len(vis_data['inheritance'])} inheritance links, and {len(vis_data['properties'])} properties")
+                return jsonify(vis_data)
+            else:
+                return jsonify({
+                    'error': 'File not found and no analysis data available',
+                    'classes': [],
+                    'properties': [],
+                    'inheritance': [],
+                    'individuals': []
+                }), 404
         
         # Extract BVSS graph data
         bvss_data = extract_bvss_graph(file_path)
