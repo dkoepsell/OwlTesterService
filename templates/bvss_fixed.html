@@ -182,14 +182,42 @@
                 // Create nodes
                 const nodes = [];
                 
-                // Add BFO root nodes first
+                // Complete BFO hierarchy with all entity types
                 const bfoNodes = [
+                    // Top level
                     {id: 'Entity', name: 'Entity', type: 'bfo', bfoCategory: 'entity', x: width/2, y: 50},
-                    {id: 'Continuant', name: 'Continuant', type: 'bfo', bfoCategory: 'continuant', x: width/3, y: 150},
-                    {id: 'Occurrent', name: 'Occurrent', type: 'bfo', bfoCategory: 'process', x: 2*width/3, y: 150},
-                    {id: 'IndependentContinuant', name: 'Independent Continuant', type: 'bfo', bfoCategory: 'independent', x: width/6, y: 250},
-                    {id: 'DependentContinuant', name: 'Dependent Continuant', type: 'bfo', bfoCategory: 'dependent', x: width/2, y: 250},
-                    {id: 'Process', name: 'Process', type: 'bfo', bfoCategory: 'process', x: 5*width/6, y: 250}
+                    
+                    // Level 1
+                    {id: 'Continuant', name: 'Continuant', type: 'bfo', bfoCategory: 'continuant', x: width/3, y: 120},
+                    {id: 'Occurrent', name: 'Occurrent', type: 'bfo', bfoCategory: 'process', x: 2*width/3, y: 120},
+                    
+                    // Level 2 - Continuants
+                    {id: 'IndependentContinuant', name: 'Independent Continuant', type: 'bfo', bfoCategory: 'independent', x: width/6, y: 190},
+                    {id: 'DependentContinuant', name: 'Dependent Continuant', type: 'bfo', bfoCategory: 'dependent', x: width/2, y: 190},
+                    {id: 'SpatialRegion', name: 'Spatial Region', type: 'bfo', bfoCategory: 'immaterial', x: 5*width/6, y: 190},
+                    
+                    // Level 3 - Independent Continuants
+                    {id: 'MaterialEntity', name: 'Material Entity', type: 'bfo', bfoCategory: 'material', x: width/12, y: 260},
+                    {id: 'ImmaterialEntity', name: 'Immaterial Entity', type: 'bfo', bfoCategory: 'immaterial', x: 3*width/12, y: 260},
+                    
+                    // Level 4 - Material Entities
+                    {id: 'ObjectAggregate', name: 'Object Aggregate', type: 'bfo', bfoCategory: 'object-aggregate', x: width/20, y: 330},
+                    {id: 'FiatObjectPart', name: 'Fiat Object Part', type: 'bfo', bfoCategory: 'fiat-object-part', x: 3*width/20, y: 330},
+                    
+                    // Level 3 - Dependent Continuants
+                    {id: 'SpecificallyDependentContinuant', name: 'Specifically Dependent', type: 'bfo', bfoCategory: 'specifically-dependent', x: 7*width/12, y: 260},
+                    {id: 'GenericallyDependentContinuant', name: 'Generically Dependent', type: 'bfo', bfoCategory: 'generic-dependent', x: 9*width/12, y: 260},
+                    
+                    // Level 4 - Specifically Dependent
+                    {id: 'Quality', name: 'Quality', type: 'bfo', bfoCategory: 'quality', x: 6*width/12, y: 330},
+                    {id: 'Function', name: 'Function', type: 'bfo', bfoCategory: 'function', x: 7*width/12, y: 330},
+                    {id: 'Disposition', name: 'Disposition', type: 'bfo', bfoCategory: 'disposition', x: 8*width/12, y: 330},
+                    
+                    // Level 2 - Occurrents
+                    {id: 'Process', name: 'Process', type: 'bfo', bfoCategory: 'process', x: 11*width/12, y: 190},
+                    {id: 'ProcessAggregate', name: 'Process Aggregate', type: 'bfo', bfoCategory: 'process-aggregate', x: 19*width/20, y: 260},
+                    {id: 'SpatiotemporalRegion', name: 'Spatiotemporal Region', type: 'bfo', bfoCategory: 'spatiotemporal-region', x: 17*width/20, y: 260},
+                    {id: 'TemporalInstant', name: 'Temporal Instant', type: 'bfo', bfoCategory: 'temporal-instant', x: 18*width/20, y: 330}
                 ];
                 
                 nodes.push(...bfoNodes);
@@ -222,17 +250,57 @@
                     });
                 });
 
-                // Create links
+                // Create links - Complete BFO hierarchy
                 const links = [];
                 
-                // BFO hierarchy
+                // Complete BFO hierarchy with all relationships
                 links.push(
+                    // Level 1
                     {source: 'Entity', target: 'Continuant', type: 'subsumption'},
                     {source: 'Entity', target: 'Occurrent', type: 'subsumption'},
+                    
+                    // Level 2 - Continuants
                     {source: 'Continuant', target: 'IndependentContinuant', type: 'subsumption'},
                     {source: 'Continuant', target: 'DependentContinuant', type: 'subsumption'},
-                    {source: 'Occurrent', target: 'Process', type: 'subsumption'}
+                    {source: 'Continuant', target: 'SpatialRegion', type: 'subsumption'},
+                    
+                    // Level 3 - Independent Continuants
+                    {source: 'IndependentContinuant', target: 'MaterialEntity', type: 'subsumption'},
+                    {source: 'IndependentContinuant', target: 'ImmaterialEntity', type: 'subsumption'},
+                    
+                    // Level 4 - Material Entities
+                    {source: 'MaterialEntity', target: 'ObjectAggregate', type: 'subsumption'},
+                    {source: 'MaterialEntity', target: 'FiatObjectPart', type: 'subsumption'},
+                    
+                    // Level 3 - Dependent Continuants
+                    {source: 'DependentContinuant', target: 'SpecificallyDependentContinuant', type: 'subsumption'},
+                    {source: 'DependentContinuant', target: 'GenericallyDependentContinuant', type: 'subsumption'},
+                    
+                    // Level 4 - Specifically Dependent
+                    {source: 'SpecificallyDependentContinuant', target: 'Quality', type: 'subsumption'},
+                    {source: 'SpecificallyDependentContinuant', target: 'Function', type: 'subsumption'},
+                    {source: 'SpecificallyDependentContinuant', target: 'Disposition', type: 'subsumption'},
+                    
+                    // Level 2 - Occurrents
+                    {source: 'Occurrent', target: 'Process', type: 'subsumption'},
+                    {source: 'Occurrent', target: 'SpatiotemporalRegion', type: 'subsumption'},
+                    
+                    // Level 3 - Processes
+                    {source: 'Process', target: 'ProcessAggregate', type: 'subsumption'},
+                    {source: 'SpatiotemporalRegion', target: 'TemporalInstant', type: 'subsumption'}
                 );
+                
+                // Map legal concepts to BFO categories and create inheritance links
+                classes.forEach(cls => {
+                    const bfoParent = getBFOParent(cls.name);
+                    if (bfoParent) {
+                        links.push({
+                            source: bfoParent,
+                            target: cls.id,
+                            type: 'instantiation'
+                        });
+                    }
+                });
 
                 // Create force simulation
                 const simulation = d3.forceSimulation(nodes)
@@ -241,14 +309,23 @@
                     .force('center', d3.forceCenter(width / 2, height / 2))
                     .force('collision', d3.forceCollide().radius(30));
 
-                // Create links
+                // Create links with different styles for different relationship types
                 const link = container.selectAll('.link')
                     .data(links)
                     .enter()
                     .append('line')
                     .attr('class', 'link')
-                    .attr('stroke', '#666')
-                    .attr('stroke-width', 2);
+                    .attr('stroke', d => {
+                        switch(d.type) {
+                            case 'subsumption': return '#3b82f6';
+                            case 'instantiation': return '#10b981';
+                            case 'participates_in': return '#f59e0b';
+                            case 'part_of': return '#9ca3af';
+                            default: return '#666';
+                        }
+                    })
+                    .attr('stroke-width', d => d.type === 'subsumption' ? 3 : 2)
+                    .attr('stroke-dasharray', d => d.type === 'part_of' ? '5,5' : null);
 
                 // Create node groups
                 const node = container.selectAll('.node')
@@ -539,6 +616,32 @@
                 }
                 
                 return 'independent'; // Default
+            }
+
+            function getBFOParent(className) {
+                const name = className.toLowerCase();
+                
+                // Map legal concepts to appropriate BFO parents
+                if (name.includes('agent') || name.includes('person') || name.includes('court')) {
+                    return 'IndependentContinuant';
+                }
+                if (name.includes('entity') || name.includes('fact') || name.includes('evidence')) {
+                    return 'MaterialEntity';
+                }
+                if (name.includes('role') || name.includes('right') || name.includes('obligation')) {
+                    return 'SpecificallyDependentContinuant';
+                }
+                if (name.includes('authority') || name.includes('jurisdiction')) {
+                    return 'Function';
+                }
+                if (name.includes('document') || name.includes('contract') || name.includes('statute') || name.includes('regulation')) {
+                    return 'GenericallyDependentContinuant';
+                }
+                if (name.includes('trial') || name.includes('process') || name.includes('adjudication') || name.includes('proceeding')) {
+                    return 'Process';
+                }
+                
+                return 'IndependentContinuant'; // Default
             }
         });
     </script>
