@@ -131,9 +131,13 @@
             });
 
         function createBVSSVisualization(data) {
+            // Handle different data formats
+            const classes = data.classes || data.nodes?.filter(n => n.type !== 'Relation') || [];
+            const properties = data.properties || data.nodes?.filter(n => n.type === 'Relation') || [];
+            
             // Update counts
-            document.getElementById('class-count').textContent = data.classes.length;
-            document.getElementById('property-count').textContent = data.properties.length;
+            document.getElementById('class-count').textContent = classes.length;
+            document.getElementById('property-count').textContent = properties.length;
 
             const svg = d3.select('#bvss-svg');
             svg.selectAll('*').remove(); // Clear existing content
