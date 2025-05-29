@@ -116,34 +116,62 @@ class BVSSValidator:
         
         # Look for quality entities in the graph
         for edge in bvss_data.get("edges", []):
-            if edge.get("relation") in ["inheres_in", "has_property"]:
+            if not edge or "source" not in edge or "target" not in edge:
+                continue
+                
+            relation = edge.get("relation", "")
+            if relation in ["inheres_in", "has_property", "points_to"]:
                 source_name = self._extract_name(edge["source"])
                 target_name = self._extract_name(edge["target"])
                 
-                # Check if source appears to be a quality and target is immaterial
+                # Check for Quality -> ImmaterialEntity violation
                 if (self._is_quality_like(source_name) and 
-                    (self._is_immaterial_entity_like(target_name) or not self._is_material_entity_like(target_name))):
+                    self._is_immaterial_entity_like(target_name)):
                     violations.append({
                         "type": "domain_violation",
                         "rule_id": "quality_inheres_material",
                         "source": source_name,
-                        "property": "inheres_in",
+                        "property": relation,
                         "target": target_name,
                         "expected": "MaterialEntity",
-                        "description": f"Quality '{source_name}' cannot inhere in ImmaterialEntity '{target_name}' - qualities must inhere in MaterialEntities"
+                        "description": f"Quality '{source_name}' cannot point to ImmaterialEntity '{target_name}' - qualities must be associated with MaterialEntities"
                     })
                 
-                # Also check for explicit Quality class relationships
-                if source_name.lower() == "quality" and target_name.lower() in ["immaterialentity", "voidspace"]:
+                # Check for inheres_in property pointing to wrong target
+                if (source_name.lower() == "inheres_in" and 
+                    target_name.lower() in ["immaterialentity", "voidspace"]):
                     violations.append({
                         "type": "domain_violation", 
                         "rule_id": "quality_inheres_material",
-                        "source": source_name,
-                        "property": edge.get("relation", "inheres_in"),
+                        "source": "inheres_in property",
+                        "property": relation,
                         "target": target_name,
                         "expected": "MaterialEntity",
-                        "description": f"Quality class cannot have inherence relation to ImmaterialEntity '{target_name}'"
+                        "description": f"The 'inheres_in' property cannot have range '{target_name}' - it should point to MaterialEntity"
                     })
+        
+        # Check for any Quality class that might be defined to inhere in wrong entities
+        for node in bvss_data.get("nodes", []):
+            if not node:
+                continue
+            node_name = self._extract_name(node.get("name", "") or node.get("id", ""))
+            if self._is_quality_like(node_name):
+                # Look for edges from this quality node
+                for edge in bvss_data.get("edges", []):
+                    if (edge and "source" in edge and 
+                        self._extract_name(edge["source"]) == node_name and
+                        edge.get("relation") in ["inheres_in", "points_to", "has_property"]):
+                        target_name = self._extract_name(edge["target"])
+                        if self._is_immaterial_entity_like(target_name):
+                            violations.append({
+                                "type": "domain_violation",
+                                "rule_id": "quality_inheres_material", 
+                                "source": node_name,
+                                "property": edge.get("relation"),
+                                "target": target_name,
+                                "expected": "MaterialEntity",
+                                "description": f"Quality instance '{node_name}' violates BFO constraint by relating to ImmaterialEntity '{target_name}'"
+                            })
                     
         return violations
     
