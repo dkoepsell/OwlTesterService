@@ -209,9 +209,9 @@
                 });
 
                 // Extract authentic nodes from your ontology with proper BFO classification
-                if (nodes && nodes.length > 0) {
+                if (data.nodes && data.nodes.length > 0) {
                     // Use the real extracted nodes from your ontology
-                    nodes.forEach(node => {
+                    data.nodes.forEach(node => {
                         ontologyNodes.push({
                             id: node.id,
                             name: node.name || node.label,

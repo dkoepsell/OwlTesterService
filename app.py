@@ -1816,11 +1816,13 @@ def api_bvss_data(filename):
         # Extract BVSS graph data
         bvss_data = extract_bvss_graph(file_path)
         
-        # Convert to the format expected by the frontend
+        # Return the complete BVSS data with all authentic relationships
         converted_data = {
-            'classes': [{'id': node['id'], 'name': node['name']} for node in bvss_data.get('nodes', []) if node.get('type') != 'Relation'],
-            'properties': [{'id': node['id'], 'name': node['name']} for node in bvss_data.get('nodes', []) if node.get('type') == 'Relation'],
-            'inheritance': [edge for edge in bvss_data.get('edges', []) if edge.get('type') == 'inheritance'],
+            'classes': bvss_data.get('classes', []),
+            'properties': bvss_data.get('properties', []),
+            'nodes': bvss_data.get('nodes', []),
+            'edges': bvss_data.get('edges', []),
+            'inheritance': bvss_data.get('inheritance', []),
             'individuals': []
         }
         
