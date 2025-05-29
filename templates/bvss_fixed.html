@@ -271,6 +271,18 @@
             return 'IndependentContinuant'; // Default for entities, persons, institutions, etc.
         }
         
+        function getGroupColor(group) {
+            const colors = {
+                0: "#000000", // BFO core classes - black
+                1: "#1e40af", // Independent Continuants - blue
+                2: "#dc2626", // Dependent Continuants - red
+                3: "#16a34a", // Generically Dependent - green
+                4: "#d97706", // Processes - orange
+                5: "#7c3aed"  // Spatial Regions - purple
+            };
+            return colors[group] || "#6b7280"; // Default gray
+        }
+        
         function createVisualization() {
             // Clear existing visualization
             d3.select("#viz-container").selectAll("*").remove();
@@ -317,59 +329,106 @@
                     .on("drag", dragged)
                     .on("end", dragended));
             
-            // Draw shapes
+            // Draw shapes with authentic BVSS styling
             node.each(function(d) {
                 const group = d3.select(this);
-                const color = d.bfo ? "#000" : "#0066cc";
+                const nodeColor = d.bfo ? "#000000" : getGroupColor(d.group);
                 const strokeWidth = d.bfo ? 3 : 2;
+                const fillColor = d.bfo && d.shape === "square" ? "#808080" : "none";
                 
                 switch(d.shape) {
-                    case "circle":
+                    case "circle": // ● Independent Continuant
                         group.append("circle")
                             .attr("r", 20)
-                            .attr("fill", "none")
-                            .attr("stroke", color)
+                            .attr("fill", fillColor)
+                            .attr("stroke", nodeColor)
                             .attr("stroke-width", strokeWidth);
                         break;
-                    case "square":
+                    case "square": // ■ Material Entity
                         group.append("rect")
                             .attr("x", -20)
                             .attr("y", -20)
                             .attr("width", 40)
                             .attr("height", 40)
-                            .attr("fill", "#d1d5db")
-                            .attr("stroke", color)
+                            .attr("fill", d.bfo ? "#808080" : "#e5e7eb")
+                            .attr("stroke", nodeColor)
                             .attr("stroke-width", strokeWidth);
                         break;
-                    case "hollow-square":
+                    case "hollow-square": // □ Spatial Region
                         group.append("rect")
                             .attr("x", -20)
                             .attr("y", -20)
                             .attr("width", 40)
                             .attr("height", 40)
                             .attr("fill", "none")
-                            .attr("stroke", color)
+                            .attr("stroke", nodeColor)
                             .attr("stroke-width", strokeWidth)
                             .attr("stroke-dasharray", "4,4");
                         break;
-                    case "small-dashed-circle":
+                    case "small-dashed-circle": // ◌ Dependent Continuant
                         group.append("circle")
                             .attr("r", 15)
                             .attr("fill", "none")
-                            .attr("stroke", color)
+                            .attr("stroke", nodeColor)
                             .attr("stroke-width", strokeWidth)
                             .attr("stroke-dasharray", "3,3");
                         break;
-                    case "arrow":
+                    case "role-circle": // ◌ Role with annotation
+                        group.append("circle")
+                            .attr("r", 15)
+                            .attr("fill", "none")
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", strokeWidth)
+                            .attr("stroke-dasharray", "3,3");
+                        group.append("text")
+                            .attr("x", 0)
+                            .attr("y", -20)
+                            .attr("font-size", "8px")
+                            .attr("text-anchor", "middle")
+                            .attr("fill", "#666666")
+                            .text("role");
+                        break;
+                    case "disposition-circle": // ◌ Disposition
+                        group.append("circle")
+                            .attr("r", 15)
+                            .attr("fill", "none")
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", strokeWidth)
+                            .attr("stroke-dasharray", "3,3");
+                        group.append("text")
+                            .attr("x", 0)
+                            .attr("y", 3)
+                            .attr("font-size", "10px")
+                            .attr("text-anchor", "middle")
+                            .attr("fill", nodeColor)
+                            .text("⚏");
+                        break;
+                    case "small-dashed-circle-migrate": // ◌ + ↺ Generically Dependent
+                        group.append("circle")
+                            .attr("r", 15)
+                            .attr("fill", "none")
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", strokeWidth)
+                            .attr("stroke-dasharray", "3,3");
+                        group.append("text")
+                            .attr("x", 18)
+                            .attr("y", -15)
+                            .attr("font-size", "12px")
+                            .attr("fill", nodeColor)
+                            .text("↺");
+                        break;
+                    case "arrow": // ⟶ Process (Occurrent)
                         group.append("polygon")
                             .attr("points", "-20,0 15,-8 15,-3 25,0 15,3 15,8")
-                            .attr("fill", color);
+                            .attr("fill", nodeColor)
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", 1);
                         break;
                     default:
                         group.append("circle")
                             .attr("r", 18)
                             .attr("fill", "none")
-                            .attr("stroke", color)
+                            .attr("stroke", nodeColor)
                             .attr("stroke-width", strokeWidth);
                 }
             });
