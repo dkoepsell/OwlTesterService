@@ -1382,6 +1382,67 @@ def delete_file(file_id):
         flash(f"Error deleting file: {str(e)}", 'error')
         return redirect(url_for('view_history'))
 
+@app.route('/bulk_file_action', methods=['POST'])
+def bulk_file_action():
+    """Handle bulk actions on multiple files (archive, unarchive, delete)."""
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        file_ids = data.get('file_ids', [])
+        
+        if not action or not file_ids:
+            return jsonify({'success': False, 'message': 'Invalid request data'})
+        
+        # Get the files
+        files = OntologyFile.query.filter(OntologyFile.id.in_(file_ids)).all()
+        
+        if not files:
+            return jsonify({'success': False, 'message': 'No files found'})
+        
+        if action == 'archive':
+            # Archive files
+            for file in files:
+                file.archived = True
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'{len(files)} file(s) archived successfully'})
+            
+        elif action == 'unarchive':
+            # Unarchive files
+            for file in files:
+                file.archived = False
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'{len(files)} file(s) restored successfully'})
+            
+        elif action == 'delete':
+            # Delete files permanently
+            file_paths = []
+            filenames = []
+            
+            for file in files:
+                file_paths.append(file.file_path)
+                filenames.append(file.original_filename)
+                db.session.delete(file)
+            
+            db.session.commit()
+            
+            # Try to delete physical files
+            for file_path in file_paths:
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as e:
+                    logger.warning(f"Could not delete physical file {file_path}: {str(e)}")
+            
+            return jsonify({'success': True, 'message': f'{len(files)} file(s) deleted successfully'})
+            
+        else:
+            return jsonify({'success': False, 'message': f'Unknown action: {action}'})
+            
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error in bulk file action: {str(e)}")
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
 # UML Diagram generation with D3.js
 @app.route('/analyze/<filename>/diagram')
 def generate_diagram(filename):
