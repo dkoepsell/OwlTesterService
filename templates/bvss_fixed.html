@@ -243,13 +243,42 @@
         
         function classifyShape(name) {
             const n = name.toLowerCase();
-            if (n.includes('process') || n.includes('trial') || n.includes('adjudication')) return 'arrow';
+            
+            // Process (Occurrent) - directed arrow ⟶
+            if (n.includes('process') || n.includes('trial') || n.includes('adjudication') || n.includes('performance')) return 'arrow';
+            
+            // Spatial/Temporal Regions - hollow square □
+            if (n.includes('jurisdiction') || n.includes('region') || n.includes('spatial') || n.includes('temporal')) return 'hollow-square';
+            
+            // Material Entity - filled gray square ■
+            if (n.includes('document') || n.includes('contract') || n.includes('evidence') || n.includes('judgment') || 
+                n.includes('molecule') || n.includes('rock') || n.includes('cell') || n.includes('agent')) return 'square';
+            
+            // Object Aggregate - thick square ⬛
+            if (n.includes('team') || n.includes('flock') || n.includes('aggregate') || n.includes('group')) return 'thick-square';
+            
+            // Fiat Object Part - hatched rectangle ▭
+            if (n.includes('part') || n.includes('hemisphere') || n.includes('component')) return 'hatched-rectangle';
+            
+            // Function/Disposition - hammer icon ⚒
+            if (n.includes('function') || n.includes('disposition') || n.includes('fragility') || n.includes('ability') || n.includes('obligation')) return 'disposition-circle';
+            
+            // Quality - tiny dot ◦
+            if (n.includes('quality') || n.includes('color') || n.includes('redness') || n.includes('hue')) return 'quality-dot';
+            
+            // Role - dashed circle with role annotation ◌
             if (n.includes('role') || n.includes('authority')) return 'role-circle';
-            if (n.includes('obligation') || n.includes('disposition')) return 'disposition-circle';
-            if (n.includes('jurisdiction') || n.includes('region')) return 'hollow-square';
-            if (n.includes('document') || n.includes('contract') || n.includes('evidence') || n.includes('judgment')) return 'square';
+            
+            // Generically Dependent - dashed circle with migration symbol ◌ + ↺
+            if (n.includes('regulation') || n.includes('statute') || n.includes('license') || n.includes('text') || n.includes('information')) return 'small-dashed-circle-migrate';
+            
+            // Specifically Dependent - anchored dashed circle ◌ + anchor
+            if (n.includes('specific') || n.includes('anchored')) return 'anchored-circle';
+            
+            // Dependent Continuant - dashed circle ◌
             if (n.includes('claim') || n.includes('right') || n.includes('liability')) return 'small-dashed-circle';
-            if (n.includes('regulation') || n.includes('statute')) return 'small-dashed-circle-migrate';
+            
+            // Independent Continuant - solid circle ●
             return 'circle';
         }
         
@@ -321,9 +350,13 @@
         function getBVSSRelationSymbol(relation) {
             if (!relation) return "is_a";
             const r = relation.toLowerCase();
+            if (r.includes("part_of")) return "part_of";
             if (r.includes("participates")) return "participates_in";
+            if (r.includes("has_role") || r.includes("has_quality")) return "has_role";
             if (r.includes("inheres")) return "inheres_in";
+            if (r.includes("located")) return "located_in";
             if (r.includes("realizes")) return "realizes";
+            if (r.includes("has_participant")) return "has_participant";
             if (r.includes("is_a") || r.includes("inheritance")) return "is_a";
             return relation; // Return the actual relation name
         }
@@ -369,8 +402,20 @@
                 .attr("stroke-dasharray", d => getBVSSArrowDash(d.relation))
                 .attr("marker-end", d => `url(#arrow-${getBVSSArrowType(d.relation)})`);
             
-            // Define BVSS arrow markers
+            // Define BVSS arrow markers and patterns
             const defs = svg.append("defs");
+            
+            // Add hatching pattern for fiat object parts
+            const hatchPattern = defs.append("pattern")
+                .attr("id", "hatch")
+                .attr("patternUnits", "userSpaceOnUse")
+                .attr("width", 8)
+                .attr("height", 8);
+            
+            hatchPattern.append("path")
+                .attr("d", "M0,0 L8,8 M0,8 L8,0")
+                .attr("stroke", "#666")
+                .attr("stroke-width", 1);
             
             // Standard is_a arrow (⇧) - larger and more visible
             defs.append("marker")
@@ -548,6 +593,47 @@
                             .attr("fill", nodeColor)
                             .attr("stroke", nodeColor)
                             .attr("stroke-width", 1);
+                        break;
+                    case "thick-square": // ⬛ Object Aggregate
+                        group.append("rect")
+                            .attr("x", -20)
+                            .attr("y", -20)
+                            .attr("width", 40)
+                            .attr("height", 40)
+                            .attr("fill", nodeColor)
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", 4);
+                        break;
+                    case "hatched-rectangle": // ▭ Fiat Object Part
+                        group.append("rect")
+                            .attr("x", -25)
+                            .attr("y", -15)
+                            .attr("width", 50)
+                            .attr("height", 30)
+                            .attr("fill", "url(#hatch)")
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", strokeWidth);
+                        break;
+                    case "quality-dot": // ◦ Quality - tiny dot
+                        group.append("circle")
+                            .attr("r", 8)
+                            .attr("fill", nodeColor)
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", 1);
+                        break;
+                    case "anchored-circle": // ◌ + anchor - Specifically Dependent
+                        group.append("circle")
+                            .attr("r", 15)
+                            .attr("fill", "none")
+                            .attr("stroke", nodeColor)
+                            .attr("stroke-width", strokeWidth)
+                            .attr("stroke-dasharray", "3,3");
+                        group.append("text")
+                            .attr("x", 18)
+                            .attr("y", -15)
+                            .attr("font-size", "12px")
+                            .attr("fill", nodeColor)
+                            .text("⚓");
                         break;
                     default:
                         group.append("circle")
