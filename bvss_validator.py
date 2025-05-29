@@ -116,12 +116,13 @@ class BVSSValidator:
         
         # Look for quality entities in the graph
         for edge in bvss_data.get("edges", []):
-            if edge.get("relation") == "inheres_in":
+            if edge.get("relation") in ["inheres_in", "has_property"]:
                 source_name = self._extract_name(edge["source"])
                 target_name = self._extract_name(edge["target"])
                 
-                # Check if source appears to be a quality
-                if self._is_quality_like(source_name) and not self._is_material_entity_like(target_name):
+                # Check if source appears to be a quality and target is immaterial
+                if (self._is_quality_like(source_name) and 
+                    (self._is_immaterial_entity_like(target_name) or not self._is_material_entity_like(target_name))):
                     violations.append({
                         "type": "domain_violation",
                         "rule_id": "quality_inheres_material",
@@ -129,7 +130,19 @@ class BVSSValidator:
                         "property": "inheres_in",
                         "target": target_name,
                         "expected": "MaterialEntity",
-                        "description": f"Quality '{source_name}' should inhere in a MaterialEntity, not '{target_name}'"
+                        "description": f"Quality '{source_name}' cannot inhere in ImmaterialEntity '{target_name}' - qualities must inhere in MaterialEntities"
+                    })
+                
+                # Also check for explicit Quality class relationships
+                if source_name.lower() == "quality" and target_name.lower() in ["immaterialentity", "voidspace"]:
+                    violations.append({
+                        "type": "domain_violation", 
+                        "rule_id": "quality_inheres_material",
+                        "source": source_name,
+                        "property": edge.get("relation", "inheres_in"),
+                        "target": target_name,
+                        "expected": "MaterialEntity",
+                        "description": f"Quality class cannot have inherence relation to ImmaterialEntity '{target_name}'"
                     })
                     
         return violations
@@ -241,8 +254,13 @@ class BVSSValidator:
     
     def _is_material_entity_like(self, name: str) -> bool:
         """Check if entity name suggests it's a material entity."""
-        material_indicators = ["entity", "object", "agent", "person", "document", "evidence"]
+        material_indicators = ["entity", "object", "agent", "person", "document", "evidence", "materialentity"]
         return any(indicator in name.lower() for indicator in material_indicators)
+    
+    def _is_immaterial_entity_like(self, name: str) -> bool:
+        """Check if entity name suggests it's an immaterial entity."""
+        immaterial_indicators = ["immaterial", "void", "space", "region", "information", "immaterialentity", "voidspace"]
+        return any(indicator in name.lower() for indicator in immaterial_indicators)
     
     def _is_role_like(self, name: str) -> bool:
         """Check if entity name suggests it's a role."""
