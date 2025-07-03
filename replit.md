@@ -116,6 +116,12 @@ This application is a comprehensive web service for testing and analyzing ontolo
 
 ## Changelog
 
+- July 03, 2025. Enhanced automatic format detection and conversion system
+  - Implemented robust format detection for mislabeled ontology files
+  - Added automatic conversion from Turtle, N-Triples, and other RDF formats to OWL/XML
+  - Improved error handling and file validation during upload process
+  - Added database cleanup for orphaned records
+  - System now gracefully handles format mismatches and provides transparent conversion
 - July 03, 2025. Initial setup
 
 ## User Preferences

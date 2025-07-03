@@ -454,38 +454,76 @@ def upload_owl():
             ext = 'owl'  # Default extension
         filename = f"{uuid.uuid4().hex}.{ext}"
         
-        # Save the file
-        file_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], filename)
-        file.save(file_path)
+        # Save the file temporarily
+        temp_file_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], f"temp_{filename}")
+        file.save(temp_file_path)
         
         # Auto-detect and convert file format if needed
+        final_file_path = None
         try:
-            logger.info(f"Attempting automatic format detection for: {file_path}")
-            logger.info(f"Original file size: {os.path.getsize(file_path)} bytes")
+            logger.info(f"Attempting automatic format detection for: {temp_file_path}")
+            logger.info(f"Original file size: {os.path.getsize(temp_file_path)} bytes")
             
             # Check if file has content
-            with open(file_path, 'rb') as f:
+            with open(temp_file_path, 'rb') as f:
                 first_few_bytes = f.read(100)
                 logger.info(f"First 100 bytes: {first_few_bytes}")
+                if len(first_few_bytes) == 0:
+                    raise Exception("Uploaded file is empty")
             
-            converted_path = auto_convert_ontology(file_path, target_format='xml')
-            if converted_path != file_path:
+            converted_path = auto_convert_ontology(temp_file_path, target_format='xml')
+            if converted_path != temp_file_path:
                 logger.info(f"File converted from original format to OWL/XML: {converted_path}")
                 logger.info(f"Converted file size: {os.path.getsize(converted_path)} bytes")
                 
-                # Update the file path to point to the converted file
-                file_path = converted_path
-                # Update filename to reflect the conversion
-                filename = os.path.basename(converted_path)
+                # Move the converted file to the final location
+                final_file_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], filename)
+                import shutil
+                shutil.move(converted_path, final_file_path)
+                
+                # Clean up temporary file
+                if os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+                    
+                logger.info(f"Converted file moved to: {final_file_path}")
             else:
                 logger.info("No conversion needed - file is already in correct format")
+                # Move the original file to the final location
+                final_file_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], filename)
+                import shutil
+                shutil.move(temp_file_path, final_file_path)
+                
         except Exception as e:
-            logger.warning(f"Format conversion failed, using original file: {e}")
+            logger.error(f"Format conversion failed: {e}")
             import traceback
-            logger.warning(f"Full traceback: {traceback.format_exc()}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            
+            # Clean up temporary file if it exists
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            
+            # Re-raise the exception to prevent database record creation
+            raise Exception(f"File processing failed: {e}")
+        
+        # Set the final file path
+        file_path = final_file_path
+        
+        # Verify file exists and is readable before creating database record
+        if not os.path.exists(file_path):
+            raise Exception(f"File was not saved properly: {file_path}")
+            
+        file_size = os.path.getsize(file_path)
+        
+        # Test if the file can be read
+        try:
+            with open(file_path, 'rb') as test_file:
+                test_content = test_file.read(100)
+                if len(test_content) == 0:
+                    raise Exception("File is empty")
+        except Exception as e:
+            raise Exception(f"File is corrupted or unreadable: {e}")
         
         # Create a record in the database
-        file_size = os.path.getsize(file_path)
         file_record = OntologyFile(
             filename=filename,
             original_filename=original_filename,
@@ -512,6 +550,15 @@ def analyze_owl(filename):
     try:
         # Find the file in the database
         file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        
+        # Check if the file actually exists on disk
+        if not os.path.exists(file_record.file_path):
+            logger.error(f"File not found on disk: {file_record.file_path}")
+            # Clean up the orphaned database record
+            db.session.delete(file_record)
+            db.session.commit()
+            flash("File not found. The file may have been corrupted during upload. Please try uploading again.", "error")
+            return redirect(url_for('index'))
         
         # Check if an analysis already exists for this file
         analysis = OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id).order_by(OntologyAnalysis.id.desc()).first()
@@ -578,6 +625,14 @@ def api_analyze_owl(filename):
         
         # Create an OwlTester instance
         tester = OwlTester()
+        
+        # Check if the file actually exists on disk
+        if not os.path.exists(file_record.file_path):
+            logger.error(f"File not found on disk: {file_record.file_path}")
+            # Clean up the orphaned database record
+            db.session.delete(file_record)
+            db.session.commit()
+            raise Exception(f"File not found: {file_record.file_path}. The file may have been corrupted during upload.")
         
         # First load the ontology
         logger.info(f"Loading ontology from path: {file_record.file_path}")
