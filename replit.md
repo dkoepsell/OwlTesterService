@@ -116,6 +116,14 @@ This application is a comprehensive web service for testing and analyzing ontolo
 
 ## Changelog
 
+- July 03, 2025. Fixed navigation system and resolved database performance issues
+  - Resolved internal server errors caused by database relationship conflicts
+  - Optimized SQLAlchemy lazy loading to prevent infinite loops and crashes
+  - Cleaned up orphaned database records that were causing performance issues
+  - Added clear navigation cards on homepage with direct access to main features
+  - Fixed dropdown menu URLs to match actual application routes
+  - Improved user interface with visual indicators and better organization
+  - All navigation paths now work correctly without server crashes
 - July 03, 2025. Enhanced automatic format detection and conversion system
   - Implemented robust format detection for mislabeled ontology files
   - Added automatic conversion from Turtle, N-Triples, and other RDF formats to OWL/XML

@@ -17,8 +17,8 @@ class User(UserMixin, db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     
     # Relationships
-    ontology_files = db.relationship('OntologyFile', backref='user', lazy=True)
-    fol_expressions = db.relationship('FOLExpression', backref='user', lazy=True)
+    ontology_files = db.relationship('OntologyFile', backref='user', lazy='select')
+    fol_expressions = db.relationship('FOLExpression', backref='user', lazy='select')
     # Sandbox ontologies relationship is defined in the SandboxOntology model
     
     def set_password(self, password):
@@ -47,7 +47,7 @@ class OntologyFile(db.Model):
     sandbox_ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=True)  # Link to source sandbox if applicable
     
     # Relationship with analysis results
-    analyses = db.relationship('OntologyAnalysis', backref='ontology_file', lazy=True, cascade="all, delete-orphan")
+    analyses = db.relationship('OntologyAnalysis', backref='ontology_file', lazy='select', cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<OntologyFile {self.original_filename}>"
