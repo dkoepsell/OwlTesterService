@@ -21,6 +21,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, EmailField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 from owl_tester import OwlTester
+from owl_format_detector import auto_convert_ontology, OntologyFormatConverter
 from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression, SandboxOntology, OntologyClass, OntologyProperty, OntologyIndividual
 # Import from improved OpenAI utils to avoid hanging issues
 from improved_openai_utils import suggest_ontology_classes, suggest_ontology_properties, suggest_bfo_category, generate_class_description  
@@ -452,6 +453,19 @@ def upload_owl():
         # Save the file
         file_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], filename)
         file.save(file_path)
+        
+        # Auto-detect and convert file format if needed
+        try:
+            logger.info(f"Attempting automatic format detection for: {file_path}")
+            converted_path = auto_convert_ontology(file_path, target_format='xml')
+            if converted_path != file_path:
+                logger.info(f"File converted from original format to OWL/XML: {converted_path}")
+                # Update the file path to point to the converted file
+                file_path = converted_path
+                # Update filename to reflect the conversion
+                filename = os.path.basename(converted_path)
+        except Exception as e:
+            logger.warning(f"Format conversion failed, using original file: {e}")
         
         # Create a record in the database
         file_size = os.path.getsize(file_path)
