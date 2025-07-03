@@ -1,0 +1,44 @@
+@prefix ex: <http://example.org/ontology#> .
+@prefix bfo: <http://purl.obolibrary.org/obo/BFO_> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex: a owl:Ontology .
+
+# Classes
+ex:Corporation rdfs:subClassOf bfo:0000040 .
+ex:Employee rdfs:subClassOf bfo:0000040 .
+ex:Department rdfs:subClassOf bfo:0000040 .
+ex:Position rdfs:subClassOf bfo:0000023 .
+ex:Salary rdfs:subClassOf bfo:0000019 .
+
+# Object Properties
+ex:worksFor a owl:ObjectProperty ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Corporation .
+
+ex:belongsTo a owl:ObjectProperty ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Department .
+
+ex:holds a owl:ObjectProperty ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Position .
+
+ex:hasSalary a owl:ObjectProperty ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Salary .
+
+# Individuals
+ex:TechCorp a ex:Corporation .
+ex:John a ex:Employee ;
+    ex:worksFor ex:TechCorp ;
+    ex:belongsTo ex:Engineering ;
+    ex:holds ex:SeniorDeveloper ;
+    ex:hasSalary ex:Salary95000 .
+
+ex:Engineering a ex:Department .
+ex:SeniorDeveloper a ex:Position .
+ex:Salary95000 a ex:Salary .

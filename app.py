@@ -437,7 +437,7 @@ def upload_owl():
         file = request.files['file']
         
         # Check if the file has a name
-        if file.filename == '':
+        if file.filename == '' or file.filename is None:
             flash('No file selected', 'error')
             return redirect(url_for('index'))
         
@@ -447,8 +447,12 @@ def upload_owl():
             return redirect(url_for('index'))
         
         # Generate a secure filename
-        original_filename = secure_filename(file.filename)
-        filename = f"{uuid.uuid4().hex}.{original_filename.rsplit('.', 1)[1].lower()}"
+        original_filename = secure_filename(file.filename or "unknown")
+        if '.' in original_filename:
+            ext = original_filename.rsplit('.', 1)[1].lower()
+        else:
+            ext = 'owl'  # Default extension
+        filename = f"{uuid.uuid4().hex}.{ext}"
         
         # Save the file
         file_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], filename)
@@ -457,15 +461,28 @@ def upload_owl():
         # Auto-detect and convert file format if needed
         try:
             logger.info(f"Attempting automatic format detection for: {file_path}")
+            logger.info(f"Original file size: {os.path.getsize(file_path)} bytes")
+            
+            # Check if file has content
+            with open(file_path, 'rb') as f:
+                first_few_bytes = f.read(100)
+                logger.info(f"First 100 bytes: {first_few_bytes}")
+            
             converted_path = auto_convert_ontology(file_path, target_format='xml')
             if converted_path != file_path:
                 logger.info(f"File converted from original format to OWL/XML: {converted_path}")
+                logger.info(f"Converted file size: {os.path.getsize(converted_path)} bytes")
+                
                 # Update the file path to point to the converted file
                 file_path = converted_path
                 # Update filename to reflect the conversion
                 filename = os.path.basename(converted_path)
+            else:
+                logger.info("No conversion needed - file is already in correct format")
         except Exception as e:
             logger.warning(f"Format conversion failed, using original file: {e}")
+            import traceback
+            logger.warning(f"Full traceback: {traceback.format_exc()}")
         
         # Create a record in the database
         file_size = os.path.getsize(file_path)
@@ -563,10 +580,17 @@ def api_analyze_owl(filename):
         tester = OwlTester()
         
         # First load the ontology
+        logger.info(f"Loading ontology from path: {file_record.file_path}")
+        logger.info(f"File exists: {os.path.exists(file_record.file_path)}")
+        if os.path.exists(file_record.file_path):
+            logger.info(f"File size: {os.path.getsize(file_record.file_path)} bytes")
+        
         load_result = tester.load_ontology_from_file(file_record.file_path)
         
         if not load_result.get('loaded', False) or not load_result.get('ontology'):
-            raise Exception(f"Failed to load ontology: {load_result.get('error', 'Unknown error')}")
+            error_msg = load_result.get('error', 'Unknown error')
+            logger.error(f"Failed to load ontology: {error_msg}")
+            raise Exception(f"Failed to load ontology: {error_msg}")
         
         # Then analyze the loaded ontology
         analysis_result = tester.analyze_ontology(load_result.get('ontology'))
