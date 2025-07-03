@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://example.org/ontology#"
+     xml:base="http://example.org/ontology"
+     xmlns:bfo="http://purl.obolibrary.org/obo/BFO_"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
+    <owl:Ontology rdf:about="http://example.org/ontology"/>
+
+    <!-- Classes -->
+    <owl:Class rdf:about="http://example.org/ontology#Corporation">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000040"/>
+    </owl:Class>
+    
+    <owl:Class rdf:about="http://example.org/ontology#Employee">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000040"/>
+    </owl:Class>
+    
+    <owl:Class rdf:about="http://example.org/ontology#Department">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000040"/>
+    </owl:Class>
+    
+    <owl:Class rdf:about="http://example.org/ontology#Position">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000023"/>
+    </owl:Class>
+    
+    <owl:Class rdf:about="http://example.org/ontology#Salary">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000019"/>
+    </owl:Class>
+
+    <!-- Object Properties -->
+    <owl:ObjectProperty rdf:about="http://example.org/ontology#worksFor">
+        <rdfs:domain rdf:resource="http://example.org/ontology#Employee"/>
+        <rdfs:range rdf:resource="http://example.org/ontology#Corporation"/>
+    </owl:ObjectProperty>
+    
+    <owl:ObjectProperty rdf:about="http://example.org/ontology#belongsTo">
+        <rdfs:domain rdf:resource="http://example.org/ontology#Employee"/>
+        <rdfs:range rdf:resource="http://example.org/ontology#Department"/>
+    </owl:ObjectProperty>
+    
+    <owl:ObjectProperty rdf:about="http://example.org/ontology#holds">
+        <rdfs:domain rdf:resource="http://example.org/ontology#Employee"/>
+        <rdfs:range rdf:resource="http://example.org/ontology#Position"/>
+    </owl:ObjectProperty>
+    
+    <owl:ObjectProperty rdf:about="http://example.org/ontology#hasSalary">
+        <rdfs:domain rdf:resource="http://example.org/ontology#Employee"/>
+        <rdfs:range rdf:resource="http://example.org/ontology#Salary"/>
+    </owl:ObjectProperty>
+
+    <!-- Individuals -->
+    <owl:NamedIndividual rdf:about="http://example.org/ontology#TechCorp">
+        <rdf:type rdf:resource="http://example.org/ontology#Corporation"/>
+    </owl:NamedIndividual>
+    
+    <owl:NamedIndividual rdf:about="http://example.org/ontology#John">
+        <rdf:type rdf:resource="http://example.org/ontology#Employee"/>
+        <worksFor rdf:resource="http://example.org/ontology#TechCorp"/>
+        <belongsTo rdf:resource="http://example.org/ontology#Engineering"/>
+        <holds rdf:resource="http://example.org/ontology#SeniorDeveloper"/>
+        <hasSalary rdf:resource="http://example.org/ontology#Salary95000"/>
+    </owl:NamedIndividual>
+    
+    <owl:NamedIndividual rdf:about="http://example.org/ontology#Engineering">
+        <rdf:type rdf:resource="http://example.org/ontology#Department"/>
+    </owl:NamedIndividual>
+    
+    <owl:NamedIndividual rdf:about="http://example.org/ontology#SeniorDeveloper">
+        <rdf:type rdf:resource="http://example.org/ontology#Position"/>
+    </owl:NamedIndividual>
+    
+    <owl:NamedIndividual rdf:about="http://example.org/ontology#Salary95000">
+        <rdf:type rdf:resource="http://example.org/ontology#Salary"/>
+    </owl:NamedIndividual>
+
+</rdf:RDF>
