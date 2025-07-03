@@ -28,22 +28,44 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto">
+                    <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link" href="/"><i class="fas fa-home me-1"></i> Home</a>
+                            <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="/">
+                                <i class="fas fa-home me-1"></i> Home
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-tools me-1"></i> Analysis Tools
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="/upload">
+                                    <i class="fas fa-upload me-2"></i> Upload Ontology
+                                </a></li>
+                                <li><a class="dropdown-item" href="/sandbox">
+                                    <i class="fas fa-project-diagram me-2"></i> Build Ontology
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="/test-bfo-display">
+                                    <i class="fas fa-flask me-2"></i> Test FOL Expression
+                                </a></li>
+                                <li><a class="dropdown-item" href="/fol-syntax-guide">
+                                    <i class="fas fa-book me-2"></i> FOL Syntax Guide
+                                </a></li>
+                            </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/upload"><i class="fas fa-upload me-1"></i> Upload Ontology</a>
+                            <a class="nav-link {% if request.endpoint == 'view_history' %}active{% endif %}" href="/history">
+                                <i class="fas fa-history me-1"></i> History
+                            </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/sandbox"><i class="fas fa-project-diagram me-1"></i> Ontology Sandbox</a>
+                            <a class="nav-link {% if request.endpoint == 'about' %}active{% endif %}" href="/about">
+                                <i class="fas fa-info-circle me-1"></i> About
+                            </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/history"><i class="fas fa-history me-1"></i> History</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/about"><i class="fas fa-info-circle me-1"></i> About</a>
-                        </li>
+                    </ul>
+                    <ul class="navbar-nav">
                         <li class="nav-item">
                             <a class="nav-link" href="https://github.com/dkoepsell/FOL-BFO-OWL-tester" target="_blank">
                                 <i class="fab fa-github me-1"></i> GitHub
@@ -77,6 +99,25 @@
             </div>
         </nav>
     </header>
+
+    <!-- Breadcrumb Navigation -->
+    {% if breadcrumbs %}
+    <nav aria-label="breadcrumb" class="bg-light border-bottom">
+        <div class="container">
+            <ol class="breadcrumb py-2 mb-0">
+                {% for breadcrumb in breadcrumbs %}
+                    {% if loop.last %}
+                        <li class="breadcrumb-item active" aria-current="page">{{ breadcrumb.name }}</li>
+                    {% else %}
+                        <li class="breadcrumb-item">
+                            <a href="{{ breadcrumb.url }}">{{ breadcrumb.name }}</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            </ol>
+        </div>
+    </nav>
+    {% endif %}
 
     <main class="container my-4">
         <!-- Flash messages display -->
