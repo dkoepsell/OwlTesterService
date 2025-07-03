@@ -1,0 +1,201 @@
+@prefix ex: <http://example.org/ontology#> .
+@prefix bfo: <http://purl.obolibrary.org/obo/BFO_> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Ontology Declaration
+ex: a owl:Ontology ;
+    rdfs:label "Corporate Ontology" ;
+    rdfs:comment "An ontology describing corporate structures and relationships" .
+
+# Classes - Material Entities
+ex:Corporation rdfs:subClassOf bfo:0000040 ;  # MaterialEntity
+    rdfs:label "Corporation" ;
+    rdfs:comment "A legal entity representing a business organization" .
+
+ex:Employee rdfs:subClassOf bfo:0000040 ;  # MaterialEntity
+    rdfs:label "Employee" ;
+    rdfs:comment "A person who works for a corporation" .
+
+ex:Department rdfs:subClassOf bfo:0000040 ;  # MaterialEntity
+    rdfs:label "Department" ;
+    rdfs:comment "An organizational unit within a corporation" .
+
+ex:Office rdfs:subClassOf bfo:0000040 ;  # MaterialEntity
+    rdfs:label "Office" ;
+    rdfs:comment "A physical location where work is performed" .
+
+# Classes - Roles
+ex:Position rdfs:subClassOf bfo:0000023 ;  # Role
+    rdfs:label "Position" ;
+    rdfs:comment "A role that an employee can hold in the corporation" .
+
+ex:ManagerRole rdfs:subClassOf ex:Position ;
+    rdfs:label "Manager Role" ;
+    rdfs:comment "A leadership position within the corporation" .
+
+ex:DeveloperRole rdfs:subClassOf ex:Position ;
+    rdfs:label "Developer Role" ;
+    rdfs:comment "A technical position focused on software development" .
+
+# Classes - Qualities
+ex:Salary rdfs:subClassOf bfo:0000019 ;  # Quality
+    rdfs:label "Salary" ;
+    rdfs:comment "The monetary compensation of an employee" .
+
+ex:Experience rdfs:subClassOf bfo:0000019 ;  # Quality
+    rdfs:label "Experience" ;
+    rdfs:comment "The professional experience level of an employee" .
+
+# Object Properties - Relationships
+ex:worksFor a owl:ObjectProperty ;
+    rdfs:label "works for" ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Corporation ;
+    rdfs:comment "Relates an employee to their employer" .
+
+ex:belongsTo a owl:ObjectProperty ;
+    rdfs:label "belongs to" ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Department ;
+    rdfs:comment "Relates an employee to their department" .
+
+ex:holds a owl:ObjectProperty ;
+    rdfs:label "holds" ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Position ;
+    rdfs:comment "Relates an employee to their position" .
+
+ex:hasSalary a owl:ObjectProperty ;
+    rdfs:label "has salary" ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Salary ;
+    rdfs:comment "Relates an employee to their salary" .
+
+ex:locatedIn a owl:ObjectProperty ;
+    rdfs:label "located in" ;
+    rdfs:domain ex:Department ;
+    rdfs:range ex:Office ;
+    rdfs:comment "Relates a department to its physical location" .
+
+ex:manages a owl:ObjectProperty ;
+    rdfs:label "manages" ;
+    rdfs:domain ex:Employee ;
+    rdfs:range ex:Department ;
+    rdfs:comment "Relates a manager to the department they manage" .
+
+# Data Properties
+ex:employeeId a owl:DatatypeProperty ;
+    rdfs:label "employee ID" ;
+    rdfs:domain ex:Employee ;
+    rdfs:range xsd:string .
+
+ex:salaryAmount a owl:DatatypeProperty ;
+    rdfs:label "salary amount" ;
+    rdfs:domain ex:Salary ;
+    rdfs:range xsd:decimal .
+
+ex:yearsOfExperience a owl:DatatypeProperty ;
+    rdfs:label "years of experience" ;
+    rdfs:domain ex:Experience ;
+    rdfs:range xsd:integer .
+
+# Individuals - Corporations
+ex:TechCorp a ex:Corporation ;
+    rdfs:label "TechCorp" ;
+    rdfs:comment "A technology corporation" .
+
+ex:InnovateCorp a ex:Corporation ;
+    rdfs:label "InnovateCorp" ;
+    rdfs:comment "An innovation-focused corporation" .
+
+# Individuals - Departments
+ex:Engineering a ex:Department ;
+    rdfs:label "Engineering Department" ;
+    ex:locatedIn ex:TechOffice .
+
+ex:Marketing a ex:Department ;
+    rdfs:label "Marketing Department" ;
+    ex:locatedIn ex:BusinessOffice .
+
+ex:HumanResources a ex:Department ;
+    rdfs:label "Human Resources Department" ;
+    ex:locatedIn ex:AdminOffice .
+
+# Individuals - Offices
+ex:TechOffice a ex:Office ;
+    rdfs:label "Technology Office" .
+
+ex:BusinessOffice a ex:Office ;
+    rdfs:label "Business Office" .
+
+ex:AdminOffice a ex:Office ;
+    rdfs:label "Administration Office" .
+
+# Individuals - Positions
+ex:SeniorDeveloper a ex:DeveloperRole ;
+    rdfs:label "Senior Developer" .
+
+ex:TechLead a ex:DeveloperRole ;
+    rdfs:label "Technical Lead" .
+
+ex:EngineeringManager a ex:ManagerRole ;
+    rdfs:label "Engineering Manager" .
+
+ex:MarketingManager a ex:ManagerRole ;
+    rdfs:label "Marketing Manager" .
+
+# Individuals - Employees
+ex:John a ex:Employee ;
+    rdfs:label "John Smith" ;
+    ex:employeeId "EMP001" ;
+    ex:worksFor ex:TechCorp ;
+    ex:belongsTo ex:Engineering ;
+    ex:holds ex:SeniorDeveloper ;
+    ex:hasSalary ex:Salary95000 .
+
+ex:Sarah a ex:Employee ;
+    rdfs:label "Sarah Johnson" ;
+    ex:employeeId "EMP002" ;
+    ex:worksFor ex:TechCorp ;
+    ex:belongsTo ex:Engineering ;
+    ex:holds ex:EngineeringManager ;
+    ex:manages ex:Engineering ;
+    ex:hasSalary ex:Salary120000 .
+
+ex:Mike a ex:Employee ;
+    rdfs:label "Mike Davis" ;
+    ex:employeeId "EMP003" ;
+    ex:worksFor ex:TechCorp ;
+    ex:belongsTo ex:Marketing ;
+    ex:holds ex:MarketingManager ;
+    ex:manages ex:Marketing ;
+    ex:hasSalary ex:Salary110000 .
+
+# Individuals - Salaries
+ex:Salary95000 a ex:Salary ;
+    ex:salaryAmount "95000.00"^^xsd:decimal ;
+    rdfs:label "Salary $95,000" .
+
+ex:Salary120000 a ex:Salary ;
+    ex:salaryAmount "120000.00"^^xsd:decimal ;
+    rdfs:label "Salary $120,000" .
+
+ex:Salary110000 a ex:Salary ;
+    ex:salaryAmount "110000.00"^^xsd:decimal ;
+    rdfs:label "Salary $110,000" .
+
+# Individuals - Experience
+ex:JohnExperience a ex:Experience ;
+    ex:yearsOfExperience "8"^^xsd:integer ;
+    rdfs:label "John's Experience" .
+
+ex:SarahExperience a ex:Experience ;
+    ex:yearsOfExperience "12"^^xsd:integer ;
+    rdfs:label "Sarah's Experience" .
+
+ex:MikeExperience a ex:Experience ;
+    ex:yearsOfExperience "10"^^xsd:integer ;
+    rdfs:label "Mike's Experience" .
