@@ -1049,33 +1049,80 @@ class OwlTester:
         expressivity = self._determine_expressivity_rdflib(rdf['graph'])
         logger.info(f"[STAGE] expressivity: {time.perf_counter()-t:.2f}s ({expressivity})")
 
-        # owlready2 / Pellet on large ontologies can hang for hours on class
-        # enumeration. Use a size-based skip: if the ontology has more named
-        # classes than a threshold, skip reasoning entirely with a clear note.
-        # (Signal-based timeouts don't work reliably under gunicorn's sync worker,
-        # which itself uses SIGALRM for its own heartbeat.)
+        # Reasoning strategy:
+        # - Below MAX_CLASSES_FOR_REASONING classes: try in-process owlready2/Pellet
+        #   (rich derivation info, works well for small/medium ontologies)
+        # - Above that: invoke an external reasoner (ROBOT+ELK) which is robust
+        #   against the owlready2 class-enumeration hang.
+        # - If the external reasoner is disabled or unavailable, fall back to a
+        #   clean "skipped" with a message.
         max_classes_for_reasoning = int(os.environ.get('MAX_CLASSES_FOR_REASONING', '500'))
+        external_reasoner = os.environ.get('EXTERNAL_REASONER', 'robot').lower()
+        external_timeout = int(os.environ.get('EXTERNAL_REASONER_TIMEOUT', '300'))
         class_count = len(rdf['class_names'])
-        if class_count > max_classes_for_reasoning:
+
+        if class_count <= max_classes_for_reasoning:
+            budget = int(os.environ.get('REASONER_BUDGET_SECONDS', '60'))
+            logger.info(f"[STAGE] reasoner: in-process Pellet with {budget}s budget...")
+            consistent, methodology_extras, derivation_steps, inferred_axioms, skipped_reason = \
+                self._try_reasoner_with_budget(onto, budget_seconds=budget)
+        elif external_reasoner == 'robot':
+            logger.info(f"[STAGE] reasoner: external ROBOT (class_count={class_count} > "
+                        f"{max_classes_for_reasoning}), timeout={external_timeout}s")
+            from external_reasoner import run_robot_reason
+            ext = run_robot_reason(
+                file_path,
+                timeout_seconds=external_timeout,
+                normalized_graph=rdf['graph'],
+            )
+            if ext['ran']:
+                consistent = bool(ext['consistent'])
+                # Cap inferences so the JSON column / response stays manageable.
+                # ELK can produce hundreds of thousands of entailed SubClassOf
+                # axioms on rich hierarchies — well beyond what the UI can
+                # render usefully.
+                cap = int(os.environ.get('MAX_INFERRED_AXIOMS', '5000'))
+                total = len(ext['inferred_axioms'])
+                if total > cap:
+                    logger.info(f"[STAGE] reasoner: capping inferred axioms {total} -> {cap}")
+                    inferred_axioms = ext['inferred_axioms'][:cap]
+                    derivation_steps = ext['derivation_steps'][:cap]
+                else:
+                    inferred_axioms = ext['inferred_axioms']
+                    derivation_steps = ext['derivation_steps']
+                methodology_extras = {
+                    'reasoner_engine': ext['engine'],
+                    'reasoning_time_s': ext['elapsed_seconds'],
+                    'inferred_axioms_total': total,
+                    'inferred_axioms_returned': len(inferred_axioms),
+                }
+                if total > cap:
+                    methodology_extras['inferred_axioms_capped_at'] = cap
+                skipped_reason = None
+            else:
+                consistent = True  # unknown — don't claim inconsistent
+                derivation_steps = []
+                inferred_axioms = []
+                methodology_extras = {
+                    'reasoner_skipped': ext['error'] or 'external reasoner did not complete',
+                    'reasoner_engine_attempted': ext['engine'],
+                }
+                skipped_reason = 'external_reasoner_failed'
+        else:
             logger.info(f"[STAGE] reasoner: SKIPPED (class_count={class_count} > "
-                        f"MAX_CLASSES_FOR_REASONING={max_classes_for_reasoning})")
+                        f"{max_classes_for_reasoning}, EXTERNAL_REASONER={external_reasoner})")
             consistent = True
+            derivation_steps = []
+            inferred_axioms = []
             methodology_extras = {
                 'reasoner_skipped': (
-                    f'Ontology has {class_count} classes (> {max_classes_for_reasoning} threshold). '
-                    f'In-process reasoning would likely hang. Use a standalone reasoner '
-                    f'(Konclude, ROBOT, ELK) for ontologies this size.'
+                    f'Ontology has {class_count} classes (> {max_classes_for_reasoning} threshold) '
+                    f'and EXTERNAL_REASONER is "{external_reasoner}". '
+                    f'Set EXTERNAL_REASONER=robot to enable external reasoning.'
                 ),
                 'reasoner_skip_threshold': max_classes_for_reasoning,
             }
-            derivation_steps = []
-            inferred_axioms = []
             skipped_reason = 'too_many_classes'
-        else:
-            budget = int(os.environ.get('REASONER_BUDGET_SECONDS', '60'))
-            logger.info(f"[STAGE] reasoner: starting with {budget}s budget...")
-            consistent, methodology_extras, derivation_steps, inferred_axioms, skipped_reason = \
-                self._try_reasoner_with_budget(onto, budget_seconds=budget)
 
         reasoning_methodology = {
             'reasoners_used': ['Pellet'],
