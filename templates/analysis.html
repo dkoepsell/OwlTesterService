@@ -3,40 +3,42 @@
 {% block head_scripts %}
 {{ super() }}
 <style>
-    /* Styles for derivation trace visualization */
+    /* Derivation trace nodes — semi-transparent color tints so they read on
+       the site's dark theme without losing their semantic blue/green/red. */
     .derivation-node {
         padding: 8px;
         border-radius: 4px;
         margin: 5px 0;
-        border: 1px solid #ccc;
-        background-color: #f8f9fa;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background-color: rgba(255, 255, 255, 0.04);
+        color: var(--bs-body-color);
         transition: all 0.3s ease;
     }
     .derivation-node:hover {
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.35);
         transform: translateY(-2px);
     }
     .derivation-node.axiom {
-        background-color: #e3f2fd;
-        border-color: #90caf9;
+        background-color: rgba(33, 150, 243, 0.18);
+        border-color: rgba(33, 150, 243, 0.45);
     }
     .derivation-node.inference {
-        background-color: #e8f5e9;
-        border-color: #a5d6a7;
+        background-color: rgba(76, 175, 80, 0.18);
+        border-color: rgba(76, 175, 80, 0.45);
     }
     .derivation-node.inconsistency {
-        background-color: #ffebee;
-        border-color: #ef9a9a;
+        background-color: rgba(244, 67, 54, 0.18);
+        border-color: rgba(244, 67, 54, 0.55);
     }
     .derivation-connector {
-        border-left: 2px dashed #ccc;
+        border-left: 2px dashed rgba(255, 255, 255, 0.25);
         height: 20px;
         margin-left: 15px;
     }
     .supporting-fact {
         margin-left: 20px;
         font-size: 0.9em;
-        color: #6c757d;
+        color: rgba(255, 255, 255, 0.65);
     }
     .derivation-header {
         font-weight: bold;
