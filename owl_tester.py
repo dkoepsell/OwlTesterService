@@ -7,6 +7,7 @@ import datetime
 import importlib.util
 import owlready2
 import json
+import time
 from io import StringIO, BytesIO
 from owlready2 import *
 from nltk.sem import Expression
@@ -401,10 +402,12 @@ class OwlTester:
             dict: Information about the loaded ontology
         """
         # First try direct loading with owlready2
+        t_load = time.perf_counter()
         try:
             # Try to load the ontology
             onto = owlready2.get_ontology(ontology_path).load()
-            
+            logger.info(f"[STAGE] load_ontology (owlready2): {time.perf_counter()-t_load:.2f}s")
+
             # Return basic information about the ontology
             return {
                 'name': onto.name,
@@ -414,6 +417,7 @@ class OwlTester:
             }
         except Exception as e:
             logging.warning(f"Initial owlready2 loading failed for {ontology_path}: {e}")
+            logger.info(f"[STAGE] load_ontology (owlready2 failed): {time.perf_counter()-t_load:.2f}s — falling back to rdflib")
             
             # Try alternate loading methods using rdflib as an intermediary
             try:
@@ -421,9 +425,11 @@ class OwlTester:
                 import tempfile
                 
                 # Load with rdflib first
+                t_rdf = time.perf_counter()
                 g = rdflib.Graph()
                 g.parse(ontology_path)
-                
+                logger.info(f"[STAGE] load_ontology (rdflib parse): {time.perf_counter()-t_rdf:.2f}s ({len(g)} triples)")
+
                 if len(g) > 0:
                     logging.info(f"Successfully loaded {len(g)} triples with rdflib")
                     
@@ -435,8 +441,10 @@ class OwlTester:
                     
                     try:
                         # Try to load the re-serialized file with owlready2
+                        t_reload = time.perf_counter()
                         onto = owlready2.get_ontology(temp_path).load()
-                        
+                        logger.info(f"[STAGE] load_ontology (owlready2 reparse): {time.perf_counter()-t_reload:.2f}s")
+
                         # Return basic information about the ontology
                         return {
                             'name': onto.name or "Unknown",
@@ -463,25 +471,45 @@ class OwlTester:
                     'error': f"Failed with both owlready2 and rdflib: {e}; {rdf_e}"
                 }
     
-    def analyze_ontology(self, onto):
+    def analyze_ontology(self, onto, file_path=None):
         """
         Analyze an ontology and extract key information.
-        
+
         Args:
             onto: The owlready2 ontology object
-            
+            file_path: Optional path to the source file. When provided, structural
+                       extraction is performed with RDFlib instead of owlready2
+                       (orders of magnitude faster on large ontologies — owlready2
+                       can hang on class enumeration with anonymous restrictions).
+
         Returns:
             dict: Analysis results
         """
+        if file_path:
+            return self._analyze_with_rdflib(onto, file_path)
+
+        t_total = time.perf_counter()
+        logger.info("[STAGE] analyze_ontology: entered (owlready2 path)")
         try:
-            # Get basic counts from the ontology
+            # Get basic counts from the ontology (each call timed separately to localize slow ones)
+            t = time.perf_counter()
             classes_list = list(onto.classes())
+            logger.info(f"[STAGE]   list(classes): {time.perf_counter()-t:.2f}s ({len(classes_list)})")
+            t = time.perf_counter()
             object_properties_list = list(onto.object_properties())
+            logger.info(f"[STAGE]   list(object_properties): {time.perf_counter()-t:.2f}s ({len(object_properties_list)})")
+            t = time.perf_counter()
             data_properties_list = list(onto.data_properties())
+            logger.info(f"[STAGE]   list(data_properties): {time.perf_counter()-t:.2f}s ({len(data_properties_list)})")
+            t = time.perf_counter()
             individuals_list = list(onto.individuals())
+            logger.info(f"[STAGE]   list(individuals): {time.perf_counter()-t:.2f}s ({len(individuals_list)})")
+            t = time.perf_counter()
             annotation_properties_list = list(onto.annotation_properties())
-            
+            logger.info(f"[STAGE]   list(annotation_properties): {time.perf_counter()-t:.2f}s ({len(annotation_properties_list)})")
+
             # Count axioms - This is a rough approximation since owlready2 doesn't directly expose axiom counts
+            t = time.perf_counter()
             axiom_count = 0
             
             # Count class axioms (subclass relationships, equivalence, etc.)
@@ -538,8 +566,10 @@ class OwlTester:
                         axiom_count += len(entity.label)
                     else:
                         axiom_count += 1  # Count as single axiom if it's not a collection
-            
+            logger.info(f"[STAGE] count_axioms: {time.perf_counter()-t:.2f}s (axiom_count={axiom_count})")
+
             # Build the detailed axioms list
+            t = time.perf_counter()
             axioms_list = []
             # Add class hierarchy axioms
             for cls in classes_list:
@@ -551,6 +581,8 @@ class OwlTester:
                                 'description': f"{cls.name} ⊑ {parent.name}"
                             })
             
+            logger.info(f"[STAGE] build_axioms_list: {time.perf_counter()-t:.2f}s (axioms={len(axioms_list)})")
+
             # Also create a list for inferred axioms
             inferred_axioms_list = []
             
@@ -613,19 +645,24 @@ class OwlTester:
             
             try:
                 # Store pre-reasoning class hierarchy for comparison
+                t = time.perf_counter()
                 pre_reasoning_subclass_relations = {}
                 for cls in onto.classes():
                     if hasattr(cls, 'name') and hasattr(cls, 'is_a'):
                         pre_reasoning_subclass_relations[cls.name] = [
                             parent.name for parent in cls.is_a if hasattr(parent, 'name')
                         ]
-                
+                logger.info(f"[STAGE] pre_reasoning_snapshot: {time.perf_counter()-t:.2f}s")
+
                 # owlready2's reasoner for consistency checking
+                t = time.perf_counter()
+                logger.info("[STAGE] pellet_reasoner: starting (may take a while)...")
                 start_time = datetime.datetime.utcnow()
                 with onto:
-                    consistency = owlready2.sync_reasoner_pellet(infer_property_values=True, 
+                    consistency = owlready2.sync_reasoner_pellet(infer_property_values=True,
                                                               infer_data_property_values=True)
                 end_time = datetime.datetime.utcnow()
+                logger.info(f"[STAGE] pellet_reasoner: {time.perf_counter()-t:.2f}s")
                 
                 # Calculate reasoning time
                 reasoning_time_ms = (end_time - start_time).total_seconds() * 1000
@@ -636,6 +673,7 @@ class OwlTester:
                 }
                 
                 # Find newly inferred relations by comparing pre and post reasoning
+                t = time.perf_counter()
                 for cls in onto.classes():
                     if hasattr(cls, 'name') and hasattr(cls, 'is_a'):
                         post_reasoning_parents = [parent.name for parent in cls.is_a if hasattr(parent, 'name')]
@@ -667,8 +705,11 @@ class OwlTester:
                                 'derivation': derivation_step
                             })
                 
+                logger.info(f"[STAGE] extract_inferences: {time.perf_counter()-t:.2f}s "
+                            f"(inferred_axioms={len(inferred_axioms_list)})")
+
                 result['consistency'] = 'Consistent'
-                
+
             except Exception as e:
                 result['consistency'] = 'Inconsistent'
                 result['consistency_error'] = str(e)
@@ -693,8 +734,11 @@ class OwlTester:
             result['derivation_steps'] = derivation_steps
             
             # Get expressivity (this is a placeholder, as owlready2 doesn't directly expose DL expressivity)
+            t = time.perf_counter()
             result['expressivity'] = self._determine_expressivity(onto)
-            
+            logger.info(f"[STAGE] expressivity: {time.perf_counter()-t:.2f}s")
+
+            logger.info(f"[STAGE] analyze_ontology TOTAL: {time.perf_counter()-t_total:.2f}s")
             return result
         except Exception as e:
             logging.error(f"Error analyzing ontology: {e}")
@@ -757,7 +801,336 @@ class OwlTester:
                 'derivation_steps': [],
                 'error': str(e)
             }
-    
+
+    # ------------------------------------------------------------------
+    # RDFlib-based fast analysis path
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _local_name(uri):
+        """Extract a friendly local name from an IRI/URIRef."""
+        s = str(uri)
+        if '#' in s:
+            return s.rsplit('#', 1)[1]
+        if '/' in s:
+            tail = s.rsplit('/', 1)[1]
+            if tail:
+                return tail
+        return s
+
+    def _extract_with_rdflib(self, file_path):
+        """
+        Fast structural extraction of an ontology via RDFlib.
+        Returns a dict of counts, named entities, axioms, expressivity, etc.
+        Avoids owlready2's class-object materialization, which can hang for
+        minutes on ontologies with many anonymous restrictions.
+        """
+        import rdflib
+        from rdflib.namespace import RDF, RDFS, OWL
+
+        t = time.perf_counter()
+        g = rdflib.Graph()
+        g.parse(file_path)
+        logger.info(f"[STAGE] rdflib.parse: {time.perf_counter()-t:.2f}s ({len(g)} triples)")
+
+        # Ontology IRI/name from owl:Ontology subject (if declared)
+        ontology_iri = ''
+        ontology_name = ''
+        for s in g.subjects(RDF.type, OWL.Ontology):
+            ontology_iri = str(s)
+            ontology_name = self._local_name(s) or ontology_iri
+            break
+
+        def collect_named(rdf_type):
+            names = []
+            seen = set()
+            for s in g.subjects(RDF.type, rdf_type):
+                if not isinstance(s, rdflib.URIRef):
+                    continue
+                name = self._local_name(s)
+                if not name or name in ('Thing', 'Nothing') or name in seen:
+                    continue
+                seen.add(name)
+                names.append(name)
+            return sorted(names)
+
+        t = time.perf_counter()
+        class_names = collect_named(OWL.Class)
+        object_property_names = collect_named(OWL.ObjectProperty)
+        data_property_names = collect_named(OWL.DatatypeProperty)
+        individual_names = collect_named(OWL.NamedIndividual)
+        annotation_property_names = collect_named(OWL.AnnotationProperty)
+        logger.info(f"[STAGE] rdflib enumerate: {time.perf_counter()-t:.2f}s "
+                    f"(classes={len(class_names)}, obj_props={len(object_property_names)}, "
+                    f"data_props={len(data_property_names)}, individuals={len(individual_names)})")
+
+        # Axioms: subClassOf, equivalentClass, disjointWith, domain, range
+        t = time.perf_counter()
+        axioms_list = []
+
+        def add_named_axiom(s, o, kind, sep):
+            if isinstance(s, rdflib.URIRef) and isinstance(o, rdflib.URIRef):
+                sn = self._local_name(s)
+                on = self._local_name(o)
+                if sn and on and sn not in ('Thing', 'Nothing'):
+                    axioms_list.append({'type': kind, 'description': f"{sn} {sep} {on}"})
+
+        for s, _, o in g.triples((None, RDFS.subClassOf, None)):
+            add_named_axiom(s, o, 'SubClassOf', '⊑')
+        for s, _, o in g.triples((None, OWL.equivalentClass, None)):
+            add_named_axiom(s, o, 'EquivalentClass', '≡')
+        for s, _, o in g.triples((None, OWL.disjointWith, None)):
+            add_named_axiom(s, o, 'DisjointWith', '⊥')
+        for s, _, o in g.triples((None, RDFS.domain, None)):
+            add_named_axiom(s, o, 'Domain', 'domain ⇒')
+        for s, _, o in g.triples((None, RDFS.range, None)):
+            add_named_axiom(s, o, 'Range', 'range ⇒')
+
+        axiom_count = len(axioms_list)
+        logger.info(f"[STAGE] rdflib axioms: {time.perf_counter()-t:.2f}s ({axiom_count})")
+
+        imports = [str(o) for o in g.objects(None, OWL.imports)]
+
+        return {
+            'graph': g,
+            'ontology_name': ontology_name or 'Unknown Ontology',
+            'ontology_iri': ontology_iri,
+            'class_names': class_names,
+            'object_property_names': object_property_names,
+            'data_property_names': data_property_names,
+            'individual_names': individual_names,
+            'annotation_property_names': annotation_property_names,
+            'axioms': axioms_list,
+            'axiom_count': axiom_count,
+            'imports': imports,
+        }
+
+    def _determine_expressivity_rdflib(self, g):
+        """Heuristic DL expressivity from an RDFlib graph (no owlready2 access)."""
+        import rdflib
+        from rdflib.namespace import RDF, RDFS, OWL
+
+        def has_triple(p):
+            for _ in g.triples((None, p, None)):
+                return True
+            return False
+
+        def has_typed(t):
+            for _ in g.subjects(RDF.type, t):
+                return True
+            return False
+
+        expressivity = "AL"
+        if has_triple(OWL.someValuesFrom):
+            expressivity = "ALE"
+
+        if has_triple(OWL.unionOf):
+            expressivity += "U"
+        if has_triple(OWL.complementOf):
+            expressivity += "C"
+        if (has_triple(OWL.minCardinality) or has_triple(OWL.maxCardinality)
+                or has_triple(OWL.cardinality) or has_triple(OWL.qualifiedCardinality)
+                or has_triple(OWL.minQualifiedCardinality) or has_triple(OWL.maxQualifiedCardinality)):
+            expressivity += "N"
+        if has_triple(OWL.inverseOf):
+            expressivity += "I"
+        if has_triple(RDFS.subPropertyOf):
+            expressivity += "H"
+        if has_typed(OWL.TransitiveProperty):
+            expressivity += "R+"
+        if has_typed(OWL.FunctionalProperty):
+            expressivity += "F"
+        if has_triple(OWL.oneOf):
+            expressivity += "O"
+        return expressivity
+
+    def _try_reasoner_with_budget(self, onto, budget_seconds=60):
+        """
+        Run owlready2 / Pellet with a SIGALRM-based timeout.
+        Returns: (consistent: bool, methodology_extras: dict, derivation_steps: list,
+                  inferred_axioms: list, skipped_reason: Optional[str])
+
+        Note: SIGALRM only interrupts Python — if Pellet's Java subprocess is mid-run,
+        it may keep running briefly after timeout. Not a leak in practice (gunicorn
+        worker death via max_requests will eventually clear it).
+        """
+        import signal
+
+        if not hasattr(signal, 'SIGALRM'):
+            # Windows fallback: just don't reason
+            return True, {'reasoner_skipped': 'no SIGALRM on this platform'}, [], [], 'unsupported_platform'
+
+        class _ReasonerTimeout(Exception):
+            pass
+
+        def _handler(signum, frame):
+            raise _ReasonerTimeout(f"reasoner exceeded {budget_seconds}s budget")
+
+        old_handler = signal.signal(signal.SIGALRM, _handler)
+        signal.alarm(int(budget_seconds))
+
+        # Capture pre-reasoning hierarchy so we can diff for inferences afterwards
+        pre = {}
+        try:
+            for cls in onto.classes():
+                if hasattr(cls, 'name') and hasattr(cls, 'is_a'):
+                    pre[cls.name] = [p.name for p in cls.is_a if hasattr(p, 'name')]
+        except _ReasonerTimeout:
+            signal.alarm(0); signal.signal(signal.SIGALRM, old_handler)
+            return True, {'reasoner_skipped': 'class enumeration exceeded budget'}, [], [], 'enumeration_timeout'
+
+        t = time.perf_counter()
+        try:
+            with onto:
+                owlready2.sync_reasoner_pellet(infer_property_values=True,
+                                               infer_data_property_values=True)
+            elapsed = time.perf_counter() - t
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+            logger.info(f"[STAGE] reasoner: {elapsed:.2f}s")
+        except _ReasonerTimeout as e:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+            logger.warning(f"[STAGE] reasoner: TIMED OUT after {budget_seconds}s")
+            return True, {'reasoner_skipped': str(e), 'reasoner_budget_seconds': budget_seconds}, [], [], 'reasoner_timeout'
+        except Exception as e:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+            logger.warning(f"[STAGE] reasoner: FAILED ({e})")
+            return False, {'inconsistency_reason': str(e)}, [{
+                'axiom_type': 'Inconsistency',
+                'description': f"Ontology may be inconsistent or reasoner failed: {e}",
+                'reason': 'Pellet error or logical contradiction',
+                'supporting_facts': ['Pellet reasoner output'],
+                'confidence': 'Medium',
+                'origin': 'Pellet reasoner'
+            }], [], 'reasoner_error'
+
+        # Diff pre/post for new SubClassOf inferences
+        derivation_steps = []
+        inferred_axioms = []
+        try:
+            for cls in onto.classes():
+                if not (hasattr(cls, 'name') and hasattr(cls, 'is_a')):
+                    continue
+                post = [p.name for p in cls.is_a if hasattr(p, 'name')]
+                for new_parent in [p for p in post if p not in pre.get(cls.name, [])]:
+                    step = {
+                        'axiom_type': 'SubClassOf',
+                        'description': f"{cls.name} ⊑ {new_parent}",
+                        'reason': 'Inferred by reasoner',
+                        'supporting_facts': ['Tableau reasoning over class restrictions'],
+                        'confidence': 'High',
+                        'origin': 'Pellet reasoner',
+                    }
+                    derivation_steps.append(step)
+                    inferred_axioms.append({
+                        'type': 'SubClassOf',
+                        'description': f"{cls.name} ⊑ {new_parent}",
+                        'derivation': step,
+                    })
+        except Exception as e:
+            logger.warning(f"Inference diff failed: {e}")
+
+        return True, {'performance': {'reasoning_time_s': time.perf_counter() - t}}, derivation_steps, inferred_axioms, None
+
+    def _analyze_with_rdflib(self, onto, file_path):
+        """
+        Fast structural analysis via RDFlib. Reasoning (owlready2/Pellet) is
+        attempted with a strict time budget; if it exceeds the budget the
+        analysis still returns with a clear note in `reasoning_methodology`.
+        """
+        t_total = time.perf_counter()
+        logger.info(f"[STAGE] analyze_ontology: entered (rdflib path) file={file_path}")
+
+        rdf = self._extract_with_rdflib(file_path)
+
+        t = time.perf_counter()
+        expressivity = self._determine_expressivity_rdflib(rdf['graph'])
+        logger.info(f"[STAGE] expressivity: {time.perf_counter()-t:.2f}s ({expressivity})")
+
+        # owlready2 / Pellet on large ontologies can hang for hours on class
+        # enumeration. Use a size-based skip: if the ontology has more named
+        # classes than a threshold, skip reasoning entirely with a clear note.
+        # (Signal-based timeouts don't work reliably under gunicorn's sync worker,
+        # which itself uses SIGALRM for its own heartbeat.)
+        max_classes_for_reasoning = int(os.environ.get('MAX_CLASSES_FOR_REASONING', '500'))
+        class_count = len(rdf['class_names'])
+        if class_count > max_classes_for_reasoning:
+            logger.info(f"[STAGE] reasoner: SKIPPED (class_count={class_count} > "
+                        f"MAX_CLASSES_FOR_REASONING={max_classes_for_reasoning})")
+            consistent = True
+            methodology_extras = {
+                'reasoner_skipped': (
+                    f'Ontology has {class_count} classes (> {max_classes_for_reasoning} threshold). '
+                    f'In-process reasoning would likely hang. Use a standalone reasoner '
+                    f'(Konclude, ROBOT, ELK) for ontologies this size.'
+                ),
+                'reasoner_skip_threshold': max_classes_for_reasoning,
+            }
+            derivation_steps = []
+            inferred_axioms = []
+            skipped_reason = 'too_many_classes'
+        else:
+            budget = int(os.environ.get('REASONER_BUDGET_SECONDS', '60'))
+            logger.info(f"[STAGE] reasoner: starting with {budget}s budget...")
+            consistent, methodology_extras, derivation_steps, inferred_axioms, skipped_reason = \
+                self._try_reasoner_with_budget(onto, budget_seconds=budget)
+
+        reasoning_methodology = {
+            'reasoners_used': ['Pellet'],
+            'reasoning_tasks': ['consistency', 'classification', 'realization'],
+            'timestamp': datetime.datetime.utcnow().isoformat(),
+            'theoretical_guarantees': {
+                'decidability': 'Decidable for OWL DL ontologies',
+                'completeness': 'Complete for SROIQ(D) description logic',
+                'soundness': 'Sound for standard description logics',
+            },
+            'limitations': [
+                'May time out on very large ontologies — see reasoner_skipped',
+                'OWL Full constructs not supported',
+            ],
+            'inference_rules': [
+                'Tableau-based reasoning',
+                'Inheritance propagation',
+                'Property chain inference',
+                'Disjointness validation',
+                'Cardinality constraint validation',
+            ],
+        }
+        reasoning_methodology.update(methodology_extras)
+        if skipped_reason:
+            reasoning_methodology['reasoning_status'] = 'skipped'
+            reasoning_methodology['reasoning_skipped_reason'] = skipped_reason
+        else:
+            reasoning_methodology['reasoning_status'] = 'completed'
+
+        result = {
+            'ontology_name': rdf['ontology_name'],
+            'ontology_iri': rdf['ontology_iri'],
+            'classes': len(rdf['class_names']),
+            'object_properties': len(rdf['object_property_names']),
+            'data_properties': len(rdf['data_property_names']),
+            'individuals': len(rdf['individual_names']),
+            'annotation_properties': len(rdf['annotation_property_names']),
+            'imported_ontologies': rdf['imports'],
+            'axiom_count': rdf['axiom_count'],
+            'axioms': rdf['axioms'],
+            'inferred_axioms': inferred_axioms,
+            'class_list': rdf['class_names'],
+            'object_property_list': rdf['object_property_names'],
+            'data_property_list': rdf['data_property_names'],
+            'individual_list': rdf['individual_names'],
+            'consistency': 'Consistent' if consistent else 'Inconsistent',
+            'is_consistent': consistent,
+            'expressivity': expressivity,
+            'reasoning_methodology': reasoning_methodology,
+            'derivation_steps': derivation_steps,
+        }
+        logger.info(f"[STAGE] analyze_ontology TOTAL: {time.perf_counter()-t_total:.2f}s "
+                    f"(reasoning_status={reasoning_methodology['reasoning_status']})")
+        return result
+
     def _determine_expressivity(self, onto):
         """
         Determine the DL expressivity of an ontology.

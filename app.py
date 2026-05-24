@@ -619,13 +619,17 @@ def analyze_owl(filename):
 @app.route('/api/analyze/<filename>')
 def api_analyze_owl(filename):
     """API endpoint for analyzing an uploaded OWL file."""
+    import time as _time
+    t_request = _time.perf_counter()
     try:
         # Find the file in the database
+        t = _time.perf_counter()
         file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
-        
+        logger.info(f"[STAGE] db_lookup: {_time.perf_counter()-t:.2f}s")
+
         # Create an OwlTester instance
         tester = OwlTester()
-        
+
         # Check if the file actually exists on disk
         if not os.path.exists(file_record.file_path):
             logger.error(f"File not found on disk: {file_record.file_path}")
@@ -633,22 +637,28 @@ def api_analyze_owl(filename):
             db.session.delete(file_record)
             db.session.commit()
             raise Exception(f"File not found: {file_record.file_path}. The file may have been corrupted during upload.")
-        
+
         # First load the ontology
         logger.info(f"Loading ontology from path: {file_record.file_path}")
         logger.info(f"File exists: {os.path.exists(file_record.file_path)}")
         if os.path.exists(file_record.file_path):
             logger.info(f"File size: {os.path.getsize(file_record.file_path)} bytes")
-        
+
+        t = _time.perf_counter()
         load_result = tester.load_ontology_from_file(file_record.file_path)
-        
+        logger.info(f"[STAGE] load_ontology_total: {_time.perf_counter()-t:.2f}s")
+
         if not load_result.get('loaded', False) or not load_result.get('ontology'):
             error_msg = load_result.get('error', 'Unknown error')
             logger.error(f"Failed to load ontology: {error_msg}")
             raise Exception(f"Failed to load ontology: {error_msg}")
-        
-        # Then analyze the loaded ontology
-        analysis_result = tester.analyze_ontology(load_result.get('ontology'))
+
+        # Then analyze the loaded ontology — pass file_path so structural extraction
+        # uses RDFlib (owlready2 class enumeration hangs on some large ontologies).
+        t = _time.perf_counter()
+        analysis_result = tester.analyze_ontology(load_result.get('ontology'),
+                                                  file_path=file_record.file_path)
+        logger.info(f"[STAGE] analyze_ontology_total: {_time.perf_counter()-t:.2f}s")
         
         if not analysis_result or not isinstance(analysis_result, dict):
             raise Exception("Invalid analysis result")
@@ -713,93 +723,34 @@ def api_analyze_owl(filename):
             derivation_steps=derivation_steps
         )
         
-        # Attempt to extract FOL premises from the ontology
+        # Build FOL premises from the structural lists produced by analyze_ontology
+        # (analyze_ontology now uses RDFlib, so class_list/object_property_list are
+        # populated without ever calling onto.classes() — avoiding the owlready2 hang).
+        t_fol = _time.perf_counter()
         try:
-            app.logger.info("Attempting to extract FOL premises...")
-            # We've already loaded the ontology earlier in this function
-            # Reuse it instead of loading it again
-            onto = load_result.get('ontology')
-            
-            if onto:
-                premises = []
-                found_premises = False
-                
-                # Try to extract annotations if available
-                structured_premises = []
-                for cls in onto.classes():
-                    if hasattr(cls, 'comment'):
-                        for comment in cls.comment:
-                            if "FOL:" in comment:
-                                fol_expr = comment.split("FOL:")[1].strip()
-                                
-                                # Create a structured premise with type, fol, and description
-                                structured_premise = {
-                                    'type': 'annotation',
-                                    'fol': fol_expr,
-                                    'description': f"Extracted from annotation on {cls.name}",
-                                    'entity_name': cls.name
-                                }
-                                
-                                structured_premises.append(structured_premise)
-                                found_premises = True
-                                
-                premises = structured_premises
-                
-                # If no premises were found in annotations, generate default ones
-                if not found_premises:
-                    app.logger.info(f"★★★ NO FOL PREMISES FOUND IN ANNOTATIONS. GENERATING DEFAULTS... ★★★")
-                    app.logger.info(f"★★★ FOUND {class_count} CLASSES AND {object_property_count} PROPERTIES FOR DEFAULT PREMISES ★★★")
-                    
-                    # Generate default premises for classes
-                    structured_premises = []
-                    for cls in onto.classes():
-                        if hasattr(cls, 'name') and cls.name:
-                            # Skip some common base classes that might create noise
-                            if cls.name in ['Thing', 'Nothing', 'Entity']:
-                                continue
-                                
-                            # Create a premise in BFO format: instance_of(x, ClassName, t)
-                            fol_expr = f"instance_of(x, {cls.name}, t)"
-                            
-                            # Create a structured premise with type, fol, and description
-                            structured_premise = {
-                                'type': 'class',
-                                'fol': fol_expr,
-                                'description': f"Entities that are instances of {cls.name}",
-                                'entity_name': cls.name
-                            }
-                            
-                            structured_premises.append(structured_premise)
-                            app.logger.info(f"★★★ Added default class FOL premise for: {cls.name} ★★★")
-                    
-                    # Generate default premises for object properties
-                    for prop in onto.object_properties():
-                        if hasattr(prop, 'name') and prop.name:
-                            # Create a premise in BFO format: PropertyName(x, y, t)
-                            fol_expr = f"{prop.name}(x, y, t)"
-                            
-                            # Create a structured premise with type, fol, and description
-                            structured_premise = {
-                                'type': 'property',
-                                'fol': fol_expr,
-                                'description': f"Relation {prop.name} between entities",
-                                'entity_name': prop.name
-                            }
-                            
-                            structured_premises.append(structured_premise)
-                            app.logger.info(f"★★★ Added default property FOL premise for: {prop.name} ★★★")
-                    
-                    premises = structured_premises
-                        
-                    app.logger.info(f"★★★ GENERATED {len(premises)} DEFAULT FOL PREMISES ★★★")
-                    
-                    # Add the premises to the analysis
-                    analysis.fol_premises = premises
-            else:
-                app.logger.warning(f"Could not extract FOL premises: {load_result.get('error', 'Unknown error')}")
+            structured_premises = []
+            for name in class_list:
+                if name in ('Thing', 'Nothing', 'Entity'):
+                    continue
+                structured_premises.append({
+                    'type': 'class',
+                    'fol': f"instance_of(x, {name}, t)",
+                    'description': f"Entities that are instances of {name}",
+                    'entity_name': name,
+                })
+            for name in object_property_list:
+                structured_premises.append({
+                    'type': 'property',
+                    'fol': f"{name}(x, y, t)",
+                    'description': f"Relation {name} between entities",
+                    'entity_name': name,
+                })
+            analysis.fol_premises = structured_premises
+            app.logger.info(f"Generated {len(structured_premises)} default FOL premises from RDFlib lists")
         except Exception as e:
-            app.logger.error(f"Error extracting FOL premises: {str(e)}")
-        
+            app.logger.error(f"Error building FOL premises: {str(e)}")
+        logger.info(f"[STAGE] fol_extract: {_time.perf_counter()-t_fol:.2f}s")
+
         # Make sure we have non-zero values for statistics if they're missing or zero
         # This prevents empty white boxes in the UI
         if analysis.class_count == 0 and len(class_list) > 0:
@@ -818,9 +769,12 @@ def api_analyze_owl(filename):
             analysis.axiom_count = len(axioms)
         
         # Save the analysis to the database
+        t = _time.perf_counter()
         db.session.add(analysis)
         db.session.commit()
-        
+        logger.info(f"[STAGE] db_commit: {_time.perf_counter()-t:.2f}s")
+        logger.info(f"[STAGE] REQUEST TOTAL for {filename}: {_time.perf_counter()-t_request:.2f}s")
+
         app.logger.info(f"Using analysis ID {analysis.id} for API calls")
         app.logger.info(f"Statistics: Classes={analysis.class_count}, Object Props={analysis.object_property_count}, Data Props={analysis.data_property_count}, Individuals={analysis.individual_count}")
         
