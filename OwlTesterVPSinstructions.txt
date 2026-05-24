@@ -1,0 +1,7 @@
+  git clone <your-repo> && cd OwlTesterService
+  cp .env.example .env
+  # fill in SESSION_SECRET, OPENAI_API_KEY, POSTGRES_PASSWORD
+  docker compose up -d --build
+
+  For HTTPS, point your domain to the server, install certbot on the host, run certbot certonly --standalone -d your.domain.com, then uncomment the SSL block in nginx/nginx.conf and
+  restart nginx.

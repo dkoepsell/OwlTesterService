@@ -1,0 +1,14 @@
+.env
+.git
+.gitignore
+.replit
+.venv
+__pycache__
+*.py[cod]
+*.db
+*.sqlite3
+uploads/
+nginx/
+docker-compose.yml
+Dockerfile
+*.md

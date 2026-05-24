@@ -1,0 +1,11 @@
+bind = "0.0.0.0:5000"
+workers = 2
+worker_class = "sync"
+timeout = 600        # OWL reasoners can be slow
+keepalive = 5
+max_requests = 500
+max_requests_jitter = 50
+preload_app = True
+accesslog = "-"
+errorlog = "-"
+loglevel = "info"
