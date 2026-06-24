@@ -1111,8 +1111,9 @@ class OwlTester:
         external_timeout = int(os.environ.get('EXTERNAL_REASONER_TIMEOUT', '300'))
         class_count = len(rdf['class_names'])
 
-        # Default: coherence is computable only on the in-process Pellet path
-        # (the external ROBOT/ELK path never materializes owlready2 classes).
+        # Unsatisfiable classes are computed on both paths now: the in-process
+        # Pellet path via inconsistent_classes(), and the external ROBOT/ELK path
+        # by parsing the reasoner's unsatisfiable-class report (with BFO merged in).
         unsatisfiable_classes = []
 
         if class_count <= max_classes_for_reasoning:
@@ -1125,13 +1126,20 @@ class OwlTester:
             logger.info(f"[STAGE] reasoner: external ROBOT (class_count={class_count} > "
                         f"{max_classes_for_reasoning}), timeout={external_timeout}s")
             from external_reasoner import run_robot_reason
+            try:
+                from bfo.catalog import DEFAULT_OWL_PATH
+                bfo_path = os.environ.get('BFO_PATH') or DEFAULT_OWL_PATH
+            except Exception:
+                bfo_path = None
             ext = run_robot_reason(
                 file_path,
                 timeout_seconds=external_timeout,
                 normalized_graph=rdf['graph'],
+                bfo_path=bfo_path,
             )
             if ext['ran']:
                 consistent = bool(ext['consistent'])
+                unsatisfiable_classes = ext.get('unsatisfiable_classes', [])
                 # Cap inferences so the JSON column / response stays manageable.
                 # ELK can produce hundreds of thousands of entailed SubClassOf
                 # axioms on rich hierarchies — well beyond what the UI can
