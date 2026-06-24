@@ -269,9 +269,29 @@
                 <ul class="list-group">
                     {% for finding in analysis.lint_findings %}
                     <li class="list-group-item list-group-item-warning">
-                        <strong>{{ finding.class }}</strong>:
-                        {{ finding.category_a }} vs {{ finding.category_b }}
-                        <div class="small mt-1">{{ finding.message }}</div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ finding.class }}</strong>:
+                                {{ finding.category_a }} vs {{ finding.category_b }}
+                                <div class="small mt-1">{{ finding.message }}</div>
+                            </div>
+                            {% if finding.class_iri %}
+                            <div class="dropdown ms-3 flex-shrink-0">
+                                <button class="btn btn-sm btn-outline-dark dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-wrench me-1"></i>Fix
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><h6 class="dropdown-header">Keep {{ finding.category_a }}, drop {{ finding.category_b }}</h6></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('fix_and_reanalyze', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_b_iri) }}"><i class="fas fa-rotate me-2"></i>Fix and re-analyze (full coherence)</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('fix_straddle_download', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_b_iri) }}"><i class="fas fa-download me-2"></i>Download fixed file</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><h6 class="dropdown-header">Keep {{ finding.category_b }}, drop {{ finding.category_a }}</h6></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('fix_and_reanalyze', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_a_iri) }}"><i class="fas fa-rotate me-2"></i>Fix and re-analyze (full coherence)</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('fix_straddle_download', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_a_iri) }}"><i class="fas fa-download me-2"></i>Download fixed file</a></li>
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>
