@@ -629,6 +629,21 @@ def fix_and_reanalyze(analysis_id):
     return redirect(url_for('analyze_owl', filename=new_filename))
 
 
+@app.route('/analyze/<filename>/reanalyze', methods=['POST'])
+def reanalyze_owl(filename):
+    """Discard the stored analysis for a file and run a fresh one.
+
+    Lets existing analyses pick up newer checks (coherence, BFO lint) without
+    re-uploading. Deletes prior analyses for the file, then redirects through
+    analyze_owl, which re-runs the full pipeline when none is found.
+    """
+    file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+    OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id).delete()
+    db.session.commit()
+    flash("Re-analyzing with the latest coherence and BFO conformance checks.", "info")
+    return redirect(url_for('analyze_owl', filename=filename))
+
+
 @app.route('/analyze/<filename>')
 def analyze_owl(filename):
     """Analyze an uploaded OWL file and display results."""
@@ -1021,14 +1036,27 @@ def show_implications(filename):
 def view_history():
     """View history of uploaded ontologies and analyses."""
     try:
-        # Get all ontology files with their analyses, ordered by upload date (newest first)
+        # Get all ontology files, ordered by upload date (newest first)
         ontologies = OntologyFile.query.order_by(OntologyFile.upload_date.desc()).all()
-        
+
+        # Count analyses per file with a single aggregate query. Loading the
+        # analyses relationship per row (for a count) pulls every OntologyAnalysis
+        # row including its large JSON blobs (axioms, inferred_axioms, ...), which
+        # made this page slow or unable to load once there were many files.
+        from sqlalchemy import func
+        analysis_counts = dict(
+            db.session.query(
+                OntologyAnalysis.ontology_file_id,
+                func.count(OntologyAnalysis.id),
+            ).group_by(OntologyAnalysis.ontology_file_id).all()
+        )
+
         # Get all FOL expressions, ordered by test date (newest first)
         expressions = FOLExpression.query.order_by(FOLExpression.test_date.desc()).limit(20).all()
-        
-        return render_template('history.html', 
+
+        return render_template('history.html',
                               ontologies=ontologies,
+                              analysis_counts=analysis_counts,
                               expressions=expressions)
     except Exception as e:
         logger.error(f"Error viewing history: {str(e)}")
