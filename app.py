@@ -544,6 +544,91 @@ def upload_owl():
         flash(f"Error uploading file: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+
+def _match_straddle_finding(analysis, class_iri, drop_iri):
+    """Return the stored lint finding that (class_iri, drop_iri) resolves, or None.
+
+    Guards the fix routes so only edges flagged as real straddles can be removed.
+    """
+    for finding in (analysis.lint_findings or []):
+        if finding.get('class_iri') == class_iri and drop_iri in (
+                finding.get('category_a_iri'), finding.get('category_b_iri')):
+            return finding
+    return None
+
+
+@app.route('/api/analysis/<int:analysis_id>/fix-straddle')
+def fix_straddle_download(analysis_id):
+    """Drop one clashing subClassOf edge and return the corrected ontology file."""
+    from ontology_fixer import fix_straddle
+    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+    class_iri = request.args.get('class_iri', '')
+    drop_iri = request.args.get('drop_iri', '')
+
+    if not _match_straddle_finding(analysis, class_iri, drop_iri):
+        flash("That fix does not match a detected partition straddle.", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    try:
+        corrected = fix_straddle(file_record.file_path, class_iri, drop_iri)
+    except ValueError as e:
+        flash(f"Could not apply fix: {e}", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    base = file_record.original_filename.rsplit('.', 1)[0]
+    response = make_response(corrected)
+    response.headers['Content-Type'] = 'application/rdf+xml'
+    response.headers['Content-Disposition'] = f'attachment; filename={base}.fixed.owl'
+    return response
+
+
+@app.route('/analysis/<int:analysis_id>/fix-and-reanalyze')
+def fix_and_reanalyze(analysis_id):
+    """Drop one clashing subClassOf edge, save the corrected ontology as a new
+    file, and run full coherence analysis on it."""
+    from ontology_fixer import fix_straddle
+    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+    class_iri = request.args.get('class_iri', '')
+    drop_iri = request.args.get('drop_iri', '')
+
+    finding = _match_straddle_finding(analysis, class_iri, drop_iri)
+    if not finding:
+        flash("That fix does not match a detected partition straddle.", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    try:
+        corrected = fix_straddle(file_record.file_path, class_iri, drop_iri)
+    except ValueError as e:
+        flash(f"Could not apply fix: {e}", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    new_filename = f"{uuid.uuid4().hex}.owl"
+    new_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], new_filename)
+    with open(new_path, 'wb') as fh:
+        fh.write(corrected)
+
+    base = file_record.original_filename.rsplit('.', 1)[0]
+    new_record = OntologyFile(
+        filename=new_filename,
+        original_filename=f"{base}.fixed.owl",
+        file_path=new_path,
+        file_size=len(corrected),
+        mime_type='application/rdf+xml',
+        user_id=current_user.id if current_user.is_authenticated else None,
+    )
+    db.session.add(new_record)
+    db.session.commit()
+
+    flash(
+        f"Removed the {finding['class']} subclass-of edge and re-analyzing the "
+        f"corrected ontology with full coherence checking.",
+        "success",
+    )
+    return redirect(url_for('analyze_owl', filename=new_filename))
+
+
 @app.route('/analyze/<filename>')
 def analyze_owl(filename):
     """Analyze an uploaded OWL file and display results."""

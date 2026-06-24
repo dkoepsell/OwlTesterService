@@ -24,13 +24,21 @@ IMMATERIAL_ENTITY_IRI = "http://purl.obolibrary.org/obo/BFO_0000141"
 
 
 class LintFinding:
-    """One partition straddle: a user class under two clashing BFO categories."""
+    """One partition straddle: a user class under two clashing BFO categories.
 
-    def __init__(self, cls, category_a, category_b, message):
+    Carries the IRIs (not just labels) so a remediation step can identify the
+    exact subClassOf edges to rewrite.
+    """
+
+    def __init__(self, cls, category_a, category_b, message,
+                 cls_iri="", category_a_iri="", category_b_iri=""):
         self.cls = cls
         self.category_a = category_a
         self.category_b = category_b
         self.message = message
+        self.cls_iri = cls_iri
+        self.category_a_iri = category_a_iri
+        self.category_b_iri = category_b_iri
 
     def to_dict(self):
         return {
@@ -38,6 +46,9 @@ class LintFinding:
             "category_a": self.category_a,
             "category_b": self.category_b,
             "message": self.message,
+            "class_iri": self.cls_iri,
+            "category_a_iri": self.category_a_iri,
+            "category_b_iri": self.category_b_iri,
         }
 
     def to_derivation_step(self):
@@ -166,6 +177,9 @@ def bfo_lint(graph, catalog):
                             label_a,
                             label_b,
                             _message(cls_name, label_a, a, label_b, b, catalog),
+                            cls_iri=cls_iri,
+                            category_a_iri=a,
+                            category_b_iri=b,
                         )
                     )
 
