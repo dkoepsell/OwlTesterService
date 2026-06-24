@@ -249,6 +249,12 @@
                     The BFO Conformance Lint below still reports partition straddles.
                 </div>
                 {% endif %}
+                <form method="post" action="{{ url_for('reanalyze_owl', filename=file.filename) }}" class="mt-3">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="fas fa-rotate me-1"></i>Re-analyze (full coherence and lint)
+                    </button>
+                    <span class="text-muted small ms-2">Re-runs the reasoner and BFO checks on this file.</span>
+                </form>
             </div>
         </div>
 
