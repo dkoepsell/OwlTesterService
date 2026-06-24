@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://example.org/aero#"
+     xml:base="http://example.org/aero"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:obo="http://purl.obolibrary.org/obo/">
+    <owl:Ontology rdf:about="http://example.org/aero"/>
+
+    <owl:Class rdf:about="http://purl.obolibrary.org/obo/BFO_0000040"/>
+    <owl:Class rdf:about="http://purl.obolibrary.org/obo/BFO_0000019"/>
+
+    <!-- Wing is a material entity; Mass is a quality. No straddle. -->
+    <owl:Class rdf:about="http://example.org/aero#Wing">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000040"/>
+        <rdfs:label>Wing</rdfs:label>
+    </owl:Class>
+    <owl:Class rdf:about="http://example.org/aero#Mass">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000019"/>
+        <rdfs:label>Mass</rdfs:label>
+    </owl:Class>
+</rdf:RDF>

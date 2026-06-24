@@ -93,9 +93,14 @@ class OntologyAnalysis(db.Model):
     individual_list = db.Column(db.JSON, nullable=True)
     
     # Transparency fields
-    reasoning_methodology = db.Column(db.JSON, nullable=True) 
+    reasoning_methodology = db.Column(db.JSON, nullable=True)
     derivation_steps = db.Column(db.JSON, nullable=True)
-    
+
+    # Coherence (distinct from consistency) and BFO conformance lint
+    unsatisfiable_classes = db.Column(db.JSON, nullable=True)
+    lint_findings = db.Column(db.JSON, nullable=True)
+    coherence_status = db.Column(db.String(20), nullable=True)
+
     def __repr__(self):
         return f"<OntologyAnalysis {self.id} for {self.ontology_file_id}>"
 

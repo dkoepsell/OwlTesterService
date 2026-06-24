@@ -30,8 +30,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Pre-download NLTK corpora so the container doesn't phone home at runtime
 RUN python -c "import nltk; nltk.download('wordnet'); nltk.download('omw-1.4')"
 
-# Copy application code
+# Copy application code (vendors bfo/bfo-2020.owl into the image; no runtime fetch)
 COPY . .
+
+# Sanity-check the vendored BFO bundle at build time: fail the build if the OWL
+# is missing or the disjointness structure regressed below the SPEC acceptance.
+RUN python -c "from bfo.catalog import load_catalog; c=load_catalog(); assert len(c.disjoint_pairs) > 7, 'BFO disjointness regressed'; print('BFO bundle OK:', len(c.disjoint_pairs), 'disjoint pairs')"
 
 # Uploads are stored on a mounted volume; create the dir as a fallback
 RUN mkdir -p uploads
