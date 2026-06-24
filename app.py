@@ -1547,6 +1547,38 @@ def import_to_sandbox(file_id):
         flash(f"Error importing file to sandbox: {str(e)}", 'error')
         return redirect(url_for('view_history'))
 
+@app.route('/delete_files', methods=['POST'])
+def delete_files():
+    """Delete multiple ontology files (and their analyses) in one action."""
+    raw_ids = request.form.getlist('file_ids')
+    int_ids = [int(i) for i in raw_ids if str(i).isdigit()]
+    if not int_ids:
+        flash("No files were selected for deletion.", "warning")
+        return redirect(url_for('view_history'))
+
+    try:
+        files = OntologyFile.query.filter(OntologyFile.id.in_(int_ids)).all()
+        paths = [f.file_path for f in files]
+        for f in files:
+            db.session.delete(f)  # cascade removes analyses
+        db.session.commit()
+
+        # Remove physical files after the DB commit; ignore individual failures.
+        for path in paths:
+            try:
+                if path and os.path.exists(path):
+                    os.remove(path)
+            except Exception as e:
+                logger.warning(f"Could not delete physical file {path}: {str(e)}")
+
+        flash(f"Deleted {len(files)} file(s) and their analyses.", "success")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error during bulk delete: {str(e)}")
+        flash(f"Error deleting files: {str(e)}", "error")
+    return redirect(url_for('view_history'))
+
+
 @app.route('/delete_file/<int:file_id>', methods=['POST'])
 def delete_file(file_id):
     """Delete an ontology file and all its analyses."""
