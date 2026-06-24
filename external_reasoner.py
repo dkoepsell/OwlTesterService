@@ -6,6 +6,7 @@ owlready2/Pellet (which can hang on class enumeration).
 """
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -16,10 +17,33 @@ from rdflib.namespace import OWL, RDFS
 
 logger = logging.getLogger(__name__)
 
+# ROBOT/ELK logs one line per unsatisfiable class when reasoning aborts, e.g.
+#   ERROR ... ReasonerHelper -     unsatisfiable: http://example.org/x#Force
+_UNSAT_RE = re.compile(r"unsatisfiable:\s*(\S+)", re.IGNORECASE)
+
 
 def robot_available():
     """True if the ROBOT CLI is on PATH."""
     return shutil.which("robot") is not None
+
+
+def extract_unsatisfiable(text):
+    """Parse ROBOT/ELK reasoner output for unsatisfiable class IRIs.
+
+    ROBOT logs one "unsatisfiable: <IRI>" line per class when reasoning aborts on
+    an incoherent (but consistent) ontology. Returns [{name, label, iri}], de-duped,
+    excluding owl:Thing / owl:Nothing.
+    """
+    out = []
+    seen = set()
+    for iri in _UNSAT_RE.findall(text or ""):
+        iri = iri.strip().strip(".,")
+        local = _local_name(iri)
+        if not iri or local in ("Nothing", "Thing") or iri in seen:
+            continue
+        seen.add(iri)
+        out.append({"name": local, "label": local, "iri": iri})
+    return out
 
 
 def _local_name(uri):
@@ -34,7 +58,7 @@ def _local_name(uri):
 
 
 def run_robot_reason(input_path, timeout_seconds=300, reasoner="ELK",
-                     normalized_graph=None):
+                     normalized_graph=None, bfo_path=None):
     """
     Run ROBOT to reason over `input_path` and return entailed axioms.
 
@@ -65,6 +89,7 @@ def run_robot_reason(input_path, timeout_seconds=300, reasoner="ELK",
         "consistent": None,
         "inferred_axioms": [],
         "derivation_steps": [],
+        "unsatisfiable_classes": [],
         "engine": f"robot+{reasoner}",
         "elapsed_seconds": 0.0,
         "error": None,
@@ -97,10 +122,15 @@ def run_robot_reason(input_path, timeout_seconds=300, reasoner="ELK",
         with tempfile.NamedTemporaryFile(suffix=".owl", delete=False) as tmp:
             out_path = tmp.name
 
-        cmd = [
-            "robot", "reason",
+        # Merge BFO in (when provided) so ELK sees BFO's disjointness and can
+        # detect partition-straddle unsatisfiability, matching the in-process
+        # path. ROBOT chains merge -> reason in a single invocation.
+        cmd = ["robot", "merge", "--input", robot_input_path]
+        if bfo_path and os.path.exists(bfo_path):
+            cmd += ["--input", bfo_path]
+        cmd += [
+            "reason",
             "--reasoner", reasoner,
-            "--input", robot_input_path,
             "--output", out_path,
             "--axiom-generators", "SubClass EquivalentClass",
             "--include-indirect", "false",
@@ -115,16 +145,30 @@ def run_robot_reason(input_path, timeout_seconds=300, reasoner="ELK",
         result["elapsed_seconds"] = time.perf_counter() - started
 
         if proc.returncode != 0:
-            stderr = (proc.stderr or "").strip()
-            # ROBOT writes "Ontology is inconsistent" to stderr when that's the verdict
-            if "inconsistent" in stderr.lower():
+            # ROBOT logs unsatisfiable classes and the inconsistency verdict to
+            # stdout (its logger), not stderr, so inspect both.
+            combined = f"{proc.stdout or ''}\n{proc.stderr or ''}"
+            low = combined.lower()
+
+            # Unsatisfiable classes: the ontology is consistent (a model exists)
+            # but incoherent. ROBOT reason aborts with exit 1 and lists them, so
+            # no reasoned output is produced (hence no inferred-axiom diff here).
+            unsat_iris = extract_unsatisfiable(combined)
+            if unsat_iris:
+                result["ran"] = True
+                result["consistent"] = True
+                result["unsatisfiable_classes"] = unsat_iris
+                logger.info(f"[STAGE] robot: {len(unsat_iris)} unsatisfiable classes")
+                return result
+
+            # ROBOT writes "Ontology is inconsistent" when that's the verdict
+            if "inconsistent" in low:
                 result["ran"] = True
                 result["consistent"] = False
-                result["error"] = stderr[:2000]
+                result["error"] = combined.strip()[:2000]
                 return result
             result["error"] = (
-                f"robot exited {proc.returncode}: "
-                f"{stderr[:1500] or (proc.stdout or '').strip()[:1500]}"
+                f"robot exited {proc.returncode}: {combined.strip()[:1500]}"
             )
             return result
 
@@ -139,6 +183,15 @@ def run_robot_reason(input_path, timeout_seconds=300, reasoner="ELK",
         reasoned.parse(out_path)
 
         new_triples = reasoned - original
+        # BFO was merged into the reasoner input, so subtract its asserted axioms
+        # to keep them out of the "newly inferred" set for the user's ontology.
+        if bfo_path and os.path.exists(bfo_path):
+            bfo_graph = rdflib.Graph()
+            try:
+                bfo_graph.parse(bfo_path)
+                new_triples = new_triples - bfo_graph
+            except Exception as e:
+                logger.warning(f"[STAGE] robot: could not subtract BFO baseline: {e}")
         for s, _, o in new_triples.triples((None, RDFS.subClassOf, None)):
             if not (isinstance(s, rdflib.URIRef) and isinstance(o, rdflib.URIRef)):
                 continue
