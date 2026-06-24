@@ -1,0 +1,6 @@
+BFO 2020 (ISO/IEC 21838-2) core OWL
+source: https://github.com/BFO-ontology/BFO-2020
+path:   21838-2/owl/bfo-core.owl
+commit: dd89f4a193038b66ef0e891d546c05a5b477f40f
+release-lineage: release-2024-01-29
+ontology-iri: http://purl.obolibrary.org/obo/bfo.owl

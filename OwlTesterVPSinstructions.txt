@@ -1,7 +1,21 @@
+Quickstart (see deploy.md for full instructions — there are TWO topologies):
+
   git clone <your-repo> && cd OwlTesterService
   cp .env.example .env
   # fill in SESSION_SECRET, OPENAI_API_KEY, POSTGRES_PASSWORD
-  docker compose up -d --build
 
-  For HTTPS, point your domain to the server, install certbot on the host, run certbot certonly --standalone -d your.domain.com, then uncomment the SSL block in nginx/nginx.conf and
-  restart nginx.
+TOPOLOGY A — self-contained (dedicated box, bundled nginx owns 80/443):
+  docker compose up -d --build
+  # For HTTPS: install certbot on the host, run
+  #   certbot certonly --standalone -d your.domain.com
+  # then point nginx/nginx.conf at your domain and restart the nginx service.
+
+TOPOLOGY B — behind an existing host nginx (this is how production /
+ontology.davidkoepsell.com runs, because the host also serves another app):
+  # Remove the `nginx` service from docker-compose.yml and publish the app
+  # on 127.0.0.1:5000, then:
+  docker compose up -d            # (use `docker-compose` v1 on the prod host)
+  # Add a host nginx vhost proxying the domain -> 127.0.0.1:5000, then:
+  certbot --nginx -d your.domain.com --redirect
+  # See deploy.md "Topology B" for the exact vhost config and the
+  # docker-compose v1 `KeyError: ContainerConfig` workaround.

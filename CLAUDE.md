@@ -60,22 +60,18 @@ Templates use Jinja2 with Bootstrap 5 dark theme. D3.js v7 handles interactive o
 
 ## Self-Hosting / VPS Deployment
 
-The app ships with a Docker Compose stack: `app` (Flask/gunicorn), `db` (PostgreSQL 16), `nginx` (reverse proxy).
+The app ships with a Docker Compose stack: `app` (Flask/gunicorn), `db` (PostgreSQL 16), and a bundled `nginx` (reverse proxy). See `deploy.md` for full instructions — there are **two topologies**, and the production box does **not** use the default one:
 
-**First-time setup:**
+- **Topology A — self-contained (repo default):** the bundled `nginx` container owns 80/443 and terminates TLS. Use on a dedicated single-app server.
+- **Topology B — behind an existing host nginx (PRODUCTION):** a host-level Ubuntu nginx owns 80/443 and reverse-proxies the domain to the app. The bundled `nginx` service is removed.
+
+> ⚠️ **Production reality:** `ontology.davidkoepsell.com` runs on a Hetzner host (`204.168.167.44`, project dir `/root/OwlTesterService`) that **also hosts a separate app** (Everdice / realmofeverdice.com). A host nginx fronts both. On that box the `nginx` service has been deleted from `docker-compose.yml` and `app` is published on `127.0.0.1:5000`; the host nginx vhost `/etc/nginx/sites-available/ontology` proxies to it, with TLS via the host's certbot (`--nginx` plugin). Do **not** redeploy it with the repo-default bundled nginx — it will collide on 80/443 and crash-loop (`host not found in upstream "app"`). That host also only has `docker-compose` v1, which needs `docker rm -f <container>` before `docker-compose up -d` to dodge a `KeyError: 'ContainerConfig'` recreate bug.
+
+**First-time setup (Topology A):**
 ```bash
 cp .env.example .env
 # Edit .env — set SESSION_SECRET, OPENAI_API_KEY, POSTGRES_PASSWORD
 docker compose up -d --build
-```
-
-**HTTPS with Let's Encrypt (after DNS points to your server):**
-```bash
-# Install certbot on the host, then:
-docker compose stop nginx
-certbot certonly --standalone -d your.domain.com
-# Uncomment the HTTPS server block in nginx/nginx.conf and update the domain name
-docker compose start nginx
 ```
 
 **Gunicorn config:** `gunicorn.conf.py` — worker timeout is 180 s to accommodate slow OWL reasoners. Increase if you see 502 errors on large ontologies.

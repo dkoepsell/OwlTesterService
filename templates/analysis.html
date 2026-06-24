@@ -154,10 +154,20 @@
             </div>
             <div class="card-body">
                 {% if analysis.is_consistent == True %}
+                    {% if analysis.coherence_status == 'incoherent' %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Logically consistent, but {{ analysis.unsatisfiable_classes | length }}
+                    class{{ '' if (analysis.unsatisfiable_classes | length) == 1 else 'es' }}
+                    {{ 'is' if (analysis.unsatisfiable_classes | length) == 1 else 'are' }}
+                    unsatisfiable. See the Coherence section below.
+                </div>
+                    {% else %}
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle me-2"></i>
                     The ontology is logically consistent. No contradictions were found.
                 </div>
+                    {% endif %}
                 {% elif analysis.is_consistent == False %}
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-triangle me-2"></i>
@@ -181,7 +191,99 @@
                 {% endif %}
             </div>
         </div>
-        
+
+        <!-- Coherence Panel -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-cubes me-2"></i>Coherence</h5>
+                {% if analysis.coherence_status == 'coherent' %}
+                <span class="badge bg-success">Coherent</span>
+                {% elif analysis.coherence_status == 'incoherent' %}
+                <span class="badge bg-warning">Incoherent ({{ analysis.unsatisfiable_classes | length }} unsatisfiable)</span>
+                {% elif analysis.coherence_status == 'inconsistent' %}
+                <span class="badge bg-danger">Inconsistent</span>
+                {% else %}
+                <span class="badge bg-secondary">Unknown</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p class="lead">Coherence asks whether any named class is unsatisfiable
+                    (equivalent to owl:Nothing). This is distinct from consistency, which only
+                    asks whether a model exists at all.</p>
+                {% if analysis.coherence_status == 'incoherent' %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    The ontology is consistent but not coherent. The following named classes
+                    cannot have any instances:
+                </div>
+                <ul class="list-group">
+                    {% for cls in analysis.unsatisfiable_classes %}
+                    <li class="list-group-item">
+                        <strong>{{ cls.label or cls.name }}</strong>
+                        {% if cls.justification %}
+                        <div class="small mt-1">{{ cls.justification }}</div>
+                        {% endif %}
+                        {% if cls.iri %}
+                        <div class="text-muted small"><code>{{ cls.iri }}</code></div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% elif analysis.coherence_status == 'coherent' %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Every named class is satisfiable. No unsatisfiable classes were found.
+                </div>
+                {% elif analysis.coherence_status == 'inconsistent' %}
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    The ontology is inconsistent, so per-class coherence cannot be assessed.
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Coherence was not computed for this ontology.
+                    {% if analysis.reasoning_methodology and analysis.reasoning_methodology.reasoning_skipped_reason %}
+                    Reason: {{ analysis.reasoning_methodology.reasoning_skipped_reason }}.
+                    {% endif %}
+                    The BFO Conformance Lint below still reports partition straddles.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- BFO Conformance Lint Panel -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-ruler-combined me-2"></i>BFO Conformance Lint</h5>
+                {% if analysis.lint_findings %}
+                <span class="badge bg-warning">{{ analysis.lint_findings | length }} finding{{ '' if (analysis.lint_findings | length) == 1 else 's' }}</span>
+                {% else %}
+                <span class="badge bg-success">Clean</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p class="lead">A fast pre-reasoner check for partition straddles: classes placed
+                    under two BFO categories that are disjoint.</p>
+                {% if analysis.lint_findings %}
+                <ul class="list-group">
+                    {% for finding in analysis.lint_findings %}
+                    <li class="list-group-item list-group-item-warning">
+                        <strong>{{ finding.class }}</strong>:
+                        {{ finding.category_a }} vs {{ finding.category_b }}
+                        <div class="small mt-1">{{ finding.message }}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    No BFO partition straddles detected.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Reasoning Methodology Panel -->
         <div class="card mb-4">
             <div class="card-header bg-secondary text-white">

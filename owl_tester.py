@@ -28,10 +28,10 @@ try:
 except LookupError:
     nltk.download('omw-1.4')
 
-# Path to the BFO OWL file if manually specified
-BFO_PATH = os.environ.get('BFO_PATH', '')
+# BFO is loaded from the vendored bfo/ bundle (see load_bfo_classes). The optional
+# BFO_PATH env var override is read at load time by bfo.catalog and _attach_bfo_import.
 
-# Import our local BFO-2020 definitions
+# Built-in BFO-2020 definitions used as a fallback if the vendored OWL cannot load.
 from bfo_2020_definitions import BFO_2020_CLASSES, BFO_2020_RELATIONS
 
 class OwlTester:
@@ -53,69 +53,38 @@ class OwlTester:
     
     def load_bfo_classes(self):
         """
-        Load BFO classes and relations from BFO-2020.
-        First tries to load from specified OWL file if provided,
-        otherwise uses the built-in BFO-2020 definitions.
+        Load BFO classes and relations from the vendored BFO 2020 bundle.
+
+        Classes (with rdfs:labels and the full disjointness structure) come from
+        the bfo/ catalog, which loads bfo/bfo-2020.owl. The parsed catalog is also
+        stored on self.bfo_catalog for the conformance lint and coherence checks.
+        Relations stay on the hand-coded BFO_2020_RELATIONS until the relation
+        signatures land (SPEC Task 4). If the catalog cannot load, fall back to the
+        built-in definitions so analysis still works.
         """
-        if BFO_PATH:
-            try:
-                # Try to load the BFO ontology from the specified path if provided
-                self.bfo_onto = owlready2.get_ontology(BFO_PATH).load()
-                
-                # Extract classes and store them in a dictionary with URI as key
-                for cls in self.bfo_onto.classes():
-                    # Get the class ID from the IRI - BFO-2020 uses specific IDs
-                    cls_id = cls.name.lower() if cls.name else str(cls.iri).split('/')[-1].lower()
-                    
-                    # Use rdfs:label if available, otherwise format the class name
-                    if cls.label and cls.label.first():
-                        label = str(cls.label.first())
-                    else:
-                        # Format the class name for display (capitalize words, replace underscores with spaces)
-                        label = cls_id.replace('_', ' ').title()
-                    
-                    # Store class information
-                    self.bfo_classes[cls_id] = {
-                        'id': cls_id,
-                        'label': label,
-                        'uri': cls.iri,
-                        'description': str(cls.comment.first()) if cls.comment and cls.comment.first() else f"BFO-2020 class: {label}"
-                    }
-                
-                # Extract object properties (relations)
-                for prop in self.bfo_onto.object_properties():
-                    # Get the property ID from the IRI
-                    prop_id = prop.name.lower() if prop.name else str(prop.iri).split('/')[-1].lower()
-                    
-                    # Use rdfs:label if available, otherwise format the property name
-                    if prop.label and prop.label.first():
-                        label = str(prop.label.first())
-                    else:
-                        # Format the property name for display
-                        label = prop_id.replace('_', ' ').title()
-                    
-                    # Store property information
-                    self.bfo_relations[prop_id] = {
-                        'id': prop_id,
-                        'label': label,
-                        'uri': prop.iri,
-                        'description': str(prop.comment.first()) if prop.comment and prop.comment.first() else f"BFO-2020 relation: {label}",
-                        'domain': str(prop.domain[0].name) if prop.domain and prop.domain[0] else '',
-                        'range': str(prop.range[0].name) if prop.range and prop.range[0] else ''
-                    }
-                
-                logging.info(f"Successfully loaded {len(self.bfo_classes)} BFO classes and {len(self.bfo_relations)} relations from OWL file")
-            except Exception as e:
-                logging.warning(f"Could not load BFO ontology from file: {e}. Using built-in BFO-2020 definitions.")
-                # Fall back to built-in definitions
-                self.bfo_classes = BFO_2020_CLASSES.copy()
-                self.bfo_relations = BFO_2020_RELATIONS.copy()
-                logging.info(f"Loaded {len(self.bfo_classes)} BFO-2020 classes and {len(self.bfo_relations)} relations from built-in definitions")
-        else:
-            # Use the built-in BFO-2020 definitions directly
+        self.bfo_catalog = None
+        try:
+            from bfo import load_catalog, as_ui_dict
+            catalog = load_catalog()
+            self.bfo_catalog = catalog
+            self.bfo_classes = as_ui_dict(catalog)
+            self.bfo_relations = BFO_2020_RELATIONS.copy()
+            logging.info(
+                f"Loaded {len(self.bfo_classes)} BFO classes from vendored "
+                f"BFO 2020 ({len(catalog.disjoint_pairs)} asserted disjoint pairs); "
+                f"{len(self.bfo_relations)} relations from built-in definitions"
+            )
+        except Exception as e:
+            logging.warning(
+                f"Could not load vendored BFO catalog: {e}. "
+                f"Using built-in BFO-2020 definitions."
+            )
             self.bfo_classes = BFO_2020_CLASSES.copy()
             self.bfo_relations = BFO_2020_RELATIONS.copy()
-            logging.info(f"Loaded {len(self.bfo_classes)} BFO-2020 classes and {len(self.bfo_relations)} relations from built-in definitions")
+            logging.info(
+                f"Loaded {len(self.bfo_classes)} BFO-2020 classes and "
+                f"{len(self.bfo_relations)} relations from built-in definitions"
+            )
     
     def test_expression(self, expr_string):
         """
@@ -391,6 +360,25 @@ class OwlTester:
         """
         return self.bfo_relations
         
+    def _attach_bfo_import(self, onto):
+        """Load the vendored BFO 2020 into the ontology's own world and add it as
+        an import, so the reasoner has BFO's disjointness and hierarchy. Idempotent
+        (owlready2 caches by IRI per world) and best-effort: a failure here must not
+        break analysis, only weaken coherence detection (the lint still runs)."""
+        try:
+            from bfo.catalog import DEFAULT_OWL_PATH
+            bfo_path = os.environ.get('BFO_PATH') or DEFAULT_OWL_PATH
+            if not os.path.exists(bfo_path):
+                logger.warning(f"BFO import skipped: {bfo_path} not found")
+                return
+            world = getattr(onto, 'world', None) or owlready2.default_world
+            bfo_onto = world.get_ontology("file://" + os.path.abspath(bfo_path)).load()
+            if bfo_onto not in onto.imported_ontologies:
+                onto.imported_ontologies.append(bfo_onto)
+            logger.info("[STAGE] BFO attached as import for reasoning")
+        except Exception as e:
+            logger.warning(f"Could not attach BFO import: {e}")
+
     def load_ontology_from_file(self, ontology_path):
         """
         Load an ontology from a file.
@@ -404,9 +392,18 @@ class OwlTester:
         # First try direct loading with owlready2
         t_load = time.perf_counter()
         try:
-            # Try to load the ontology
-            onto = owlready2.get_ontology(ontology_path).load()
+            # Load into a dedicated world so each analysis is isolated. Without
+            # this, owlready2's default world accumulates classes across uploads
+            # and inconsistent_classes() would report stale unsatisfiable classes
+            # from prior requests.
+            world = owlready2.World()
+            onto = world.get_ontology(ontology_path).load()
             logger.info(f"[STAGE] load_ontology (owlready2): {time.perf_counter()-t_load:.2f}s")
+
+            # Attach BFO as an import so the reasoner sees BFO's disjointness and
+            # hierarchy. Kept as an import (not merge-flattened) so provenance
+            # stays clean. Degrades quietly if BFO cannot be attached.
+            self._attach_bfo_import(onto)
 
             # Return basic information about the ontology
             return {
@@ -442,8 +439,11 @@ class OwlTester:
                     try:
                         # Try to load the re-serialized file with owlready2
                         t_reload = time.perf_counter()
-                        onto = owlready2.get_ontology(temp_path).load()
+                        world = owlready2.World()
+                        onto = world.get_ontology(temp_path).load()
                         logger.info(f"[STAGE] load_ontology (owlready2 reparse): {time.perf_counter()-t_reload:.2f}s")
+
+                        self._attach_bfo_import(onto)
 
                         # Return basic information about the ontology
                         return {
@@ -948,7 +948,12 @@ class OwlTester:
         """
         Run owlready2 / Pellet with a SIGALRM-based timeout.
         Returns: (consistent: bool, methodology_extras: dict, derivation_steps: list,
-                  inferred_axioms: list, skipped_reason: Optional[str])
+                  inferred_axioms: list, skipped_reason: Optional[str],
+                  unsatisfiable_classes: list[dict])
+
+        unsatisfiable_classes lists the named classes the reasoner proved equal to
+        owl:Nothing (each {name, label, iri}). This is coherence, separate from the
+        global consistency flag, and is empty when reasoning was skipped or failed.
 
         Note: SIGALRM only interrupts Python — if Pellet's Java subprocess is mid-run,
         it may keep running briefly after timeout. Not a leak in practice (gunicorn
@@ -958,7 +963,7 @@ class OwlTester:
 
         if not hasattr(signal, 'SIGALRM'):
             # Windows fallback: just don't reason
-            return True, {'reasoner_skipped': 'no SIGALRM on this platform'}, [], [], 'unsupported_platform'
+            return True, {'reasoner_skipped': 'no SIGALRM on this platform'}, [], [], 'unsupported_platform', []
 
         class _ReasonerTimeout(Exception):
             pass
@@ -977,12 +982,17 @@ class OwlTester:
                     pre[cls.name] = [p.name for p in cls.is_a if hasattr(p, 'name')]
         except _ReasonerTimeout:
             signal.alarm(0); signal.signal(signal.SIGALRM, old_handler)
-            return True, {'reasoner_skipped': 'class enumeration exceeded budget'}, [], [], 'enumeration_timeout'
+            return True, {'reasoner_skipped': 'class enumeration exceeded budget'}, [], [], 'enumeration_timeout', []
 
         t = time.perf_counter()
         try:
+            # Reason over the ontology's own world (isolated per analysis), not the
+            # global default world. Pass the world explicitly so inconsistent_classes()
+            # below reflects only this ontology plus its BFO import.
+            reason_world = getattr(onto, 'world', None) or owlready2.default_world
             with onto:
-                owlready2.sync_reasoner_pellet(infer_property_values=True,
+                owlready2.sync_reasoner_pellet(reason_world,
+                                               infer_property_values=True,
                                                infer_data_property_values=True)
             elapsed = time.perf_counter() - t
             signal.alarm(0)
@@ -992,7 +1002,7 @@ class OwlTester:
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old_handler)
             logger.warning(f"[STAGE] reasoner: TIMED OUT after {budget_seconds}s")
-            return True, {'reasoner_skipped': str(e), 'reasoner_budget_seconds': budget_seconds}, [], [], 'reasoner_timeout'
+            return True, {'reasoner_skipped': str(e), 'reasoner_budget_seconds': budget_seconds}, [], [], 'reasoner_timeout', []
         except Exception as e:
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old_handler)
@@ -1004,7 +1014,7 @@ class OwlTester:
                 'supporting_facts': ['Pellet reasoner output'],
                 'confidence': 'Medium',
                 'origin': 'Pellet reasoner'
-            }], [], 'reasoner_error'
+            }], [], 'reasoner_error', []
 
         # Diff pre/post for new SubClassOf inferences
         derivation_steps = []
@@ -1032,7 +1042,35 @@ class OwlTester:
         except Exception as e:
             logger.warning(f"Inference diff failed: {e}")
 
-        return True, {'performance': {'reasoning_time_s': time.perf_counter() - t}}, derivation_steps, inferred_axioms, None
+        # Coherence: classes the reasoner proved equal to owl:Nothing. These can
+        # exist even when the ontology is globally consistent (a model exists).
+        unsatisfiable = self._collect_unsatisfiable(onto)
+
+        return True, {'performance': {'reasoning_time_s': time.perf_counter() - t}}, \
+            derivation_steps, inferred_axioms, None, unsatisfiable
+
+    @staticmethod
+    def _collect_unsatisfiable(onto):
+        """Map the reasoner's inconsistent (unsatisfiable) named classes to
+        [{name, label, iri}]. Returns [] if the world cannot be queried."""
+        unsat = []
+        try:
+            world = getattr(onto, 'world', None) or owlready2.default_world
+            for cls in world.inconsistent_classes():
+                if cls is owlready2.Nothing:
+                    continue
+                iri = getattr(cls, 'iri', '') or ''
+                name = getattr(cls, 'name', '') or (iri.rsplit('/', 1)[-1] if iri else str(cls))
+                label = name
+                try:
+                    if cls.label and cls.label.first():
+                        label = str(cls.label.first())
+                except Exception:
+                    pass
+                unsat.append({'name': name, 'label': label, 'iri': iri})
+        except Exception as e:
+            logger.warning(f"Could not collect unsatisfiable classes: {e}")
+        return unsat
 
     def _analyze_with_rdflib(self, onto, file_path):
         """
@@ -1044,6 +1082,18 @@ class OwlTester:
         logger.info(f"[STAGE] analyze_ontology: entered (rdflib path) file={file_path}")
 
         rdf = self._extract_with_rdflib(file_path)
+
+        # BFO conformance lint: fast, pre-reasoner partition-straddle check.
+        # Runs on every path (including the large-ontology external-reasoner path)
+        # so it is the coherence safety net when the DL reasoner is skipped.
+        t = time.perf_counter()
+        try:
+            from bfo_lint import bfo_lint
+            lint_findings = bfo_lint(rdf['graph'], getattr(self, 'bfo_catalog', None))
+        except Exception as e:
+            logger.warning(f"[STAGE] bfo_lint failed: {e}")
+            lint_findings = []
+        logger.info(f"[STAGE] bfo_lint: {time.perf_counter()-t:.2f}s ({len(lint_findings)} findings)")
 
         t = time.perf_counter()
         expressivity = self._determine_expressivity_rdflib(rdf['graph'])
@@ -1061,10 +1111,15 @@ class OwlTester:
         external_timeout = int(os.environ.get('EXTERNAL_REASONER_TIMEOUT', '300'))
         class_count = len(rdf['class_names'])
 
+        # Default: coherence is computable only on the in-process Pellet path
+        # (the external ROBOT/ELK path never materializes owlready2 classes).
+        unsatisfiable_classes = []
+
         if class_count <= max_classes_for_reasoning:
             budget = int(os.environ.get('REASONER_BUDGET_SECONDS', '60'))
             logger.info(f"[STAGE] reasoner: in-process Pellet with {budget}s budget...")
-            consistent, methodology_extras, derivation_steps, inferred_axioms, skipped_reason = \
+            consistent, methodology_extras, derivation_steps, inferred_axioms, skipped_reason, \
+                unsatisfiable_classes = \
                 self._try_reasoner_with_budget(onto, budget_seconds=budget)
         elif external_reasoner == 'robot':
             logger.info(f"[STAGE] reasoner: external ROBOT (class_count={class_count} > "
@@ -1152,6 +1207,29 @@ class OwlTester:
         else:
             reasoning_methodology['reasoning_status'] = 'completed'
 
+        # Coherence is distinct from consistency: a consistent ontology can still
+        # have unsatisfiable named classes. Status is only firm when the reasoner
+        # actually ran; otherwise it is unknown and the lint is the safety net.
+        if not consistent:
+            coherence_status = 'inconsistent'
+        elif skipped_reason:
+            coherence_status = 'unknown'
+        elif unsatisfiable_classes:
+            coherence_status = 'incoherent'
+        else:
+            coherence_status = 'coherent'
+
+        # Attach the lint message as a per-class justification where the lint
+        # flagged the same class (the spec's fallback for missing Pellet
+        # justifications), else a generic note.
+        lint_by_class = {f.cls: f.message for f in lint_findings}
+        for cls in unsatisfiable_classes:
+            key = cls.get('name') or cls.get('label')
+            cls['justification'] = lint_by_class.get(
+                key,
+                'Unsatisfiable: equivalent to owl:Nothing under the asserted axioms.'
+            )
+
         result = {
             'ontology_name': rdf['ontology_name'],
             'ontology_iri': rdf['ontology_iri'],
@@ -1173,6 +1251,9 @@ class OwlTester:
             'expressivity': expressivity,
             'reasoning_methodology': reasoning_methodology,
             'derivation_steps': derivation_steps,
+            'lint_findings': [f.to_dict() for f in lint_findings],
+            'unsatisfiable_classes': unsatisfiable_classes,
+            'coherence_status': coherence_status,
         }
         logger.info(f"[STAGE] analyze_ontology TOTAL: {time.perf_counter()-t_total:.2f}s "
                     f"(reasoning_status={reasoning_methodology['reasoning_status']})")

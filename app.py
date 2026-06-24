@@ -697,7 +697,40 @@ def api_analyze_owl(filename):
         # Extract transparency information
         reasoning_methodology = analysis_result.get('reasoning_methodology', {})
         derivation_steps = analysis_result.get('derivation_steps', [])
-            
+
+        # Coherence and BFO conformance lint
+        lint_findings = analysis_result.get('lint_findings', [])
+        unsatisfiable_classes = analysis_result.get('unsatisfiable_classes', [])
+        coherence_status = analysis_result.get('coherence_status')
+
+        # When the reasoner produced no derivation steps but classes are
+        # unsatisfiable, populate the Derivation Trace from the lint findings so
+        # the panel explains the incoherence instead of sitting empty.
+        if not derivation_steps and unsatisfiable_classes:
+            try:
+                from bfo_lint import bfo_lint  # noqa: F401  (module presence guard)
+                unsat_names = {c.get('name') or c.get('label') for c in unsatisfiable_classes}
+                for finding in lint_findings:
+                    if finding.get('class') in unsat_names:
+                        derivation_steps.append({
+                            'axiom_type': 'Inconsistency',
+                            'origin': 'BFO Lint',
+                            'confidence': 'High',
+                            'description': (
+                                f"{finding['class']} is placed under both "
+                                f"{finding['category_a']} and {finding['category_b']}, "
+                                f"which are disjoint."
+                            ),
+                            'reason': finding['message'],
+                            'supporting_facts': [
+                                f"{finding['class']} is unsatisfiable (equal to owl:Nothing)",
+                                f"{finding['category_a']} and {finding['category_b']} "
+                                f"are disjoint in BFO 2020",
+                            ],
+                        })
+            except Exception as e:
+                app.logger.warning(f"Could not build lint-derived derivation steps: {e}")
+
         # Create a new analysis record
         analysis = OntologyAnalysis(
             ontology_file_id=file_record.id,
@@ -720,7 +753,10 @@ def api_analyze_owl(filename):
             data_property_list=data_property_list,
             individual_list=individual_list,
             reasoning_methodology=reasoning_methodology,
-            derivation_steps=derivation_steps
+            derivation_steps=derivation_steps,
+            lint_findings=lint_findings,
+            unsatisfiable_classes=unsatisfiable_classes,
+            coherence_status=coherence_status
         )
         
         # Build FOL premises from the structural lists produced by analyze_ontology
