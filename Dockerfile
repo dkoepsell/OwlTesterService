@@ -1,18 +1,38 @@
+# --- Builder stage: compile Prover9 + Mace4 (LADR) from source ----------------
+# Debian dropped the prover9 package (no candidate in trixie), so we build LADR
+# ourselves and copy just the two binaries into the final image. They power the
+# FOL prover cross-check (SPEC Task 5); the cross-check degrades gracefully if
+# absent, so a build failure here never breaks the app at runtime.
+# laitep/ladr is a maintained mirror of McCune's LADR. The sed patch reorders
+# -lm after the objects (modern ld is link-order sensitive; libm's round() would
+# otherwise be unresolved), and the relaxed CFLAGS let the old C build under
+# GCC 14's stricter defaults.
+FROM python:3.11-slim AS ladr
+RUN apt-get update && apt-get install -y --no-install-recommends git build-essential \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 https://github.com/laitep/ladr /tmp/ladr && \
+    cd /tmp/ladr && \
+    sed -i 's/-lm -o/-o/g; s#\.\./ladr/libladr.a#../ladr/libladr.a -lm#g' provers.src/Makefile && \
+    make all CFLAGS="-O2 -w -fcommon -std=gnu89 -Wno-implicit-int -Wno-implicit-function-declaration -Wno-return-mismatch" && \
+    test -x bin/prover9 && test -x bin/mace4
+
+# --- Final image --------------------------------------------------------------
 FROM python:3.11-slim
 
 # Install system dependencies:
 #   default-jre-headless — Java runtime for OWL reasoners (Pellet/HermiT) and ROBOT
 #   libpq-dev + gcc    — needed to build psycopg2-binary
 #   wget               — to fetch ROBOT during image build
-#   prover9            — Prover9 + Mace4 for the FOL prover cross-check (SPEC Task 5);
-#                        the cross-check degrades gracefully if this is absent
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     libpq-dev \
     gcc \
     wget \
-    prover9 \
     && rm -rf /var/lib/apt/lists/*
+
+# Prover9 + Mace4 from the builder stage (dynamically link libc/libm, present in base).
+COPY --from=ladr /tmp/ladr/bin/prover9 /tmp/ladr/bin/mace4 /usr/local/bin/
+RUN prover9 --help >/dev/null 2>&1; mace4 --help >/dev/null 2>&1; echo "prover9/mace4 installed"
 
 # Install ROBOT (OBO/OWL toolkit) for external reasoning on large ontologies.
 # Uses ELK by default — orders of magnitude faster than in-process owlready2/Pellet
