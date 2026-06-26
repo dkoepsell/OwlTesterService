@@ -19,25 +19,25 @@
             <p>Our system supports two primary notation formats for FOL expressions:</p>
             
             <h6 class="mt-4">1. BFO Standard Notation (Recommended)</h6>
-            <div class="card bg-light mb-3">
+            <div class="card bg-light text-dark mb-3">
                 <div class="card-body">
                     <p class="mb-0">Uses <code>instance_of(x, Class, t)</code> syntax with explicit temporal parameter.</p>
-                    <p class="text-muted">This is the preferred format that allows for temporal reasoning.</p>
+                    <p class="mb-0" style="color:#6c757d;">This is the preferred format that allows for temporal reasoning.</p>
                     <pre class="bg-dark text-light p-3 mt-2 rounded"><code>forall x, t (instance_of(x, continuant, t) -> exists_at(x, t))</code></pre>
                 </div>
             </div>
             
             <h6>2. Traditional Notation</h6>
-            <div class="card bg-light mb-3">
+            <div class="card bg-light text-dark mb-3">
                 <div class="card-body">
                     <p class="mb-0">Uses <code>Class(x)</code> syntax without explicit temporal parameter.</p>
-                    <p class="text-muted">This simplified format is more limited but easier to write.</p>
+                    <p class="mb-0" style="color:#6c757d;">This simplified format is more limited but easier to write.</p>
                     <pre class="bg-dark text-light p-3 mt-2 rounded"><code>forall x (Continuant(x) -> exists t (Exists_at(x, t)))</code></pre>
                 </div>
             </div>
             
             <h6 class="mt-4">3. Prover9 (LADR) Notation</h6>
-            <div class="card bg-light mb-3">
+            <div class="card bg-light text-dark mb-3">
                 <div class="card-body">
                     <p class="mb-0">Paste Prover9 / LADR formulas directly. Quantifier runs like <code>all X all T (...)</code> and the connectives <code>&amp;</code>, <code>|</code>, <code>-&gt;</code>, <code>-</code> are understood; a trailing clause dot and <code>formulas(...)</code> / <code>end_of_list.</code> wrappers are tolerated.</p>
                     <pre class="bg-dark text-light p-3 mt-2 rounded"><code>all X all T (instance_of(X,force,T) -> instance_of(X,quality,T)).</code></pre>
@@ -45,7 +45,7 @@
             </div>
 
             <h6 class="mt-4">4. CLIF (Common Logic) Notation</h6>
-            <div class="card bg-light mb-3">
+            <div class="card bg-light text-dark mb-3">
                 <div class="card-body">
                     <p class="mb-0">Paste ISO Common Logic Interchange Format s-expressions, the syntax BFO 2020 itself is axiomatized in. <code>forall</code>, <code>exists</code>, <code>and</code>, <code>or</code>, <code>not</code>, <code>if</code>, <code>iff</code> and predicates <code>(instance_of x C t)</code> are converted automatically for validation.</p>
                     <pre class="bg-dark text-light p-3 mt-2 rounded"><code>(forall (x t) (if (instance_of x force t) (instance_of x quality t)))</code></pre>
