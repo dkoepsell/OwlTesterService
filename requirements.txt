@@ -4,10 +4,11 @@ flask>=3.1.0
 flask-sqlalchemy>=3.1.1
 gunicorn>=23.0.0
 nltk>=3.9.1
-# Pin below 0.51: owlready2 0.51 ships jena-arq-fixed2.10.0.jar compiled for
-# Java 25 (class file 69), but the runtime image has Java 21 — Pellet then dies
-# with UnsupportedClassVersionError on RDF/XML input. 0.50's jar is Java 6.
-owlready2>=0.47,<0.51
+# Pin to 0.47: from 0.50 onward owlready2 ships jena-{arq,core}-fixed2.10.0.jar
+# recompiled for Java 25 (class file 69), but the runtime image has Java 21 —
+# Pellet then dies with UnsupportedClassVersionError on RDF/XML input. 0.47's
+# bundled Jena jars are Java 6 and load on any modern JRE.
+owlready2==0.47
 psycopg2-binary>=2.9.10
 openai>=1.76.2
 plantuml>=0.3.0
