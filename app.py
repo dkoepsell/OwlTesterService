@@ -208,8 +208,13 @@ def test_expression():
         # Test the expression
         result = owl_tester.test_expression(expression)
 
-        # Add the detected format to the result if available
-        if detected_format and 'format_detected' not in result:
+        # Add the detected format to the result. When the input was Prover9 or
+        # CLIF, report that as the format the user wrote (test_expression only
+        # sees the converted internal form, so it would otherwise say
+        # "instance_of"). Otherwise fall back to whatever was detected.
+        if detected_format in ('clif', 'prover9'):
+            result['format_detected'] = detected_format
+        elif detected_format and 'format_detected' not in result:
             result['format_detected'] = detected_format
         if conversion_note:
             result['conversion_note'] = conversion_note

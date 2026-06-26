@@ -55,3 +55,21 @@ def test_prepare_expression_reports_note():
 def test_prepare_expression_noop_for_internal():
     expr, syn, note = prepare_expression("all x.(P(x) -> Q(x))")
     assert note is None  # nothing converted
+
+
+def test_converted_clif_has_no_false_free_variables():
+    """Bound x,t and the constant 'force' must not be reported as free variables
+    after CLIF conversion (regression: the old regex only knew 'forall')."""
+    from owl_tester import OwlTester
+    internal, _, _ = prepare_expression(
+        "(forall (x t) (if (instance_of x force t) (instance_of x quality t)))"
+    )
+    assert OwlTester().detect_free_variables(internal) == []
+
+
+def test_converted_prover9_has_no_false_free_variables():
+    from owl_tester import OwlTester
+    internal, _, _ = prepare_expression(
+        "all X all T (instance_of(X,force,T) -> instance_of(X,quality,T))."
+    )
+    assert OwlTester().detect_free_variables(internal) == []

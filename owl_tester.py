@@ -270,39 +270,21 @@ class OwlTester:
         Returns:
             list: List of free variable names found in the expression
         """
-        # If parsing failed, we can't reliably detect free variables
+        # Parse with NLTK and ask the parsed expression which variables are free.
+        # NLTK's .free() correctly accounts for every binder form it accepts
+        # (all x., exists x., and converted Prover9/CLIF input), and it treats
+        # multi-character lowercase identifiers like "force" as constants rather
+        # than variables. The previous regex only recognized "forall"/"exists",
+        # so converted input (which uses "all x.") had its bound variables, and
+        # even class-name constants, wrongly reported as free.
         try:
             expr = self.read_parser.parse(expr_string)
-        except:
+        except Exception:
             return []
-            
-        # Extract all variables used in the expression
-        all_vars = set()
-        var_pattern = r'\b([a-zA-Z][a-zA-Z0-9_]*)\s*(?=\)|,)'
-        for var_match in re.finditer(var_pattern, expr_string):
-            var_name = var_match.group(1)
-            # Skip if it's likely a class or relation name (starts with uppercase)
-            # Also skip if it's a known BFO class or relation name
-            if (not var_name[0].isupper() and 
-                var_name not in ['forall', 'exists', 'instance_of'] and
-                var_name.lower() not in [c.lower() for c in self.bfo_classes.keys()] and
-                var_name.lower() not in [r.lower() for r in self.bfo_relations.keys()]):
-                all_vars.add(var_name)
-                
-        # Extract bound variables from quantifiers
-        bound_vars = set()
-        
-        # Match forall x, forall x,y, exists x patterns
-        quant_pattern = r'\b(forall|exists)\s+([a-zA-Z][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z][a-zA-Z0-9_]*)*)'
-        for quant_match in re.finditer(quant_pattern, expr_string):
-            quant_vars = quant_match.group(2)
-            # Split comma-separated variables
-            for var in re.split(r'\s*,\s*', quant_vars):
-                bound_vars.add(var.strip())
-                
-        # Free variables are those that appear in all_vars but not in bound_vars
-        free_vars = all_vars - bound_vars
-        return sorted(list(free_vars))
+        try:
+            return sorted(str(v) for v in expr.free())
+        except Exception:
+            return []
         
     def extract_terms(self, expr_string):
         """

@@ -219,6 +219,28 @@ document.addEventListener('DOMContentLoaded', function() {
             preprocessedContainer.parentNode.removeChild(preprocessedContainer);
         }
         
+        // If the input was converted from Prover9/CLIF, show the note and the
+        // internal form it was validated as.
+        let conversionContainer = document.getElementById('conversion-container');
+        if (data.conversion_note) {
+            if (!conversionContainer) {
+                conversionContainer = document.createElement('div');
+                conversionContainer.id = 'conversion-container';
+                expressionText.parentNode.insertBefore(conversionContainer, expressionText.nextSibling);
+            }
+            conversionContainer.innerHTML = `
+                <div class="alert alert-info mt-2">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-wand-magic-sparkles me-2"></i>
+                        <strong>${data.conversion_note}</strong>
+                    </div>
+                    <pre class="bg-dark text-light p-2 rounded mb-0">${data.expression}</pre>
+                </div>
+            `;
+        } else if (conversionContainer) {
+            conversionContainer.remove();
+        }
+
         // Display format detected if available
         if (data.format_detected) {
             formatDetected.classList.remove('d-none');
@@ -234,6 +256,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 case 'traditional':
                     badgeClass = 'bg-warning text-dark';
                     badgeText = 'Traditional Notation';
+                    break;
+                case 'prover9':
+                    badgeClass = 'bg-info text-dark';
+                    badgeText = 'Prover9 (LADR) Notation';
+                    break;
+                case 'clif':
+                    badgeClass = 'bg-info text-dark';
+                    badgeText = 'CLIF (Common Logic) Notation';
                     break;
                 default:
                     badgeClass = 'bg-secondary';
