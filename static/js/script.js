@@ -276,12 +276,24 @@ document.addEventListener('DOMContentLoaded', function() {
             formatDetected.classList.add('d-none');
         }
         
-        // Show validity result
+        // Show validity result. Three levels:
+        //   valid       -> fully valid and BFO compatible (green)
+        //   well_formed -> valid first-order logic, but uses non-BFO terms (info)
+        //   otherwise   -> genuine problems, e.g. parse error or free variables (red)
         if (data.valid) {
             validityResult.innerHTML = `
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle me-2"></i>
-                    <strong>Valid Expression</strong>: The expression is syntactically correct and uses recognized BFO terms.
+                    <strong>Valid Expression</strong>: Syntactically correct and uses recognized BFO terms.
+                </div>
+            `;
+        } else if (data.well_formed) {
+            const n = (data.non_bfo_terms || []).length;
+            validityResult.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-circle-check me-2"></i>
+                    <strong>Valid first-order logic</strong>: The expression is well formed.
+                    It uses ${n} term${n === 1 ? '' : 's'} outside the BFO vocabulary, which is allowed (see notes below).
                 </div>
             `;
         } else {
@@ -292,8 +304,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
         }
-        
-        // Display issues if any
+
+        // Display issues (genuine problems) if any
         if (data.issues && data.issues.length > 0) {
             issuesList.innerHTML = '';
             data.issues.forEach(issue => {
@@ -306,6 +318,27 @@ document.addEventListener('DOMContentLoaded', function() {
             issuesContainer.classList.remove('d-none');
         } else {
             issuesContainer.classList.add('d-none');
+        }
+
+        // Display informational notes (e.g. non-BFO terms) separately, not as errors
+        let notesContainer = document.getElementById('notes-container');
+        if (data.notes && data.notes.length > 0) {
+            if (!notesContainer) {
+                notesContainer = document.createElement('div');
+                notesContainer.id = 'notes-container';
+                notesContainer.className = 'mt-3';
+                issuesContainer.parentNode.insertBefore(notesContainer, issuesContainer.nextSibling);
+            }
+            let items = '';
+            data.notes.forEach(note => {
+                items += `<li class="list-group-item list-group-item-info"><i class="fas fa-circle-info me-2"></i>${note}</li>`;
+            });
+            notesContainer.innerHTML = `
+                <h5 class="mb-2"><i class="fas fa-note-sticky me-2"></i>Notes</h5>
+                <ul class="list-group">${items}</ul>
+            `;
+        } else if (notesContainer) {
+            notesContainer.remove();
         }
         
         // Display BFO classes used

@@ -156,33 +156,52 @@ class OwlTester:
                             })
                     
                     if partial_matches:
-                        # Add the first partial match with a note
+                        # Partial match is informational, not a problem.
                         match = partial_matches[0]
-                        results['issues'].append(f"Note: '{term}' was interpreted as BFO {match['type']} '{match['match']}'. This is a partial match.")
+                        results.setdefault('notes', []).append(
+                            f"'{term}' was interpreted as BFO {match['type']} "
+                            f"'{match['match']}' (partial match)."
+                        )
                     else:
-                        # No match found - ensure we're storing strings not objects
+                        # Using a term outside BFO is allowed: the expression can
+                        # still be perfectly valid first-order logic. Record it as
+                        # an informational note rather than a blocking issue.
                         non_bfo_terms.append(str(term))
-                        results['issues'].append(f"Term '{term}' is not recognized as a BFO class or relation.")
-            
+                        results.setdefault('notes', []).append(
+                            f"'{term}' is outside the BFO vocabulary. The "
+                            f"expression is still valid logic; this term is just "
+                            f"not a recognized BFO class or relation."
+                        )
+
             # Detect the format used in the expression
             format_detected = self.detect_format(expr_string)
             if format_detected:
                 results['format_detected'] = format_detected
-            
-            # Detect any free variables in the expression
+
+            # Detect any free variables in the expression. Unbound variables mean
+            # the formula is not closed, which is a genuine problem (an issue).
             free_vars = self.detect_free_variables(expr_string)
             if free_vars:
                 results['free_variables'] = free_vars
-                results['issues'].append(f"Warning: Found free variables not bound by quantifiers: {', '.join(free_vars)}")
-            
+                results['issues'].append(f"Found free variables not bound by quantifiers: {', '.join(free_vars)}")
+
             # Store the terms found
             results['bfo_classes_used'] = bfo_classes_used
             results['bfo_relations_used'] = bfo_relations_used
             results['non_bfo_terms'] = non_bfo_terms
-            
-            # Determine overall validity
-            results['valid'] = len(non_bfo_terms) == 0 and results['parsed'] and not results['issues']
-            
+            results.setdefault('notes', [])
+
+            # Three-level verdict:
+            #   well_formed     = parses and is a closed formula (no free vars,
+            #                     no blocking issues). Valid first-order logic.
+            #   bfo_compatible  = every term is a recognized BFO class/relation.
+            #   valid           = well_formed AND bfo_compatible (fully BFO valid).
+            # A well-formed expression that uses non-BFO terms is no longer flatly
+            # "invalid"; it is valid logic, just outside BFO.
+            results['well_formed'] = results['parsed'] and not results['issues']
+            results['bfo_compatible'] = len(non_bfo_terms) == 0
+            results['valid'] = results['well_formed'] and results['bfo_compatible']
+
             return results
             
         except LogicalExpressionException as e:

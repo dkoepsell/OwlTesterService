@@ -73,3 +73,20 @@ def test_converted_prover9_has_no_false_free_variables():
         "all X all T (instance_of(X,force,T) -> instance_of(X,quality,T))."
     )
     assert OwlTester().detect_free_variables(internal) == []
+
+
+def test_non_bfo_term_is_well_formed_not_invalid():
+    """A closed FOL formula that uses a non-BFO term is well formed (soft verdict),
+    with the non-BFO term reported as a note rather than a blocking issue."""
+    from owl_tester import OwlTester
+    from owl_preprocessor import preprocess_expression
+    internal, _, _ = prepare_expression(
+        "(forall (x t) (if (instance_of x force t) (instance_of x quality t)))"
+    )
+    internal, _ = preprocess_expression(internal)
+    r = OwlTester().test_expression(internal)
+    assert r["well_formed"] is True
+    assert r["bfo_compatible"] is False
+    assert r["valid"] is False
+    assert r["issues"] == []            # non-BFO term is not a blocking issue
+    assert any("force" in n for n in r["notes"])
