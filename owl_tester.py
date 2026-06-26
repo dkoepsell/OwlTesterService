@@ -710,24 +710,30 @@ class OwlTester:
 
                 result['consistency'] = 'Consistent'
 
-            except Exception as e:
+            except owlready2.OwlReadyInconsistentOntologyError as e:
+                # A genuine logical inconsistency: Pellet proved no model exists.
                 result['consistency'] = 'Inconsistent'
                 result['consistency_error'] = str(e)
-                
-                # Add reasoning details for inconsistency
+
                 reasoning_methodology['inconsistency_reason'] = str(e)
                 reasoning_methodology['inconsistency_type'] = 'Logical contradiction detected'
-                
-                # Create a derivation step for the inconsistency
+
                 inconsistency_step = {
                     'axiom_type': 'Inconsistency',
-                    'description': f"Ontology is inconsistent: {str(e)}",
+                    'description': "Ontology is logically inconsistent (no model exists).",
                     'reason': 'Logical contradiction',
                     'supporting_facts': ['Pellet reasoner detection'],
                     'confidence': 'High',
                     'origin': 'Pellet reasoner'
                 }
                 derivation_steps.append(inconsistency_step)
+            except Exception as e:
+                # The reasoner crashed (e.g. a Java/Jena error). This is NOT a
+                # logical inconsistency — mark consistency as undetermined rather
+                # than mislabeling a tooling failure as a contradiction.
+                result['consistency'] = 'Unknown'
+                result['reasoner_skipped'] = f'reasoner error: {e}'
+                reasoning_methodology['reasoner_error'] = str(e)
             
             # Add reasoning methodology and derivation steps to the result
             result['reasoning_methodology'] = reasoning_methodology
@@ -1003,18 +1009,28 @@ class OwlTester:
             signal.signal(signal.SIGALRM, old_handler)
             logger.warning(f"[STAGE] reasoner: TIMED OUT after {budget_seconds}s")
             return True, {'reasoner_skipped': str(e), 'reasoner_budget_seconds': budget_seconds}, [], [], 'reasoner_timeout', []
-        except Exception as e:
+        except owlready2.OwlReadyInconsistentOntologyError as e:
+            # A genuine logical inconsistency: Pellet proved no model exists.
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old_handler)
-            logger.warning(f"[STAGE] reasoner: FAILED ({e})")
+            logger.warning(f"[STAGE] reasoner: ontology is INCONSISTENT ({e})")
             return False, {'inconsistency_reason': str(e)}, [{
                 'axiom_type': 'Inconsistency',
-                'description': f"Ontology may be inconsistent or reasoner failed: {e}",
-                'reason': 'Pellet error or logical contradiction',
+                'description': "Ontology is logically inconsistent (no model exists).",
+                'reason': 'Pellet proved the ontology unsatisfiable',
                 'supporting_facts': ['Pellet reasoner output'],
-                'confidence': 'Medium',
+                'confidence': 'High',
                 'origin': 'Pellet reasoner'
-            }], [], 'reasoner_error', []
+            }], [], 'inconsistent', []
+        except Exception as e:
+            # The reasoner crashed (e.g. a Java/Jena error, OWLAPI parse failure).
+            # This is NOT a logical inconsistency — do not claim the ontology is
+            # inconsistent. Degrade to "could not determine", like the timeout path,
+            # so the report does not mislabel a tooling failure as a contradiction.
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+            logger.warning(f"[STAGE] reasoner: FAILED, not an inconsistency ({e})")
+            return True, {'reasoner_skipped': f'reasoner error: {e}'}, [], [], 'reasoner_error', []
 
         # Diff pre/post for new SubClassOf inferences
         derivation_steps = []
