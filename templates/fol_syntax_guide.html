@@ -36,9 +36,25 @@
                 </div>
             </div>
             
+            <h6 class="mt-4">3. Prover9 (LADR) Notation</h6>
+            <div class="card bg-light mb-3">
+                <div class="card-body">
+                    <p class="mb-0">Paste Prover9 / LADR formulas directly. Quantifier runs like <code>all X all T (...)</code> and the connectives <code>&amp;</code>, <code>|</code>, <code>-&gt;</code>, <code>-</code> are understood; a trailing clause dot and <code>formulas(...)</code> / <code>end_of_list.</code> wrappers are tolerated.</p>
+                    <pre class="bg-dark text-light p-3 mt-2 rounded"><code>all X all T (instance_of(X,force,T) -> instance_of(X,quality,T)).</code></pre>
+                </div>
+            </div>
+
+            <h6 class="mt-4">4. CLIF (Common Logic) Notation</h6>
+            <div class="card bg-light mb-3">
+                <div class="card-body">
+                    <p class="mb-0">Paste ISO Common Logic Interchange Format s-expressions, the syntax BFO 2020 itself is axiomatized in. <code>forall</code>, <code>exists</code>, <code>and</code>, <code>or</code>, <code>not</code>, <code>if</code>, <code>iff</code> and predicates <code>(instance_of x C t)</code> are converted automatically for validation.</p>
+                    <pre class="bg-dark text-light p-3 mt-2 rounded"><code>(forall (x t) (if (instance_of x force t) (instance_of x quality t)))</code></pre>
+                </div>
+            </div>
+
             <div class="alert alert-warning mt-3">
                 <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Important:</strong> We recommend using the BFO Standard Notation as it provides better compatibility with temporal reasoning and BFO ontologies.
+                <strong>Important:</strong> We recommend using the BFO Standard Notation as it provides better compatibility with temporal reasoning and BFO ontologies. Prover9 and CLIF input is converted to it for validation, and uploaded ontologies can be exported to both formats from the analysis page.
             </div>
         </div>
     </div>

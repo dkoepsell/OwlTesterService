@@ -180,24 +180,40 @@ def test_expression():
         if not expression or not expression.strip():
             return jsonify({'error': 'No expression provided'}), 400
         
-        # Preprocess the expression and get the detected format
+        raw_expression = expression
+        conversion_note = None
+
+        # First detect/convert Prover9 (LADR) or CLIF (Common Logic) syntax into
+        # the internal infix form NLTK's parser understands. No-op for the
+        # existing instance_of / traditional formats.
         try:
-            expression, detected_format = preprocess_expression(expression)
+            from fol_input import prepare_expression
+            expression, detected_format, conversion_note = prepare_expression(expression)
+        except Exception as e:
+            app.logger.error(f"Error normalizing expression syntax: {str(e)}")
+            detected_format = None
+
+        # Then run the existing comma-quantifier preprocessing.
+        try:
+            expression, pp_format = preprocess_expression(expression)
+            detected_format = detected_format or pp_format
         except Exception as e:
             app.logger.error(f"Error preprocessing expression: {str(e)}")
-            # If there's an error, just use the original expression and no format
-            detected_format = None
-        
+            detected_format = detected_format or None
+
         # Store the expression in session
         session['last_expression'] = expression
         session['detected_format'] = detected_format
-        
+
         # Test the expression
         result = owl_tester.test_expression(expression)
-        
+
         # Add the detected format to the result if available
         if detected_format and 'format_detected' not in result:
             result['format_detected'] = detected_format
+        if conversion_note:
+            result['conversion_note'] = conversion_note
+            result['original_expression'] = raw_expression
         
         # Log the expression and result for debugging
         app.logger.info(f"Tested expression: {expression}")
@@ -887,6 +903,24 @@ def api_analyze_owl(filename):
             app.logger.error(f"Error building FOL premises: {str(e)}")
         logger.info(f"[STAGE] fol_extract: {_time.perf_counter()-t_fol:.2f}s")
 
+        # Provable FOL export (SPEC Task 5): render the ontology's subsumptions and
+        # disjointness as a Prover9/CLIF theory. Best-effort; failure must not block
+        # the analysis. The prover cross-check itself runs on demand (it is slow).
+        t_export = _time.perf_counter()
+        try:
+            from fol_export import generate_exports
+            from bfo.catalog import DEFAULT_OWL_PATH
+            exports = generate_exports(file_path=file_record.file_path,
+                                       bfo_path=DEFAULT_OWL_PATH)
+            if exports.get('error'):
+                app.logger.warning(f"FOL export non-fatal error: {exports['error']}")
+            analysis.fol_prover9 = exports.get('prover9') or None
+            analysis.fol_clif = exports.get('clif') or None
+            analysis.fol_export_stats = exports.get('stats') or None
+        except Exception as e:
+            app.logger.error(f"Error generating FOL export: {str(e)}")
+        logger.info(f"[STAGE] fol_export: {_time.perf_counter()-t_export:.2f}s")
+
         # Make sure we have non-zero values for statistics if they're missing or zero
         # This prevents empty white boxes in the UI
         if analysis.class_count == 0 and len(class_list) > 0:
@@ -1012,6 +1046,133 @@ def generate_implications(analysis_id):
             'success': False,
             'message': f"Error generating implications: {str(e)}"
         }), 500
+
+
+@app.route('/api/analysis/<analysis_id>/fol-export')
+def fol_export(analysis_id):
+    """Return the analysis's FOL export in Prover9 or CLIF syntax.
+
+    Query params: format=prover9|clif (default prover9), download=1 to send as a
+    file attachment. Regenerates on the fly if the analysis predates the export
+    columns (older records).
+    """
+    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    fmt = (request.args.get('format') or 'prover9').lower()
+    if fmt not in ('prover9', 'clif'):
+        return jsonify({'error': "format must be 'prover9' or 'clif'"}), 400
+
+    text = analysis.fol_prover9 if fmt == 'prover9' else analysis.fol_clif
+    if not text:
+        # Backfill for analyses created before this feature.
+        try:
+            from fol_export import generate_exports
+            from bfo.catalog import DEFAULT_OWL_PATH
+            file_record = OntologyFile.query.get(analysis.ontology_file_id)
+            if file_record and os.path.exists(file_record.file_path):
+                exports = generate_exports(file_path=file_record.file_path,
+                                           bfo_path=DEFAULT_OWL_PATH)
+                analysis.fol_prover9 = exports.get('prover9') or None
+                analysis.fol_clif = exports.get('clif') or None
+                analysis.fol_export_stats = exports.get('stats') or None
+                db.session.commit()
+                text = exports.get(fmt)
+        except Exception as e:
+            app.logger.error(f"Error backfilling FOL export: {e}")
+
+    if not text:
+        return jsonify({'error': 'No FOL export available for this analysis'}), 404
+
+    resp = make_response(text)
+    resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    if request.args.get('download'):
+        ext = 'p9' if fmt == 'prover9' else 'clif'
+        name = (analysis.ontology_name or f'analysis-{analysis.id}').replace(' ', '_')
+        resp.headers['Content-Disposition'] = f'attachment; filename="{name}.{ext}"'
+    return resp
+
+
+@app.route('/api/analysis/<analysis_id>/prover-check', methods=['POST'])
+def prover_check(analysis_id):
+    """Run the Prover9/Mace4 cross-check and compare with the OWL reasoner.
+
+    Slow (one prover invocation per class), so it runs on demand rather than at
+    analysis time. Degrades gracefully when the prover9 binary is absent.
+    """
+    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    try:
+        from fol_export import build_theory
+        from prover9_runner import cross_check
+        from bfo.catalog import DEFAULT_OWL_PATH
+
+        file_record = OntologyFile.query.get(analysis.ontology_file_id)
+        if not file_record or not os.path.exists(file_record.file_path):
+            return jsonify({'ran': False,
+                            'reason': 'source ontology file is no longer on disk'}), 200
+
+        theory = build_theory(file_path=file_record.file_path,
+                              bfo_path=DEFAULT_OWL_PATH)
+
+        # The OWL reasoner's unsatisfiable set, by label, for the agreement test.
+        reasoner_unsat = []
+        for c in (analysis.unsatisfiable_classes or []):
+            if isinstance(c, dict):
+                reasoner_unsat.append(c.get('label') or c.get('name'))
+            else:
+                reasoner_unsat.append(str(c))
+        reasoner_unsat = [n for n in reasoner_unsat if n]
+
+        result = cross_check(theory, reasoner_unsat_names=reasoner_unsat)
+        analysis.prover_cross_check = result
+        db.session.commit()
+        return jsonify(result), 200
+    except Exception as e:
+        app.logger.error(f"Error in prover_check: {e}")
+        return jsonify({'ran': False, 'reason': f"{type(e).__name__}: {e}"}), 200
+
+
+# -- Bring Your Own AI API key ----------------------------------------------
+
+@app.context_processor
+def inject_ai_key_status():
+    """Expose AI key availability to all templates so the UI can prompt for a key."""
+    try:
+        from api_key_utils import has_openai_key, key_source
+        return {'ai_key_available': has_openai_key(), 'ai_key_source': key_source()}
+    except Exception:
+        return {'ai_key_available': False, 'ai_key_source': 'none'}
+
+
+@app.route('/api/settings/openai-key', methods=['GET', 'POST', 'DELETE'])
+def manage_openai_key():
+    """Get status of / set / clear the user's own OpenAI API key (session-scoped).
+
+    POST   {api_key: "sk-..."}  -> store in session (never persisted to the DB).
+    DELETE                       -> remove the session key.
+    GET                          -> {has_key, source} for the current context.
+    """
+    from api_key_utils import has_openai_key, key_source, SESSION_KEY
+
+    if request.method == 'GET':
+        return jsonify({'has_key': has_openai_key(), 'source': key_source()})
+
+    if request.method == 'DELETE':
+        session.pop(SESSION_KEY, None)
+        return jsonify({'success': True, 'has_key': has_openai_key(),
+                        'source': key_source()})
+
+    data = request.get_json(silent=True) or {}
+    api_key = (data.get('api_key') or '').strip()
+    if not api_key:
+        return jsonify({'success': False, 'message': 'No API key provided'}), 400
+    # Light sanity check; OpenAI keys start with "sk-". Do not log the key.
+    if not api_key.startswith('sk-') or len(api_key) < 20:
+        return jsonify({'success': False,
+                        'message': 'That does not look like an OpenAI API key '
+                                   '(expected it to start with "sk-").'}), 400
+    session[SESSION_KEY] = api_key
+    app.logger.info("Stored a user-supplied OpenAI API key in the session")
+    return jsonify({'success': True, 'has_key': True, 'source': 'session'})
+
 
 @app.route('/implications/<filename>')
 def show_implications(filename):

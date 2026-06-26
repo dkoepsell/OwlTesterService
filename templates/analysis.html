@@ -685,7 +685,82 @@
                 {% endif %}
             </div>
         </div>
-        
+
+        <!-- Provable FOL Export: Prover9 + CLIF -->
+        <div class="card mb-4" id="folExportCard">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-square-root-variable me-2"></i>Provable FOL Export (Prover9 and CLIF)</h5>
+            </div>
+            <div class="card-body">
+                <p class="lead">The ontology's subsumptions and disjointness axioms,
+                rendered as a first-order theory a theorem prover can run. Continuants
+                use time-indexed instantiation <code>instance_of(x, C, t)</code>;
+                occurrents use atemporal <code>instance_of_at(x, O)</code>.</p>
+
+                {% if analysis.fol_export_stats %}
+                <p class="text-muted small">
+                    {{ analysis.fol_export_stats.classes }} classes,
+                    {{ analysis.fol_export_stats.subsumptions }} subsumptions,
+                    {{ analysis.fol_export_stats.disjoint_axioms }} disjointness axioms
+                    ({{ analysis.fol_export_stats.continuants }} continuants,
+                    {{ analysis.fol_export_stats.occurrents }} occurrents).
+                </p>
+                {% endif %}
+
+                {% if analysis.fol_prover9 or analysis.fol_clif %}
+                <ul class="nav nav-tabs" id="folSyntaxTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="prover9-tab" data-bs-toggle="tab" data-bs-target="#prover9-pane" type="button" role="tab">Prover9 / LADR</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="clif-tab" data-bs-toggle="tab" data-bs-target="#clif-pane" type="button" role="tab">CLIF (Common Logic)</button>
+                    </li>
+                </ul>
+                <div class="tab-content pt-3">
+                    <div class="tab-pane fade show active" id="prover9-pane" role="tabpanel">
+                        <a class="btn btn-sm btn-outline-secondary mb-2" href="{{ url_for('fol_export', analysis_id=analysis.id, format='prover9', download=1) }}"><i class="fas fa-download me-1"></i>Download .p9</a>
+                        <pre class="bg-dark text-light p-3 rounded" style="max-height:400px;overflow:auto;"><code>{{ analysis.fol_prover9 }}</code></pre>
+                    </div>
+                    <div class="tab-pane fade" id="clif-pane" role="tabpanel">
+                        <a class="btn btn-sm btn-outline-secondary mb-2" href="{{ url_for('fol_export', analysis_id=analysis.id, format='clif', download=1) }}"><i class="fas fa-download me-1"></i>Download .clif</a>
+                        <pre class="bg-dark text-light p-3 rounded" style="max-height:400px;overflow:auto;"><code>{{ analysis.fol_clif }}</code></pre>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No FOL export was generated for this analysis. Re-analyze to generate one.</div>
+                {% endif %}
+
+                <hr>
+                <h6><i class="fas fa-scale-balanced me-2"></i>Prover cross-check</h6>
+                <p class="small text-muted">Runs Prover9 (with Mace4) over the exported
+                theory and checks whether its set of unsatisfiable classes agrees with
+                the OWL reasoner. Disagreement points to a tool bug.</p>
+                <button class="btn btn-primary btn-sm" id="runProverCheckBtn"
+                        data-url="{{ url_for('prover_check', analysis_id=analysis.id) }}">
+                    <i class="fas fa-play me-1"></i>Run prover cross-check
+                </button>
+                <div id="proverCheckResult" class="mt-3"
+                     {% if analysis.prover_cross_check %}data-prefilled="1"{% endif %}>
+                    {% set pc = analysis.prover_cross_check %}
+                    {% if pc %}
+                        {% if not pc.ran %}
+                            <div class="alert alert-warning mb-0">{{ pc.reason }}</div>
+                        {% elif pc.agree == true %}
+                            <div class="alert alert-success mb-0">FOL prover and OWL reasoner agree: {{ pc.prover_unsatisfiable|length }} unsatisfiable classes ({{ pc.engine }}).</div>
+                        {% elif pc.agree == false %}
+                            <div class="alert alert-danger mb-0">
+                                <strong>Divergence.</strong>
+                                Prover-only: {{ pc.only_prover|join(', ') or 'none' }};
+                                reasoner-only: {{ pc.only_reasoner|join(', ') or 'none' }}.
+                            </div>
+                        {% else %}
+                            <div class="alert alert-secondary mb-0">Prover found {{ pc.prover_unsatisfiable|length }} unsatisfiable classes ({{ pc.tested }} tested{% if pc.capped %}, capped{% endif %}).</div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <div class="card mb-4">
             <div class="card-header bg-secondary text-white">
                 <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Ontology Entities</h5>
@@ -861,6 +936,45 @@
         setupSearch('searchObjectProperties', 'objectPropertiesList', 'li');
         setupSearch('searchDataProperties', 'dataPropertiesList', 'li');
         setupSearch('searchIndividuals', 'individualsList', 'li');
+
+        // Prover9/Mace4 cross-check (on demand)
+        const proverBtn = document.getElementById('runProverCheckBtn');
+        if (proverBtn) {
+            proverBtn.addEventListener('click', function() {
+                const out = document.getElementById('proverCheckResult');
+                proverBtn.disabled = true;
+                const orig = proverBtn.innerHTML;
+                proverBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Running prover...';
+                out.innerHTML = '';
+                fetch(proverBtn.dataset.url, {method: 'POST'})
+                    .then(r => r.json())
+                    .then(pc => {
+                        let html;
+                        if (!pc.ran) {
+                            html = '<div class="alert alert-warning mb-0">' + (pc.reason || 'Prover did not run.') + '</div>';
+                        } else if (pc.agree === true) {
+                            html = '<div class="alert alert-success mb-0">FOL prover and OWL reasoner agree: ' +
+                                   pc.prover_unsatisfiable.length + ' unsatisfiable classes (' + pc.engine + ').</div>';
+                        } else if (pc.agree === false) {
+                            html = '<div class="alert alert-danger mb-0"><strong>Divergence.</strong> Prover-only: ' +
+                                   (pc.only_prover.join(', ') || 'none') + '; reasoner-only: ' +
+                                   (pc.only_reasoner.join(', ') || 'none') + '.</div>';
+                        } else {
+                            html = '<div class="alert alert-secondary mb-0">Prover found ' +
+                                   pc.prover_unsatisfiable.length + ' unsatisfiable classes (' + pc.tested +
+                                   ' tested' + (pc.capped ? ', capped' : '') + ').</div>';
+                        }
+                        out.innerHTML = html;
+                    })
+                    .catch(e => {
+                        out.innerHTML = '<div class="alert alert-danger mb-0">Error: ' + e + '</div>';
+                    })
+                    .finally(() => {
+                        proverBtn.disabled = false;
+                        proverBtn.innerHTML = orig;
+                    });
+            });
+        }
     });
 </script>
 {% endblock %}
