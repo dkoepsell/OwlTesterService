@@ -60,6 +60,11 @@ COPY . .
 # is missing or the disjointness structure regressed below the SPEC acceptance.
 RUN python -c "from bfo.catalog import load_catalog; c=load_catalog(); assert len(c.disjoint_pairs) > 7, 'BFO disjointness regressed'; print('BFO bundle OK:', len(c.disjoint_pairs), 'disjoint pairs')"
 
+# Fail the build if owlready2's bundled Jena jars need a newer JRE than is
+# installed (owlready2 >= 0.50 ships Java-25 jars that crash Pellet on Java 21).
+# This catches a future owlready2 bump before it reaches a user's first upload.
+RUN python scripts/check_bundled_jar_java.py
+
 # Uploads are stored on a mounted volume; create the dir as a fallback
 RUN mkdir -p uploads
 
