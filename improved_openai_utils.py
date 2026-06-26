@@ -11,18 +11,26 @@ logger = logging.getLogger(__name__)
 # do not change this unless explicitly requested by the user
 OPENAI_MODEL = "gpt-4o"
 
-def get_openai_client():
+def get_openai_client(api_key=None):
     """
-    Create and return an OpenAI client using the API key from environment variables.
-    
+    Create and return an OpenAI client.
+
+    The key is resolved by api_key_utils: an explicit argument, then a
+    user-supplied key in the Flask session (Bring Your Own Key), then the
+    server's OPENAI_API_KEY environment variable.
+
     Returns:
         OpenAI: Configured OpenAI client
     """
-    api_key = os.environ.get("OPENAI_API_KEY")
+    from api_key_utils import resolve_openai_key
+    api_key = resolve_openai_key(api_key)
     if not api_key:
-        logger.error("OPENAI_API_KEY not found in environment variables")
-        raise ValueError("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
-    
+        logger.error("No OpenAI API key available (session or environment)")
+        raise ValueError(
+            "No OpenAI API key available. Add your own key in the AI settings, "
+            "or set the OPENAI_API_KEY environment variable on the server."
+        )
+
     return OpenAI(api_key=api_key)
     
 def suggest_ontology_classes(domain, subject):

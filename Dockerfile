@@ -4,11 +4,14 @@ FROM python:3.11-slim
 #   default-jre-headless — Java runtime for OWL reasoners (Pellet/HermiT) and ROBOT
 #   libpq-dev + gcc    — needed to build psycopg2-binary
 #   wget               — to fetch ROBOT during image build
+#   prover9            — Prover9 + Mace4 for the FOL prover cross-check (SPEC Task 5);
+#                        the cross-check degrades gracefully if this is absent
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     libpq-dev \
     gcc \
     wget \
+    prover9 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install ROBOT (OBO/OWL toolkit) for external reasoning on large ontologies.

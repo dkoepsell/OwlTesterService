@@ -101,6 +101,13 @@ class OntologyAnalysis(db.Model):
     lint_findings = db.Column(db.JSON, nullable=True)
     coherence_status = db.Column(db.String(20), nullable=True)
 
+    # Provable FOL export (SPEC Task 5): the ontology's axioms rendered in
+    # Prover9 (LADR) and CLIF syntax, plus the prover-vs-reasoner cross-check.
+    fol_prover9 = db.Column(db.Text, nullable=True)
+    fol_clif = db.Column(db.Text, nullable=True)
+    fol_export_stats = db.Column(db.JSON, nullable=True)
+    prover_cross_check = db.Column(db.JSON, nullable=True)
+
     def __repr__(self):
         return f"<OntologyAnalysis {self.id} for {self.ontology_file_id}>"
 

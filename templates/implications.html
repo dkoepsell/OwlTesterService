@@ -35,6 +35,36 @@
                     These examples illustrate how the logical rules in your ontology would manifest in concrete situations.
                 </p>
                 
+                <!-- Bring Your Own AI key -->
+                <div id="aiKeyPanel" class="mb-4">
+                    <div class="alert {% if ai_key_available %}alert-success{% else %}alert-warning{% endif %} d-flex justify-content-between align-items-center" id="aiKeyStatus">
+                        <span>
+                            <i class="fas fa-key me-2"></i>
+                            {% if ai_key_available %}
+                                AI is enabled
+                                ({% if ai_key_source == 'session' %}using your own key{% else %}server key{% endif %}).
+                            {% else %}
+                                AI is not configured. Add your own OpenAI API key to enable implication generation. Your key is stored only in your session and never saved to our database.
+                            {% endif %}
+                        </span>
+                        <button class="btn btn-sm btn-outline-dark" type="button" id="toggleAiKeyForm">
+                            {% if ai_key_source == 'session' %}Change/Remove key{% else %}Add your key{% endif %}
+                        </button>
+                    </div>
+                    <div id="aiKeyForm" class="card card-body {% if ai_key_available %}d-none{% endif %}">
+                        <label for="aiKeyInput" class="form-label">OpenAI API key</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="aiKeyInput" placeholder="sk-..." autocomplete="off">
+                            <button class="btn btn-primary" type="button" id="saveAiKeyBtn">Save</button>
+                            {% if ai_key_source == 'session' %}
+                            <button class="btn btn-outline-danger" type="button" id="clearAiKeyBtn">Remove</button>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted mt-1">Get a key at platform.openai.com. It is held in your server-side session only.</small>
+                        <div id="aiKeyMsg" class="mt-2 small"></div>
+                    </div>
+                </div>
+
                 <div id="implicationsControls" class="mb-4">
                     {% if not analysis.implications_generated %}
                         <button id="generateImplicationsBtn" class="btn btn-primary" 
@@ -113,7 +143,42 @@
     // Wait for DOM to be fully loaded before attaching event listeners
     window.addEventListener('DOMContentLoaded', function() {
         console.log("DOM fully loaded");
-        
+
+        // --- Bring Your Own AI key controls ---
+        const toggleKeyBtn = document.getElementById('toggleAiKeyForm');
+        const keyForm = document.getElementById('aiKeyForm');
+        const saveKeyBtn = document.getElementById('saveAiKeyBtn');
+        const clearKeyBtn = document.getElementById('clearAiKeyBtn');
+        const keyInput = document.getElementById('aiKeyInput');
+        const keyMsg = document.getElementById('aiKeyMsg');
+        if (toggleKeyBtn && keyForm) {
+            toggleKeyBtn.addEventListener('click', () => keyForm.classList.toggle('d-none'));
+        }
+        if (saveKeyBtn) {
+            saveKeyBtn.addEventListener('click', function() {
+                const key = (keyInput.value || '').trim();
+                keyMsg.textContent = 'Saving...';
+                fetch("{{ url_for('manage_openai_key') }}", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({api_key: key})
+                }).then(r => r.json()).then(d => {
+                    if (d.success) {
+                        keyMsg.innerHTML = '<span class="text-success">Key saved. Reloading...</span>';
+                        setTimeout(() => location.reload(), 700);
+                    } else {
+                        keyMsg.innerHTML = '<span class="text-danger">' + (d.message || 'Failed to save key') + '</span>';
+                    }
+                }).catch(e => { keyMsg.innerHTML = '<span class="text-danger">Error: ' + e + '</span>'; });
+            });
+        }
+        if (clearKeyBtn) {
+            clearKeyBtn.addEventListener('click', function() {
+                fetch("{{ url_for('manage_openai_key') }}", {method: 'DELETE'})
+                    .then(r => r.json()).then(() => location.reload());
+            });
+        }
+
         // Find buttons safely
         const generateBtn = document.getElementById('generateImplicationsBtn');
         const regenerateBtn = document.getElementById('regenerateImplicationsBtn');

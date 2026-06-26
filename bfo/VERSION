@@ -4,3 +4,38 @@ path:   21838-2/owl/bfo-core.owl
 commit: dd89f4a193038b66ef0e891d546c05a5b477f40f
 release-lineage: release-2024-01-29
 ontology-iri: http://purl.obolibrary.org/obo/bfo.owl
+
+---
+
+BFO 2020 (ISO/IEC 21838-2) Common Logic (CLIF) first-order axiomatization
+file:    bfo/bfo-2020.clif
+source:  https://github.com/BFO-ontology/BFO-2020
+commit:  dd89f4a193038b66ef0e891d546c05a5b477f40f   (same commit as the OWL above)
+ref-note: this exact commit (dated 2026-03-01) was used; the recorded path resolved
+          without falling back to a branch HEAD. Module file bodies carry an internal
+          "generated 2025/12/05" stamp from the upstream generator.
+upstream-path: 21838-2/common-logic/
+vendored-on:   2026-06-26
+clif-dialect:  ISO/IEC 24707:2018 Common Logic Interchange Format (cl: namespace)
+
+Upstream has NO single combined master CLIF file; the normative first-order
+axiomatization is modularized into separate .cl files. bfo/bfo-2020.clif is the
+verbatim concatenation of the 13 core normative modules (in dependency order),
+each preceded by a "--- MODULE: <path> ---" marker. The non-normative
+profiles/ (temporalized-relations.cl) and contributions/ (allen-relation-
+definitions.cl) directories, plus README/release-notes, were intentionally excluded.
+
+Raw URLs fetched (base: https://raw.githubusercontent.com/BFO-ontology/BFO-2020/dd89f4a193038b66ef0e891d546c05a5b477f40f/21838-2/common-logic/):
+  universal-declaration.cl
+  existence-instantiation.cl
+  continuant-mereology.cl
+  occurrent-mereology.cl
+  generic-dependence.cl
+  specific-dependency.cl
+  material-entity.cl
+  history.cl
+  participation.cl
+  order.cl
+  spatial.cl
+  temporal-region.cl
+  spatiotemporal.cl
