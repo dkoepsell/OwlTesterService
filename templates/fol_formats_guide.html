@@ -1,0 +1,155 @@
+{% extends "layout.html" %}
+
+{% block title %}Prover9 and CLIF Guide{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-2">Prover9 and CLIF Formats</h1>
+    <p class="text-muted mb-4">How this app exports ontologies to first-order logic, runs a theorem prover to cross-check the OWL reasoner, and accepts both syntaxes in the expression tester.</p>
+
+    <!-- Overview -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-circle-info me-2"></i>Overview</h5>
+        </div>
+        <div class="card-body">
+            <p>An OWL ontology describes classes and how they relate. To check that reasoning about it is sound, this app translates the ontology's structure into a first-order logic (FOL) theory and ships it to a theorem prover. If the prover and the OWL reasoner disagree about which classes are unsatisfiable, that points to a tool bug, which is exactly what a tester named FOL-BFO-OWL exists to catch.</p>
+            <p class="mb-0">Two FOL syntaxes are supported, side by side:</p>
+            <ul class="mb-0">
+                <li><strong>Prover9 (LADR)</strong>: a compact infix syntax read by the Prover9 theorem prover and the Mace4 model finder. This app runs both for the cross-check.</li>
+                <li><strong>CLIF (Common Logic Interchange Format)</strong>: the ISO/IEC 24707 s-expression syntax. BFO 2020 (ISO/IEC 21838-2) is itself axiomatized in CLIF, so it is the natural interchange format for BFO work.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Temporalization -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-clock me-2"></i>How membership is written (BFO 2020 temporalization)</h5>
+        </div>
+        <div class="card-body">
+            <p>BFO 2020 treats continuants and occurrents differently in time, so the export does too:</p>
+            <ul>
+                <li><strong>Continuants</strong> (objects, qualities, dispositions, roles) persist through time, so membership is time indexed: <code>instance_of(x, C, t)</code>.</li>
+                <li><strong>Occurrents</strong> (processes, events) carry their temporal parts intrinsically, so membership is atemporal: <code>instance_of_at(x, O)</code>.</li>
+            </ul>
+            <p class="mb-0">A class is classified by whether it sits under <code>BFO_0000002</code> (continuant) or <code>BFO_0000003</code> (occurrent) in the vendored BFO catalog. A <em>Wing</em> instantiates at a time; a <em>Flight</em> does not.</p>
+        </div>
+    </div>
+
+    <!-- Prover9 -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-square-root-variable me-2"></i>Prover9 (LADR) syntax</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-bordered align-middle">
+                <thead><tr><th>Construct</th><th>Prover9</th></tr></thead>
+                <tbody>
+                    <tr><td>Universal quantifier</td><td><code>all X (...)</code></td></tr>
+                    <tr><td>Existential quantifier</td><td><code>exists X (...)</code></td></tr>
+                    <tr><td>And, Or</td><td><code>&amp;</code>, <code>|</code></td></tr>
+                    <tr><td>Implication, Biconditional</td><td><code>-&gt;</code>, <code>&lt;-&gt;</code></td></tr>
+                    <tr><td>Negation</td><td><code>-</code></td></tr>
+                    <tr><td>Predicate</td><td><code>instance_of(X, force, T)</code></td></tr>
+                    <tr><td>Clause terminator</td><td>a single <code>.</code> at the end of each formula</td></tr>
+                </tbody>
+            </table>
+            <p>Variables are capitalized (the export sets <code>set(prolog_style_variables).</code>); constants such as class names are lower case. Assumptions live inside a <code>formulas(assumptions). ... end_of_list.</code> block.</p>
+            <p class="mb-1"><strong>Worked example.</strong> If <em>Force</em> is placed under both <em>Quality</em> and <em>Disposition</em> (which BFO declares disjoint), the export is:</p>
+            <pre class="bg-dark text-light p-3 rounded"><code>set(prolog_style_variables).
+
+formulas(assumptions).
+  % --- Subsumptions (SubClassOf) ---
+  all X all T (instance_of(X,force,T) -&gt; instance_of(X,disposition,T)).
+  all X all T (instance_of(X,force,T) -&gt; instance_of(X,quality,T)).
+  % --- Disjointness ---
+  all X all T (-(instance_of(X,disposition,T) &amp; instance_of(X,quality,T))).
+end_of_list.</code></pre>
+            <p class="mb-0">To prove that <em>Force</em> is unsatisfiable, the cross-check adds the goal <code>all X all T (-instance_of(X,force,T)).</code> Prover9 negates it, assumes a force exists, and derives a contradiction through the disjointness axiom. A proof means the class is empty.</p>
+        </div>
+    </div>
+
+    <!-- CLIF -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-code me-2"></i>CLIF (Common Logic) syntax</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm table-bordered align-middle">
+                <thead><tr><th>Construct</th><th>CLIF</th></tr></thead>
+                <tbody>
+                    <tr><td>Universal quantifier</td><td><code>(forall (x t) ...)</code></td></tr>
+                    <tr><td>Existential quantifier</td><td><code>(exists (x) ...)</code></td></tr>
+                    <tr><td>And, Or</td><td><code>(and ...)</code>, <code>(or ...)</code></td></tr>
+                    <tr><td>Implication, Biconditional</td><td><code>(if a b)</code>, <code>(iff a b)</code></td></tr>
+                    <tr><td>Negation</td><td><code>(not a)</code></td></tr>
+                    <tr><td>Predicate</td><td><code>(instance_of x force t)</code></td></tr>
+                    <tr><td>Module wrapper</td><td><code>(cl-text NAME form ...)</code></td></tr>
+                </tbody>
+            </table>
+            <p class="mb-1">The same Force example in CLIF:</p>
+            <pre class="bg-dark text-light p-3 rounded"><code>(cl-text ontology-export
+  ;; --- Subsumptions (SubClassOf) ---
+  (forall (x t) (if (instance_of x force t) (instance_of x disposition t)))
+  (forall (x t) (if (instance_of x force t) (instance_of x quality t)))
+  ;; --- Disjointness ---
+  (forall (x t) (not (and (instance_of x disposition t) (instance_of x quality t)))))</code></pre>
+            <p class="mb-0">The official BFO 2020 CLIF axiomatization (13 normative modules from ISO/IEC 21838-2) is vendored with the app at <code>bfo/bfo-2020.clif</code> and used as the canonical statement of what BFO says.</p>
+        </div>
+    </div>
+
+    <!-- Where it appears -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-location-dot me-2"></i>Where you will find these in the app</h5>
+        </div>
+        <div class="card-body">
+            <h6>1. On an analysis page (export and cross-check)</h6>
+            <p>After you upload and analyze an ontology, the <strong>Provable FOL Export</strong> panel shows the theory in Prover9 and CLIF tabs, with download buttons. The <strong>Run prover cross-check</strong> button runs Prover9 and Mace4 over the export and compares the result with the OWL reasoner.</p>
+            <h6>2. In the expression tester (input)</h6>
+            <p class="mb-0">The <a href="{{ url_for('fol_syntax_guide') }}">FOL expression tester</a> accepts Prover9 and CLIF directly. Paste either syntax and it is detected, converted to the internal form, validated, and checked against the BFO vocabulary. You do not need to rewrite expressions by hand.</p>
+        </div>
+    </div>
+
+    <!-- Reading the verdict -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-scale-balanced me-2"></i>Reading the cross-check verdict</h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-bordered align-middle mb-3">
+                <thead><tr><th>Verdict</th><th>Meaning</th></tr></thead>
+                <tbody>
+                    <tr><td><span class="badge bg-success">Agree</span></td><td>The prover and the OWL reasoner found the same set of unsatisfiable classes. Confidence is high.</td></tr>
+                    <tr><td><span class="badge bg-danger">Divergence</span></td><td>One tool flagged a class the other did not. The panel lists prover-only and reasoner-only classes. This is worth investigating: it can indicate a translation gap or a reasoner limitation.</td></tr>
+                    <tr><td><span class="badge bg-secondary">Result without full agreement</span></td><td>The class count exceeded the per-run cap, so only a subset was tested. The number tested and the cap are reported.</td></tr>
+                    <tr><td><span class="badge bg-warning text-dark">Did not run</span></td><td>The Prover9 binary was not available on the server. The export still renders; only the live cross-check is skipped.</td></tr>
+                </tbody>
+            </table>
+            <p class="mb-0 small text-muted">The cross-check runs one prover invocation per class and is bounded by a time budget, so it is offered on demand rather than on every upload.</p>
+        </div>
+    </div>
+
+    <!-- Running locally -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="fas fa-terminal me-2"></i>Running the export yourself</h5>
+        </div>
+        <div class="card-body">
+            <p>Download the Prover9 export and run it with Prover9 or Mace4 locally:</p>
+            <pre class="bg-dark text-light p-3 rounded"><code># Search for a proof (a contradiction implies an unsatisfiable theory):
+prover9 -f ontology.p9
+
+# Or look for a model (Mace4 confirms satisfiability):
+mace4 -f ontology.p9</code></pre>
+            <p class="mb-0">The CLIF export can be loaded into any ISO Common Logic tool. Note that BFO 2020 CLIF is modular: it is a set of <code>(cl-text ...)</code> modules rather than one flat theory, matching the upstream structure.</p>
+        </div>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="fas fa-book me-2"></i>
+        See also the <a href="{{ url_for('fol_syntax_guide') }}">FOL Syntax Guide</a> for the BFO standard and traditional notations used in the expression tester.
+    </div>
+</div>
+{% endblock %}

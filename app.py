@@ -256,6 +256,13 @@ def fol_syntax_guide():
     """Documentation page for FOL syntax rules."""
     return render_template('fol_syntax_guide.html')
 
+
+@app.route('/fol-formats')
+def fol_formats_guide():
+    """Reference documentation for the Prover9 and CLIF formats and the prover
+    cross-check, guiding users on the export, input, and BFO Common Logic."""
+    return render_template('fol_formats_guide.html')
+
 @app.route('/api/get-bfo-classes')
 def get_bfo_classes():
     """API endpoint to get all BFO classes."""
