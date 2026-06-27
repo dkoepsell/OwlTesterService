@@ -17,6 +17,7 @@ The translated background is cached once per process (it is a fixed input).
 import logging
 import os
 
+from bfo import clif_signature as _sig
 from clif_lexer import CLString, parse
 
 logger = logging.getLogger(__name__)
@@ -119,3 +120,143 @@ def load_clif(path=None):
     path = path or _DEFAULT_BFO_CLIF
     with open(path, "r", encoding="utf-8") as fh:
         return parse(fh.read())
+
+
+# -- CLIF -> Prover9 translation (Phase 3) -----------------------------------
+
+class ClifTranslationError(ValueError):
+    """A CLIF form that the Prover9 translator cannot faithfully render.
+
+    Raised on anything beyond plain first-order BFO: a predicate absent from the
+    signature map, an arity that drifted, a string literal or functional term in
+    argument position, or a malformed connective. The measured BFO-2020 vocabulary
+    contains none of these, so this is a guard against silent mistranslation if a
+    future BFO bump introduces a feature the map does not cover.
+    """
+
+
+def _prover9_var(name):
+    """Render a CLIF variable as a Prover9 (prolog-style) variable.
+
+    Under set(prolog_style_variables) Prover9 reads an upper-case-initial token as
+    a variable and a lower-case one as a constant/predicate. BFO's variables are
+    lower-case, so upper-casing them (after the total hyphen rule) yields a valid,
+    collision-free variable that the lower-case class constants can never shadow.
+    """
+    return _sig.to_prover9_symbol(name).upper()
+
+
+def _render_term(node, bound):
+    """Render a CLIF term: a bound variable (-> Prover9 variable) or a constant.
+
+    Anything not bound by an enclosing quantifier is a constant (a BFO universal
+    name such as `history` or `material-entity`), rendered via the hyphen rule.
+    """
+    if isinstance(node, CLString):
+        raise ClifTranslationError(f"string literal in term position: {node!r}")
+    if isinstance(node, list):
+        raise ClifTranslationError(f"functional term not supported: {node!r}")
+    if node in bound:
+        return _prover9_var(node)
+    return _sig.to_prover9_symbol(node)
+
+
+def _render_formula(node, bound):
+    """Render one CLIF sentence as a Prover9 formula string (no trailing dot)."""
+    if not isinstance(node, list) or not node:
+        raise ClifTranslationError(f"not a formula: {node!r}")
+    h = _head_symbol(node)
+    if h is None:
+        raise ClifTranslationError(f"formula has no operator head: {node!r}")
+
+    if h in _QUANTIFIERS:
+        varlist = node[1] if len(node) > 1 else None
+        if not isinstance(varlist, list) or any(
+            not isinstance(v, str) or isinstance(v, CLString) for v in varlist
+        ):
+            raise ClifTranslationError(f"malformed quantifier var list: {node!r}")
+        inner_bound = bound | {v for v in varlist}
+        body = node[2:]
+        if not body:
+            raise ClifTranslationError(f"quantifier with no body: {node!r}")
+        rendered = [_render_formula(b, inner_bound) for b in body]
+        # CL quantifiers bind a single sentence; conjoin defensively if more.
+        inner = rendered[0] if len(rendered) == 1 else "(" + " & ".join(rendered) + ")"
+        quant = _sig.QUANTIFIERS[h]
+        prefix = " ".join(f"{quant} {_prover9_var(v)}" for v in varlist)
+        return f"({prefix} {inner})"
+
+    if h == "not":
+        if len(node) != 2:
+            raise ClifTranslationError(f"`not` takes one argument: {node!r}")
+        return f"-{_render_formula(node[1], bound)}"
+
+    if h in ("and", "or"):
+        if len(node) < 3:
+            raise ClifTranslationError(f"`{h}` needs >= 2 arguments: {node!r}")
+        op = _sig.CONNECTIVES[h]
+        return "(" + f" {op} ".join(_render_formula(c, bound) for c in node[1:]) + ")"
+
+    if h in ("if", "iff"):
+        if len(node) != 3:
+            raise ClifTranslationError(f"`{h}` takes two arguments: {node!r}")
+        op = _sig.CONNECTIVES[h]
+        return (f"({_render_formula(node[1], bound)} {op} "
+                f"{_render_formula(node[2], bound)})")
+
+    if h == "=":
+        if len(node) != 3:
+            raise ClifTranslationError(f"`=` takes two arguments: {node!r}")
+        return f"({_render_term(node[1], bound)} = {_render_term(node[2], bound)})"
+
+    # Atomic predicate application, validated against the signature map.
+    head = node[0]
+    arity = len(node) - 1
+    expected = _sig.PREDICATES.get(head)
+    if expected is None:
+        raise ClifTranslationError(f"predicate absent from BFO signature map: {head!r}")
+    if expected != arity:
+        raise ClifTranslationError(
+            f"arity mismatch for {head!r}: got {arity}, map expects {expected}")
+    sym = _sig.to_prover9_symbol(head)
+    if arity == 0:
+        return sym
+    return f"{sym}(" + ",".join(_render_term(a, bound) for a in node[1:]) + ")"
+
+
+_HEADER = (
+    "% BFO-2020 full first-order theory as Prover9 / Mace4 background.\n"
+    "% Translated from bfo/bfo-2020.clif (ISO Common Logic) by clif_theory.py.\n"
+    "% Continuants and instantiation are time-indexed: instance_of(x, C, t).\n"
+)
+
+_THEORY_CACHE = {}
+
+
+def render_prover9_theory(path=None):
+    """Translate a CLIF theory (default: vendored BFO-2020) into a Prover9 block.
+
+    Returns a complete, runnable assumptions section:
+
+        set(prolog_style_variables).
+        formulas(assumptions).
+          <one rendered axiom per line>
+        end_of_list.
+
+    Duplicate set() directives and multiple assumptions lists are harmless in
+    Prover9/Mace4, so this block can also be prepended to the ontology export
+    (Phase 5). The translation is cached per file path: the BFO background is a
+    fixed input rendered once per process. Raises ClifTranslationError if any form
+    falls outside plain first-order BFO.
+    """
+    key = os.path.abspath(path or _DEFAULT_BFO_CLIF)
+    cached = _THEORY_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    forms = load_clif(path)
+    body = [f"  {_render_formula(a, frozenset())}." for a in iter_axioms(forms)]
+    text = (_HEADER + "set(prolog_style_variables).\n\n"
+            "formulas(assumptions).\n" + "\n".join(body) + "\nend_of_list.\n")
+    _THEORY_CACHE[key] = text
+    return text
