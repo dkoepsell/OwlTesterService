@@ -220,7 +220,7 @@
             <h5 class="card-title mb-0">
                 <i class="fas fa-check-circle me-2"></i>Completeness Validation
                 <span class="float-end badge {% if analysis.completeness.is_complete %}bg-light text-success{% else %}bg-light text-warning{% endif %}">
-                    {{ analysis.completeness.overall_coverage|round|int }}% Complete
+                    {{ (analysis.completeness.overall_coverage or 0)|round|int }}% Complete
                 </span>
             </h5>
         </div>
@@ -231,19 +231,19 @@
                     <ul class="list-group">
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-dark">
                             Classes
-                            <span class="badge bg-primary rounded-pill">{{ analysis.completeness.class_coverage|round|int }}%</span>
+                            <span class="badge bg-primary rounded-pill">{{ (analysis.completeness.class_coverage or 0)|round|int }}%</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-dark">
                             Object Properties
-                            <span class="badge bg-primary rounded-pill">{{ analysis.completeness.object_property_coverage|round|int }}%</span>
+                            <span class="badge bg-primary rounded-pill">{{ (analysis.completeness.object_property_coverage or 0)|round|int }}%</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-dark">
                             Data Properties
-                            <span class="badge bg-primary rounded-pill">{{ analysis.completeness.data_property_coverage|round|int }}%</span>
+                            <span class="badge bg-primary rounded-pill">{{ (analysis.completeness.data_property_coverage or 0)|round|int }}%</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center bg-dark">
                             Individuals
-                            <span class="badge bg-primary rounded-pill">{{ analysis.completeness.individual_coverage|round|int }}%</span>
+                            <span class="badge bg-primary rounded-pill">{{ (analysis.completeness.individual_coverage or 0)|round|int }}%</span>
                         </li>
                     </ul>
                 </div>

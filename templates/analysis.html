@@ -399,7 +399,7 @@
                     <div class="mt-3">
                         <h6><i class="fas fa-tachometer-alt me-2"></i>Performance:</h6>
                         <div class="alert alert-info">
-                            <p><strong>Reasoning Time:</strong> {{ analysis.reasoning_methodology.performance.reasoning_time_ms|round|int }} ms</p>
+                            <p><strong>Reasoning Time:</strong> {{ (analysis.reasoning_methodology.performance.reasoning_time_ms or 0)|round|int }} ms</p>
                             <p><strong>Start Time:</strong> {{ analysis.reasoning_methodology.performance.start_time }}</p>
                             <p><strong>End Time:</strong> {{ analysis.reasoning_methodology.performance.end_time }}</p>
                         </div>
