@@ -11,6 +11,79 @@ logger = logging.getLogger(__name__)
 # do not change this unless explicitly requested by the user
 OPENAI_MODEL = "gpt-4o"
 
+# Anthropic model for the Bring-Your-Own-Key Claude path (implication generation).
+ANTHROPIC_MODEL = "claude-opus-4-8"
+
+# Structured-output schema so Claude returns exactly the shape the parser expects.
+_IMPLICATIONS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "implications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "scenario": {"type": "string"},
+                    "premises_used": {"type": "array", "items": {"type": "string"}},
+                    "explanation": {"type": "string"},
+                },
+                "required": ["title", "scenario", "premises_used", "explanation"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["implications"],
+    "additionalProperties": False,
+}
+
+
+def _generate_implications_anthropic(system_prompt, user_prompt, api_key):
+    """Generate implications with Claude (BYO Anthropic key); return raw JSON text.
+
+    Prefers structured outputs so the response is a single JSON object matching
+    _IMPLICATIONS_SCHEMA, which the shared parser then handles exactly like the
+    OpenAI path. Falls back to a JSON-only prompt instruction if the installed
+    SDK predates output_config, stripping any stray markdown code fences.
+    """
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key)
+    base = dict(
+        model=ANTHROPIC_MODEL,
+        max_tokens=16000,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    try:
+        message = client.messages.create(
+            output_config={"format": {"type": "json_schema",
+                                      "schema": _IMPLICATIONS_SCHEMA}},
+            **base,
+        )
+    except Exception as struct_err:  # noqa: BLE001 - older SDK / unsupported field
+        logger.info("Anthropic structured outputs unavailable (%s); "
+                    "falling back to JSON-only prompt", struct_err)
+        base["system"] = system_prompt + (
+            "\n\nReturn ONLY a single JSON object of the form "
+            '{"implications": [...]} with no prose and no markdown code fences.')
+        message = client.messages.create(**base)
+
+    if getattr(message, "stop_reason", None) == "refusal":
+        raise ValueError("Claude declined to generate implications for this input.")
+
+    text = "".join(
+        getattr(b, "text", "") for b in message.content
+        if getattr(b, "type", None) == "text"
+    ).strip()
+    # Strip a ```json ... ``` fence if the fallback path produced one.
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text[:4].lower() == "json":
+            text = text[4:]
+        text = text.strip()
+    return text
+
+
 def get_openai_client(api_key=None):
     """
     Create and return an OpenAI client.
@@ -356,10 +429,19 @@ def generate_real_world_implications(ontology_name, domain_classes, fol_premises
     """
     import logging
     logger = logging.getLogger(__name__)
-    
+
     try:
-        client = get_openai_client()
-        
+        # Resolve the AI provider (OpenAI or Anthropic) from the BYO key / env.
+        from api_key_utils import resolve_ai
+        provider, api_key = resolve_ai()
+        if not api_key:
+            raise ValueError(
+                "No AI API key available. Add your own OpenAI or Anthropic key in "
+                "the AI settings, or set OPENAI_API_KEY or ANTHROPIC_API_KEY on the "
+                "server."
+            )
+        client = get_openai_client(api_key) if provider == "openai" else None
+
         # If no FOL premises provided or empty list, generate simple defaults based on classes
         if not fol_premises or len(fol_premises) == 0:
             logger.warning("No FOL premises provided, generating defaults from classes")
@@ -494,28 +576,29 @@ If the premises seem auto-generated (simple instance_of formulas), create meanin
 for a {ontology_name.replace("Ontology", "").strip()} domain.
 """
 
-        # Make the API call
-        response = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.7
-        )
-        
-        # Parse the response
-        if response is None or response.choices is None or len(response.choices) == 0:
-            logger.error("OpenAI API returned an empty response when generating implications")
-            return [{"error": "The OpenAI API returned an empty response. Please try again later.", "title": "Error"}]
-            
-        result_text = response.choices[0].message.content
+        # Make the API call (provider-specific), then parse the JSON uniformly.
+        if provider == "anthropic":
+            result_text = _generate_implications_anthropic(system_prompt, user_prompt, api_key)
+        else:
+            response = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.7
+            )
+            if response is None or response.choices is None or len(response.choices) == 0:
+                logger.error("OpenAI API returned an empty response when generating implications")
+                return [{"error": "The OpenAI API returned an empty response. Please try again later.", "title": "Error"}]
+            result_text = response.choices[0].message.content
+
         if result_text is None or result_text.strip() == "":
-            logger.error("OpenAI API returned empty content when generating implications")
-            return [{"error": "The OpenAI API returned empty content. Please try again later.", "title": "Error"}]
-            
-        logger.info(f"Raw OpenAI response: {result_text}")
+            logger.error("%s returned empty content when generating implications", provider)
+            return [{"error": "The AI provider returned empty content. Please try again later.", "title": "Error"}]
+
+        logger.info(f"Raw {provider} response: {result_text}")
         
         # Handle different JSON formats that might be returned
         implications = []

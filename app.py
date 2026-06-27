@@ -1154,42 +1154,68 @@ def prover_check(analysis_id):
 def inject_ai_key_status():
     """Expose AI key availability to all templates so the UI can prompt for a key."""
     try:
-        from api_key_utils import has_openai_key, key_source
-        return {'ai_key_available': has_openai_key(), 'ai_key_source': key_source()}
+        from api_key_utils import has_ai_key, ai_key_source, active_provider
+        return {'ai_key_available': has_ai_key(), 'ai_key_source': ai_key_source(),
+                'ai_provider': active_provider() or 'openai'}
     except Exception:
-        return {'ai_key_available': False, 'ai_key_source': 'none'}
+        return {'ai_key_available': False, 'ai_key_source': 'none',
+                'ai_provider': 'openai'}
 
 
 @app.route('/api/settings/openai-key', methods=['GET', 'POST', 'DELETE'])
 def manage_openai_key():
-    """Get status of / set / clear the user's own OpenAI API key (session-scoped).
+    """Get status of / set / clear the user's own AI API key (session-scoped).
 
-    POST   {api_key: "sk-..."}  -> store in session (never persisted to the DB).
-    DELETE                       -> remove the session key.
-    GET                          -> {has_key, source} for the current context.
+    Supports two providers: OpenAI and Anthropic (Claude).
+
+    POST   {api_key: "sk-...", provider: "openai"|"anthropic"}
+                                 -> store in session (never persisted to the DB).
+    DELETE                       -> remove all session keys.
+    GET                          -> {has_key, source, provider} for this context.
     """
-    from api_key_utils import has_openai_key, key_source, SESSION_KEY
+    from api_key_utils import (has_ai_key, ai_key_source, active_provider,
+                               SESSION_KEY, ANTHROPIC_SESSION_KEY,
+                               PROVIDER_SESSION_KEY)
 
     if request.method == 'GET':
-        return jsonify({'has_key': has_openai_key(), 'source': key_source()})
+        return jsonify({'has_key': has_ai_key(), 'source': ai_key_source(),
+                        'provider': active_provider()})
 
     if request.method == 'DELETE':
         session.pop(SESSION_KEY, None)
-        return jsonify({'success': True, 'has_key': has_openai_key(),
-                        'source': key_source()})
+        session.pop(ANTHROPIC_SESSION_KEY, None)
+        session.pop(PROVIDER_SESSION_KEY, None)
+        return jsonify({'success': True, 'has_key': has_ai_key(),
+                        'source': ai_key_source(), 'provider': active_provider()})
 
     data = request.get_json(silent=True) or {}
     api_key = (data.get('api_key') or '').strip()
+    provider = (data.get('provider') or 'openai').strip().lower()
+    if provider not in ('openai', 'anthropic'):
+        return jsonify({'success': False, 'message': 'Unknown AI provider.'}), 400
     if not api_key:
         return jsonify({'success': False, 'message': 'No API key provided'}), 400
-    # Light sanity check; OpenAI keys start with "sk-". Do not log the key.
-    if not api_key.startswith('sk-') or len(api_key) < 20:
-        return jsonify({'success': False,
-                        'message': 'That does not look like an OpenAI API key '
-                                   '(expected it to start with "sk-").'}), 400
-    session[SESSION_KEY] = api_key
-    app.logger.info("Stored a user-supplied OpenAI API key in the session")
-    return jsonify({'success': True, 'has_key': True, 'source': 'session'})
+
+    # Light sanity check by provider; do not log the key. Storing one provider's
+    # key clears the other so the active provider is unambiguous.
+    if provider == 'openai':
+        if not api_key.startswith('sk-') or len(api_key) < 20:
+            return jsonify({'success': False,
+                            'message': 'That does not look like an OpenAI API key '
+                                       '(expected it to start with "sk-").'}), 400
+        session[SESSION_KEY] = api_key
+        session.pop(ANTHROPIC_SESSION_KEY, None)
+    else:
+        if not api_key.startswith('sk-ant-') or len(api_key) < 20:
+            return jsonify({'success': False,
+                            'message': 'That does not look like an Anthropic API key '
+                                       '(expected it to start with "sk-ant-").'}), 400
+        session[ANTHROPIC_SESSION_KEY] = api_key
+        session.pop(SESSION_KEY, None)
+    session[PROVIDER_SESSION_KEY] = provider
+    app.logger.info("Stored a user-supplied %s API key in the session", provider)
+    return jsonify({'success': True, 'has_key': True, 'source': 'session',
+                    'provider': provider})
 
 
 @app.route('/implications/<filename>')

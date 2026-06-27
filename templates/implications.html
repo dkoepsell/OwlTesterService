@@ -42,9 +42,9 @@
                             <i class="fas fa-key me-2"></i>
                             {% if ai_key_available %}
                                 AI is enabled
-                                ({% if ai_key_source == 'session' %}using your own key{% else %}server key{% endif %}).
+                                ({% if ai_key_source == 'session' %}using your own {{ 'Anthropic (Claude)' if ai_provider == 'anthropic' else 'OpenAI' }} key{% else %}server key{% endif %}).
                             {% else %}
-                                AI is not configured. Add your own OpenAI API key to enable implication generation. Your key is stored only in your session and never saved to our database.
+                                AI is not configured. Add your own OpenAI or Anthropic (Claude) API key to enable implication generation. Your key is stored only in your session and never saved to our database.
                             {% endif %}
                         </span>
                         <button class="btn btn-sm btn-outline-dark" type="button" id="toggleAiKeyForm">
@@ -52,7 +52,12 @@
                         </button>
                     </div>
                     <div id="aiKeyForm" class="card card-body {% if ai_key_available %}d-none{% endif %}">
-                        <label for="aiKeyInput" class="form-label">OpenAI API key</label>
+                        <label for="aiProviderSelect" class="form-label">AI provider</label>
+                        <select class="form-select mb-2" id="aiProviderSelect">
+                            <option value="openai" {% if ai_provider != 'anthropic' %}selected{% endif %}>OpenAI (GPT-4o)</option>
+                            <option value="anthropic" {% if ai_provider == 'anthropic' %}selected{% endif %}>Anthropic (Claude)</option>
+                        </select>
+                        <label for="aiKeyInput" class="form-label">API key</label>
                         <div class="input-group">
                             <input type="password" class="form-control" id="aiKeyInput" placeholder="sk-..." autocomplete="off">
                             <button class="btn btn-primary" type="button" id="saveAiKeyBtn">Save</button>
@@ -60,7 +65,7 @@
                             <button class="btn btn-outline-danger" type="button" id="clearAiKeyBtn">Remove</button>
                             {% endif %}
                         </div>
-                        <small class="text-muted mt-1">Get a key at platform.openai.com. It is held in your server-side session only.</small>
+                        <small class="text-muted mt-1" id="aiKeyHelp">Get an OpenAI key at platform.openai.com or an Anthropic key at console.anthropic.com. It is held in your server-side session only.</small>
                         <div id="aiKeyMsg" class="mt-2 small"></div>
                     </div>
                 </div>
@@ -151,17 +156,27 @@
         const clearKeyBtn = document.getElementById('clearAiKeyBtn');
         const keyInput = document.getElementById('aiKeyInput');
         const keyMsg = document.getElementById('aiKeyMsg');
+        const providerSelect = document.getElementById('aiProviderSelect');
         if (toggleKeyBtn && keyForm) {
             toggleKeyBtn.addEventListener('click', () => keyForm.classList.toggle('d-none'));
+        }
+        // Swap the placeholder to match the selected provider's key format.
+        if (providerSelect && keyInput) {
+            const syncPlaceholder = () => {
+                keyInput.placeholder = providerSelect.value === 'anthropic' ? 'sk-ant-...' : 'sk-...';
+            };
+            providerSelect.addEventListener('change', syncPlaceholder);
+            syncPlaceholder();
         }
         if (saveKeyBtn) {
             saveKeyBtn.addEventListener('click', function() {
                 const key = (keyInput.value || '').trim();
+                const provider = providerSelect ? providerSelect.value : 'openai';
                 keyMsg.textContent = 'Saving...';
                 fetch("{{ url_for('manage_openai_key') }}", {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({api_key: key})
+                    body: JSON.stringify({api_key: key, provider: provider})
                 }).then(r => r.json()).then(d => {
                     if (d.success) {
                         keyMsg.innerHTML = '<span class="text-success">Key saved. Reloading...</span>';
