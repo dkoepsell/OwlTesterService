@@ -657,6 +657,72 @@ def fix_and_reanalyze(analysis_id):
     return redirect(url_for('analyze_owl', filename=new_filename))
 
 
+@app.route('/api/analysis/<int:analysis_id>/auto-fix-straddles')
+def auto_fix_straddles_download(analysis_id):
+    """Resolve every partition straddle at once (keep the more specific BFO
+    category in each) and return the corrected ontology file."""
+    from ontology_fixer import fix_all_straddles
+    from bfo.catalog import load_catalog
+    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+
+    try:
+        corrected, _ = fix_all_straddles(
+            file_record.file_path, analysis.lint_findings or [], load_catalog())
+    except ValueError as e:
+        flash(f"Could not auto-fix: {e}", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    base = file_record.original_filename.rsplit('.', 1)[0]
+    response = make_response(corrected)
+    response.headers['Content-Type'] = 'application/rdf+xml'
+    response.headers['Content-Disposition'] = f'attachment; filename={base}.autofixed.owl'
+    return response
+
+
+@app.route('/analysis/<int:analysis_id>/auto-fix-and-reanalyze')
+def auto_fix_and_reanalyze(analysis_id):
+    """Resolve every partition straddle at once, save the corrected ontology as a
+    new file, and run full coherence analysis on it."""
+    from ontology_fixer import fix_all_straddles
+    from bfo.catalog import load_catalog
+    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+
+    try:
+        corrected, removed = fix_all_straddles(
+            file_record.file_path, analysis.lint_findings or [], load_catalog())
+    except ValueError as e:
+        flash(f"Could not auto-fix: {e}", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    new_filename = f"{uuid.uuid4().hex}.owl"
+    new_path = os.path.join(app.config['UPLOADED_OWLS_DEST'], new_filename)
+    with open(new_path, 'wb') as fh:
+        fh.write(corrected)
+
+    base = file_record.original_filename.rsplit('.', 1)[0]
+    new_record = OntologyFile(
+        filename=new_filename,
+        original_filename=f"{base}.autofixed.owl",
+        file_path=new_path,
+        file_size=len(corrected),
+        mime_type='application/rdf+xml',
+        user_id=current_user.id if current_user.is_authenticated else None,
+    )
+    db.session.add(new_record)
+    db.session.commit()
+
+    edges = "edge" if removed == 1 else "edges"
+    flash(
+        f"Auto-fixed {removed} partition straddle {edges} (kept the more specific "
+        f"BFO category in each) and re-analyzing the corrected ontology with full "
+        f"coherence checking.",
+        "success",
+    )
+    return redirect(url_for('analyze_owl', filename=new_filename))
+
+
 @app.route('/analyze/<filename>/reanalyze', methods=['POST'])
 def reanalyze_owl(filename):
     """Discard the stored analysis for a file and run a fresh one.

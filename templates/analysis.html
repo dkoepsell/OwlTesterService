@@ -272,6 +272,16 @@
                 <p class="lead">A fast pre-reasoner check for partition straddles: classes placed
                     under two BFO categories that are disjoint.</p>
                 {% if analysis.lint_findings %}
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3 p-2 rounded bg-dark-subtle border">
+                    <span class="fw-semibold me-1"><i class="fas fa-wand-magic-sparkles me-1"></i>Auto-fix all straddles</span>
+                    <a class="btn btn-sm btn-primary" href="{{ url_for('auto_fix_and_reanalyze', analysis_id=analysis.id) }}">
+                        <i class="fas fa-rotate me-1"></i>Auto-fix all &amp; re-analyze
+                    </a>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auto_fix_straddles_download', analysis_id=analysis.id) }}">
+                        <i class="fas fa-download me-1"></i>Download auto-fixed file
+                    </a>
+                    <span class="text-muted small ms-1">Keeps the more specific BFO category in each straddle.</span>
+                </div>
                 <ul class="list-group">
                     {% for finding in analysis.lint_findings %}
                     <li class="list-group-item list-group-item-warning">
