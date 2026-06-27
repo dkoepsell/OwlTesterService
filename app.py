@@ -1133,7 +1133,13 @@ def prover_check(analysis_id):
                 reasoner_unsat.append(str(c))
         reasoner_unsat = [n for n in reasoner_unsat if n]
 
-        result = cross_check(theory, reasoner_unsat_names=reasoner_unsat)
+        # Opt-in: feed the full BFO-2020 first-order theory as background so the
+        # check uses BFO's category axioms, not just derived disjointness. Heavier
+        # and may report classes as undetermined within the per-class limits.
+        bfo_background = request.values.get('bfo_background') in ('1', 'true', 'on')
+
+        result = cross_check(theory, reasoner_unsat_names=reasoner_unsat,
+                             bfo_background=bfo_background)
         analysis.prover_cross_check = result
         db.session.commit()
         return jsonify(result), 200
