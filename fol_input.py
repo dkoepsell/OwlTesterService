@@ -12,8 +12,13 @@ Scope: the common first-order subset (quantifiers, the boolean connectives, and
 n-ary predicates). Sort declarations, functions, and CLIF's sequence markers /
 `cl-text` wrappers are tolerated but not deeply modeled; conversion is best-effort
 and reports a note when it falls back.
+
+CLIF reading is delegated to clif_lexer (string-literal aware), so quoted prose in
+a pasted `cl:comment` never leaks into the converted formula.
 """
 import re
+
+from clif_lexer import CLString, parse as _clif_parse
 
 
 def detect_syntax(expr):
@@ -79,43 +84,13 @@ def prover9_to_internal(expr):
 
 # -- CLIF -> internal --------------------------------------------------------
 
-class _SExprParser:
-    """Minimal s-expression reader for the CLIF first-order subset."""
-
-    def __init__(self, text):
-        self.toks = self._tokenize(text)
-        self.i = 0
-
-    @staticmethod
-    def _tokenize(text):
-        # Strip CLIF line comments (;; ...) and the cl-text/cl:text wrapper name
-        # is handled structurally below.
-        text = re.sub(r";;[^\n]*", " ", text)
-        return re.findall(r"\(|\)|[^()\s]+", text)
-
-    def parse(self):
-        forms = []
-        while self.i < len(self.toks):
-            forms.append(self._read())
-        return forms
-
-    def _read(self):
-        tok = self.toks[self.i]
-        self.i += 1
-        if tok == "(":
-            lst = []
-            while self.i < len(self.toks) and self.toks[self.i] != ")":
-                lst.append(self._read())
-            self.i += 1  # consume ')'
-            return lst
-        return tok
-
-
 _CONNECTIVE = {"and": "&", "or": "|"}
 
 
 def _sexpr_to_internal(node):
     """Render a parsed CLIF s-expression node as NLTK infix syntax."""
+    if isinstance(node, CLString):
+        return ""  # quoted prose (comment/title) carries no formula
     if isinstance(node, str):
         return node
     if not node:
@@ -128,12 +103,17 @@ def _sexpr_to_internal(node):
         return " & ".join(f"({r})" for r in rendered)
     h = head.lower()
 
-    if h in ("cl-text", "cl:text", "cl-module", "cl:module"):
-        # (cl-text NAME form...) -> conjoin the forms, skip the name token.
+    if h in ("cl-text", "cl:text", "cl-module", "cl:module",
+             "cl-comment", "cl:comment", "cl-ttl", "cl:ttl"):
+        # Wrappers: conjoin the embedded forms, skipping quoted prose/titles and
+        # bare name tokens (e.g. the cl:text module name).
         body = [n for n in node[1:] if not isinstance(n, str)]
         rendered = [_sexpr_to_internal(n) for n in body]
         rendered = [r for r in rendered if r]
         return " & ".join(f"({r})" for r in rendered)
+
+    if h in ("cl-outdiscourse", "cl:outdiscourse", "cl-imports", "cl:imports"):
+        return ""  # vocabulary declarations, not formulas
 
     if h in ("forall", "exists"):
         quant = "all" if h == "forall" else "exists"
@@ -169,7 +149,7 @@ def _sexpr_to_internal(node):
 
 def clif_to_internal(expr):
     """Convert a CLIF expression to NLTK infix syntax (best effort)."""
-    forms = _SExprParser(expr).parse()
+    forms = _clif_parse(expr)
     rendered = [_sexpr_to_internal(f) for f in forms]
     rendered = [r for r in rendered if r]
     if len(rendered) == 1:
