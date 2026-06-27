@@ -62,3 +62,26 @@ def test_coherent_fixture_has_no_clashing_disjointness(coherent_owl, catalog):
     # both of its classes straddle (no partition straddle present).
     out = generate_exports(file_path=coherent_owl, catalog=catalog)
     assert out["error"] is None
+
+
+# -- Phase 4: alignment to the BFO background --------------------------------
+
+def test_align_bfo_off_is_byte_identical_default(straddle_owl, catalog):
+    """The acceptance criterion: with the flag off the export is unchanged."""
+    theory = build_theory(file_path=straddle_owl, catalog=catalog)
+    assert render_prover9(theory, align_bfo=False) == render_prover9(theory)
+    assert render_clif(theory, align_bfo=False) == render_clif(theory)
+
+
+def test_align_bfo_uses_only_ternary_instantiation(straddle_owl, catalog):
+    """Aligned, occurrents instantiate via the ternary instance_of(x, C, t) too,
+    so the export shares one predicate set with the BFO background."""
+    theory = build_theory(file_path=straddle_owl, catalog=catalog)
+    p9 = render_prover9(theory, align_bfo=True)
+    clif = render_clif(theory, align_bfo=True)
+    assert "instance_of_at" not in p9
+    assert "instance_of_at" not in clif
+    assert "instance_of(" in p9
+    # Default export still distinguishes occurrents (proves the flag is the cause).
+    assert "instance_of_at" in render_prover9(theory)
+    assert clif.count("(") == clif.count(")")
