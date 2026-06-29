@@ -1,0 +1,61 @@
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo:  <http://purl.obolibrary.org/obo/> .
+@prefix sool: <https://seal.tamu.edu/sool/kernel#> .
+
+#
+# Minimal SOoL kernel — BFO-grounded top categories.
+#
+# This is a deliberately small, real kernel so the typing-dependent stages of
+# owltesterservice (A4 anchors, A5 size bound, B3 node typing, D competency) have
+# something to run against. A larger published kernel can replace it via --kernel;
+# the gate derives everything from the graph, so no code changes are needed.
+#
+# BFO anchors used:
+#   obo:BFO_0000020  specifically dependent continuant (SDC)
+#   obo:BFO_0000017  realizable entity
+#   obo:BFO_0000023  role
+#   obo:BFO_0000040  material entity
+#   obo:BFO_0000003  occurrent
+#   obo:BFO_0000031  generically dependent continuant (GDC)
+#
+
+<https://seal.tamu.edu/sool/kernel> a owl:Ontology ;
+    owl:versionInfo "sool-kernel/0.1" .
+
+### SOoL top categories, each grounded to its required BFO anchor. -------------
+
+sool:Norm a owl:Class ;
+    rdfs:label "Norm" ;
+    rdfs:subClassOf obo:BFO_0000020 .   # specifically dependent continuant
+
+sool:Obligation a owl:Class ;
+    rdfs:label "Obligation" ;
+    rdfs:subClassOf obo:BFO_0000020 .
+
+sool:LegalEffect a owl:Class ;
+    rdfs:label "Legal Effect" ;
+    rdfs:subClassOf obo:BFO_0000020 .
+
+sool:Role a owl:Class ;
+    rdfs:label "Role" ;
+    rdfs:subClassOf obo:BFO_0000023 .   # BFO role (a realizable, under SDC)
+
+sool:Agent a owl:Class ;
+    rdfs:label "Agent" ;
+    rdfs:subClassOf obo:BFO_0000040 .   # material entity
+
+sool:LegalEvent a owl:Class ;
+    rdfs:label "Legal Event" ;
+    rdfs:subClassOf obo:BFO_0000003 .   # occurrent
+
+sool:Contradiction a owl:Class ;
+    rdfs:label "Contradiction" ;
+    rdfs:subClassOf obo:BFO_0000031 .   # generically dependent continuant
+
+### A representative slice of the 13 contradiction typology classes (D3). ------
+
+sool:NormConflict       a owl:Class ; rdfs:label "Norm Conflict" ;       rdfs:subClassOf sool:Contradiction .
+sool:RecognitionFailure a owl:Class ; rdfs:label "Recognition Failure" ; rdfs:subClassOf sool:Contradiction .
+sool:EffectBreak        a owl:Class ; rdfs:label "Effect Break" ;        rdfs:subClassOf sool:Contradiction .

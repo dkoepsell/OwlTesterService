@@ -1,0 +1,8 @@
+# code: E_ANTIPATTERN
+# desc: D4 - no AbsenceOf*/Lack*/Failure* named class (failure must be an instance)
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT ?c WHERE {
+  ?c a owl:Class .
+  BIND(REPLACE(STR(?c), "^.*[#/]", "") AS ?local)
+  FILTER(REGEX(?local, "^(AbsenceOf|Absence|LackOf|Lack|Failure|Non[A-Z]|Without|Privation|Deprivation)", "i"))
+}

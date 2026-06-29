@@ -1,0 +1,11 @@
+# code: E_COMPETENCY
+# desc: D1 - every Norm instance must be a specifically dependent continuant
+PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX obo:  <http://purl.obolibrary.org/obo/>
+PREFIX sool: <https://seal.tamu.edu/sool/kernel#>
+SELECT ?ind WHERE {
+  ?ind rdf:type ?t .
+  ?t rdfs:subClassOf* sool:Norm .
+  FILTER NOT EXISTS { ?t rdfs:subClassOf* obo:BFO_0000020 . }
+}

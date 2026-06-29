@@ -3,6 +3,10 @@ name = "owl-tester-service"
 version = "0.1.0"
 description = "FOL-BFO-OWL Analysis System — ontology validation, reasoning, and visualization"
 requires-python = ">=3.11"
+
+[project.scripts]
+owltester = "owltester.cli:main"
+
 dependencies = [
     "email-validator>=2.2.0",
     "flask-uploads>=0.2.1",

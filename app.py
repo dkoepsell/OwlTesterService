@@ -78,6 +78,17 @@ app.config['ALLOWED_EXTENSIONS'] = {'owl', 'rdf', 'xml', 'ttl', 'n3', 'nt', 'ofn
 if not os.path.exists(app.config['UPLOADED_OWLS_DEST']):
     os.makedirs(app.config['UPLOADED_OWLS_DEST'])
 
+# Mount the owltesterservice gate as an HTTP service (POST /owltester/check,
+# /owltester/repair, GET /owltester/report/<id>). Best-effort: a missing gate
+# must not stop the rest of the app from starting.
+try:
+    from owltester.service import bp as _owltester_bp, configure as _owltester_configure
+    _owltester_configure()
+    app.register_blueprint(_owltester_bp)
+    logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)
+
 # Helper function to check if a file has an allowed extension
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -611,6 +622,49 @@ def fix_straddle_download(analysis_id):
     return response
 
 
+def _autofix_trivialization_block(original_path, corrected_bytes, removed_count=0):
+    """owltesterservice delta-invariant guard for the in-app autofix.
+
+    The autofix removes BFO subClassOf edges; in pathological cases bulk removal
+    can hollow an ontology out (the SOOL_autofixed.owl failure). Before we save or
+    serve an autofix result, run the gate's Stage-E delta invariant (counts only,
+    no reasoner) and refuse any result that trivializes or over-relaxes.
+
+    Returns (blocked: bool, message: str). Gate-unavailable degrades to allow, so
+    this never breaks existing behavior, but when present it is a hard stop.
+    """
+    try:
+        import owltester
+    except Exception:  # noqa: BLE001 - gate optional
+        return False, ""
+    import tempfile
+    tmp = None
+    try:
+        base = owltester.baseline_for(original_path)
+        with tempfile.NamedTemporaryFile(suffix=".owl", delete=False) as fh:
+            tmp = fh.name
+            fh.write(corrected_bytes if isinstance(corrected_bytes, bytes)
+                     else corrected_bytes.encode())
+        out = owltester.baseline_for(tmp)
+        if base.axioms > 0 and out.axioms == 0:
+            return True, (f"{owltester.errors.E_TRIVIALIZED}: input had "
+                          f"{base.axioms} axioms, the fix would leave 0.")
+        floor = base.axioms - max(0, int(removed_count))
+        if out.axioms < floor:
+            return True, (f"{owltester.errors.E_OVER_RELAXED}: axioms dropped "
+                          f"from {base.axioms} to {out.axioms}, more than the "
+                          f"{removed_count} removed edge(s) account for.")
+        return False, ""
+    except Exception:  # noqa: BLE001 - never let the guard crash the request
+        return False, ""
+    finally:
+        if tmp and os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
 @app.route('/analysis/<int:analysis_id>/fix-and-reanalyze')
 def fix_and_reanalyze(analysis_id):
     """Drop one clashing subClassOf edge, save the corrected ontology as a new
@@ -667,10 +721,17 @@ def auto_fix_straddles_download(analysis_id):
     file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
 
     try:
-        corrected, _ = fix_all_straddles(
+        corrected, removed = fix_all_straddles(
             file_record.file_path, analysis.lint_findings or [], load_catalog())
     except ValueError as e:
         flash(f"Could not auto-fix: {e}", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    blocked, reason = _autofix_trivialization_block(
+        file_record.file_path, corrected, removed_count=removed)
+    if blocked:
+        flash(f"Auto-fix refused: it would damage the ontology ({reason}). "
+              f"No file was produced.", "error")
         return redirect(url_for('analyze_owl', filename=file_record.filename))
 
     base = file_record.original_filename.rsplit('.', 1)[0]
@@ -694,6 +755,13 @@ def auto_fix_and_reanalyze(analysis_id):
             file_record.file_path, analysis.lint_findings or [], load_catalog())
     except ValueError as e:
         flash(f"Could not auto-fix: {e}", "error")
+        return redirect(url_for('analyze_owl', filename=file_record.filename))
+
+    blocked, reason = _autofix_trivialization_block(
+        file_record.file_path, corrected, removed_count=removed)
+    if blocked:
+        flash(f"Auto-fix refused: it would damage the ontology ({reason}). "
+              f"No corrected file was saved.", "error")
         return redirect(url_for('analyze_owl', filename=file_record.filename))
 
     new_filename = f"{uuid.uuid4().hex}.owl"
