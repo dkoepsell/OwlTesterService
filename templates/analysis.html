@@ -274,9 +274,11 @@
                 {% if analysis.lint_findings %}
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-3 p-2 rounded bg-dark-subtle border">
                     <span class="fw-semibold me-1"><i class="fas fa-wand-magic-sparkles me-1"></i>Auto-fix all straddles</span>
-                    <a class="btn btn-sm btn-primary" href="{{ url_for('auto_fix_and_reanalyze', analysis_id=analysis.id) }}">
-                        <i class="fas fa-rotate me-1"></i>Auto-fix all &amp; re-analyze
-                    </a>
+                    <form method="post" action="{{ url_for('auto_fix_and_reanalyze', analysis_id=analysis.id) }}" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="fas fa-rotate me-1"></i>Auto-fix all &amp; re-analyze
+                        </button>
+                    </form>
                     <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auto_fix_straddles_download', analysis_id=analysis.id) }}">
                         <i class="fas fa-download me-1"></i>Download auto-fixed file
                     </a>
@@ -298,11 +300,11 @@
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li><h6 class="dropdown-header">Keep {{ finding.category_a }}, drop {{ finding.category_b }}</h6></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('fix_and_reanalyze', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_b_iri) }}"><i class="fas fa-rotate me-2"></i>Fix and re-analyze (full coherence)</a></li>
+                                    <li><form method="post" action="{{ url_for('fix_and_reanalyze', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_b_iri) }}"><button type="submit" class="dropdown-item"><i class="fas fa-rotate me-2"></i>Fix and re-analyze (full coherence)</button></form></li>
                                     <li><a class="dropdown-item" href="{{ url_for('fix_straddle_download', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_b_iri) }}"><i class="fas fa-download me-2"></i>Download fixed file</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><h6 class="dropdown-header">Keep {{ finding.category_b }}, drop {{ finding.category_a }}</h6></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('fix_and_reanalyze', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_a_iri) }}"><i class="fas fa-rotate me-2"></i>Fix and re-analyze (full coherence)</a></li>
+                                    <li><form method="post" action="{{ url_for('fix_and_reanalyze', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_a_iri) }}"><button type="submit" class="dropdown-item"><i class="fas fa-rotate me-2"></i>Fix and re-analyze (full coherence)</button></form></li>
                                     <li><a class="dropdown-item" href="{{ url_for('fix_straddle_download', analysis_id=analysis.id, class_iri=finding.class_iri, drop_iri=finding.category_a_iri) }}"><i class="fas fa-download me-2"></i>Download fixed file</a></li>
                                 </ul>
                             </div>

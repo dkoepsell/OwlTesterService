@@ -146,9 +146,11 @@
                                         <td>{{ file.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
                                         <td>{{ (file.file_size / 1024)|round(1) }} KB</td>
                                         <td>
-                                            <a href="{{ url_for('import_to_sandbox', file_id=file.id) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-file-import me-1"></i> Import
-                                            </a>
+                                            <form method="post" action="{{ url_for('import_to_sandbox', file_id=file.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-file-import me-1"></i> Import
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                 {% endfor %}

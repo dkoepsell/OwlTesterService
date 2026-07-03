@@ -665,7 +665,7 @@ def _autofix_trivialization_block(original_path, corrected_bytes, removed_count=
                 pass
 
 
-@app.route('/analysis/<int:analysis_id>/fix-and-reanalyze')
+@app.route('/analysis/<int:analysis_id>/fix-and-reanalyze', methods=['POST'])
 def fix_and_reanalyze(analysis_id):
     """Drop one clashing subClassOf edge, save the corrected ontology as a new
     file, and run full coherence analysis on it."""
@@ -741,7 +741,7 @@ def auto_fix_straddles_download(analysis_id):
     return response
 
 
-@app.route('/analysis/<int:analysis_id>/auto-fix-and-reanalyze')
+@app.route('/analysis/<int:analysis_id>/auto-fix-and-reanalyze', methods=['POST'])
 def auto_fix_and_reanalyze(analysis_id):
     """Resolve every partition straddle at once, save the corrected ontology as a
     new file, and run full coherence analysis on it."""
@@ -1402,7 +1402,7 @@ def view_history():
         flash(f"Error viewing history: {str(e)}", 'error')
         return redirect(url_for('index'))
 
-@app.route('/import_to_sandbox/<int:file_id>')
+@app.route('/import_to_sandbox/<int:file_id>', methods=['POST'])
 def import_to_sandbox(file_id):
     """Import an ontology file from history to the sandbox."""
     success = False
@@ -2544,7 +2544,7 @@ def sandbox_edit(ontology_id):
         flash(f"Error editing sandbox ontology: {str(e)}", 'error')
         return redirect(url_for('sandbox_list'))
 
-@app.route('/sandbox/<int:ontology_id>/export_to_history')
+@app.route('/sandbox/<int:ontology_id>/export_to_history', methods=['POST'])
 def export_to_history(ontology_id):
     """Export a sandbox ontology to history for analysis."""
     try:
@@ -2557,30 +2557,39 @@ def export_to_history(ontology_id):
         
         # Generate OWL/RDF XML
         owl_xml = generate_owl_xml(ontology, classes, properties, individuals)
-        
-        # Create a temp file to save the OWL content
-        import tempfile
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.owl')
-        temp_file.write(owl_xml.encode('utf-8'))
-        temp_file_path = temp_file.name
-        temp_file.close()
-        
+        owl_bytes = owl_xml.encode('utf-8')
+
+        # Reuse the previous export when nothing changed. Every sandbox
+        # "analyze" used to mint a new uploads/ file + history row even for
+        # identical content, so one ontology accumulated hundreds of entries.
+        prev = (OntologyFile.query
+                .filter_by(sandbox_ontology_id=ontology.id, from_sandbox=True)
+                .order_by(OntologyFile.upload_date.desc())
+                .first())
+        if prev and os.path.exists(prev.file_path):
+            try:
+                with open(prev.file_path, 'rb') as prev_fh:
+                    unchanged = prev_fh.read() == owl_bytes
+            except OSError:
+                unchanged = False
+            if unchanged:
+                flash(f"Ontology '{ontology.title}' is unchanged since its last "
+                      f"export — reusing the existing history entry.", 'info')
+                return redirect(url_for('analyze_owl', filename=prev.filename,
+                                        original_name=prev.original_filename,
+                                        file_id=prev.id))
+
         # Generate a unique filename
         unique_filename = f"{ontology.title.replace(' ', '_')}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.owl"
-        
+
         # Define the destination path (uploads directory)
         upload_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
-        
+
         dest_path = os.path.join(upload_dir, unique_filename)
-        
-        # Copy the temp file to the uploads directory
-        import shutil
-        shutil.copy2(temp_file_path, dest_path)
-        
-        # Clean up the temp file
-        os.unlink(temp_file_path)
-        
+        with open(dest_path, 'wb') as dest_fh:
+            dest_fh.write(owl_bytes)
+
         # Create a new OntologyFile record
         file_size = os.path.getsize(dest_path)
         file_record = OntologyFile(
