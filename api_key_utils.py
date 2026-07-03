@@ -43,7 +43,11 @@ def resolve_openai_key(explicit=None):
         return explicit
     s = _session()
     if s and s.get(SESSION_KEY):
-        return s.get(SESSION_KEY)
+        key = s.get(SESSION_KEY)
+        # An Anthropic key misfiled in the OpenAI slot is worse than no key:
+        # it turns every OpenAI call into a 401.
+        if not key.startswith("sk-ant-"):
+            return key
     return os.environ.get("OPENAI_API_KEY")
 
 
@@ -75,6 +79,12 @@ def resolve_ai(explicit_key=None, explicit_provider=None):
         chosen = s.get(PROVIDER_SESSION_KEY)
         openai_key = s.get(SESSION_KEY)
         anthropic_key = s.get(ANTHROPIC_SESSION_KEY)
+        # Heal sessions that filed an Anthropic key ("sk-ant-...") in the
+        # OpenAI slot before the save endpoint auto-detected the provider.
+        if openai_key and openai_key.startswith("sk-ant-"):
+            anthropic_key = anthropic_key or openai_key
+            openai_key = None
+            chosen = "anthropic"
         if chosen == "anthropic" and anthropic_key:
             return ("anthropic", anthropic_key)
         if chosen == "openai" and openai_key:

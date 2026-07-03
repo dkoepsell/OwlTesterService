@@ -1167,7 +1167,18 @@ def generate_implications(analysis_id):
                     domain_classes=domain_classes,
                     fol_premises=fol_premises
                 )
-                
+
+                # The generator reports failure as [{"error": ..., "title": ...}]
+                # instead of raising. Surface that as an error response — don't
+                # persist an error card as if it were an implication.
+                if (isinstance(implications, list) and implications
+                        and isinstance(implications[0], dict)
+                        and implications[0].get('error')):
+                    return jsonify({
+                        'success': False,
+                        'message': implications[0]['error']
+                    }), 502
+
                 # Update the analysis record
                 analysis.real_world_implications = implications
                 analysis.implications_generated = True
@@ -1332,6 +1343,11 @@ def manage_openai_key():
 
     # Light sanity check by provider; do not log the key. Storing one provider's
     # key clears the other so the active provider is unambiguous.
+    # Anthropic keys also start with "sk-", so an "sk-ant-" key pasted with the
+    # dropdown left on OpenAI would pass the OpenAI check, get sent to OpenAI,
+    # and 401. File it by what it actually is.
+    if provider == 'openai' and api_key.startswith('sk-ant-'):
+        provider = 'anthropic'
     if provider == 'openai':
         if not api_key.startswith('sk-') or len(api_key) < 20:
             return jsonify({'success': False,

@@ -21,7 +21,7 @@
                 <div class="btn-group mb-3" role="group">
                     <button type="button" class="btn btn-outline-secondary" onclick="resetView()">Reset View</button>
                     <button type="button" class="btn btn-outline-secondary" onclick="centerGraph()">Center Graph</button>
-                    <button type="button" class="btn btn-outline-primary" onclick="downloadPNG()">Download PNG</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="downloadSVG()">Download SVG</button>
                     <button type="button" class="btn btn-outline-warning" onclick="validateGraph()">Validate Logic</button>
                 </div>
                 
@@ -725,61 +725,68 @@
             );
         }
         
-        function downloadPNG() {
+        function downloadSVG() {
             const svg = document.querySelector("#viz-container svg");
             if (!svg) {
                 alert("No visualization to download");
                 return;
             }
-            
-            // Get the SVG dimensions
-            const svgRect = svg.getBoundingClientRect();
-            const svgWidth = svgRect.width;
-            const svgHeight = svgRect.height;
-            
-            // Create a canvas element
-            const canvas = document.createElement("canvas");
-            canvas.width = svgWidth * 2; // Higher resolution
-            canvas.height = svgHeight * 2;
-            const ctx = canvas.getContext("2d");
-            
-            // Scale for higher quality
-            ctx.scale(2, 2);
-            
-            // Set dark background to match theme
-            ctx.fillStyle = "#1f2937";
-            ctx.fillRect(0, 0, svgWidth, svgHeight);
-            
-            // Convert SVG to string
-            const svgData = new XMLSerializer().serializeToString(svg);
-            const svgBlob = new Blob([svgData], {type: "image/svg+xml;charset=utf-8"});
-            const svgUrl = URL.createObjectURL(svgBlob);
-            
-            // Create an image and draw it to canvas
-            const img = new Image();
-            img.onload = function() {
-                ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
-                
-                // Convert canvas to PNG and download
-                canvas.toBlob(function(blob) {
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = "bvss-ontology-visualization.png";
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                }, "image/png");
-                
-                URL.revokeObjectURL(svgUrl);
-            };
-            
-            img.onerror = function() {
-                alert("PNG export failed. Please try screenshotting the visualization instead.");
-            };
-            
-            img.src = svgUrl;
+
+            // Export the FULL graph at natural size, not the rasterized
+            // viewport: clone the SVG, strip the zoom/pan transform, and size
+            // the viewBox to the content so every node label is readable.
+            const SVG_NS = "http://www.w3.org/2000/svg";
+            const contentGroup = svg.querySelector("g");
+            let bbox = null;
+            try {
+                bbox = contentGroup ? contentGroup.getBBox() : null;
+            } catch (e) { /* detached or empty svg */ }
+
+            const clone = svg.cloneNode(true);
+            const cloneGroup = clone.querySelector("g");
+            if (cloneGroup) {
+                cloneGroup.removeAttribute("transform");  // undo current zoom/pan
+            }
+
+            const pad = 40;
+            let x = 0, y = 0, w = svg.clientWidth || 1200, h = svg.clientHeight || 800;
+            if (bbox && bbox.width > 0 && bbox.height > 0) {
+                x = bbox.x - pad;
+                y = bbox.y - pad;
+                w = bbox.width + 2 * pad;
+                h = bbox.height + 2 * pad;
+            }
+            clone.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+            clone.setAttribute("width", Math.ceil(w));
+            clone.setAttribute("height", Math.ceil(h));
+            clone.setAttribute("xmlns", SVG_NS);
+            clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+            // Node labels are white — bake in the dark theme background so the
+            // standalone file is readable outside the app.
+            const bg = document.createElementNS(SVG_NS, "rect");
+            bg.setAttribute("x", x);
+            bg.setAttribute("y", y);
+            bg.setAttribute("width", w);
+            bg.setAttribute("height", h);
+            bg.setAttribute("fill", "#1f2937");
+            clone.insertBefore(bg, clone.firstChild);
+
+            const style = document.createElementNS(SVG_NS, "style");
+            style.textContent = "text { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }";
+            clone.insertBefore(style, clone.firstChild);
+
+            const svgData = new XMLSerializer().serializeToString(clone);
+            const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + svgData],
+                                  {type: "image/svg+xml;charset=utf-8"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "bvss-ontology-visualization.svg";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
         
         function validateGraph() {
@@ -870,7 +877,8 @@
                     if (error.source && error.target && error.property) {
                         // Highlight problematic edges
                         d3.selectAll('line')
-                            .filter(d => d.source.name === error.source && d.target.name === error.target)
+                            .filter(d => d && d.source && d.target &&
+                                    d.source.name === error.source && d.target.name === error.target)
                             .classed('validation-error', true)
                             .attr('stroke', '#dc3545')
                             .attr('stroke-width', 4)
@@ -880,7 +888,7 @@
                     if (error.entity) {
                         // Highlight problematic nodes
                         d3.selectAll('g')
-                            .filter(d => d.name === error.entity)
+                            .filter(d => d && d.name === error.entity)
                             .classed('validation-error', true)
                             .select('circle, rect, polygon')
                             .attr('stroke', '#dc3545')
@@ -896,13 +904,14 @@
             d3.selectAll('.validation-error').classed('validation-error', false);
             d3.selectAll('.validation-warning').classed('validation-warning', false);
             
-            // Restore original styles
-            d3.selectAll('line')
+            // Restore original styles (only elements with bound graph data —
+            // selectAll also matches unbound lines/groups elsewhere on the page)
+            d3.selectAll('line').filter(d => !!d)
                 .attr('stroke', d => getBVSSArrowColor(d.relation))
                 .attr('stroke-width', d => getBVSSArrowWidth(d.relation))
                 .attr('stroke-dasharray', d => getBVSSArrowDash(d.relation));
-                
-            d3.selectAll('g').selectAll('circle, rect, polygon')
+
+            d3.selectAll('g').selectAll('circle, rect, polygon').filter(d => !!d)
                 .attr('stroke', d => d.bfo ? "#000000" : getGroupColor(d.group))
                 .attr('stroke-width', d => d.bfo ? 3 : 2);
         }

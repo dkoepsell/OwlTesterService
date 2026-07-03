@@ -94,6 +94,15 @@
                     {% if analysis.implications_generated and analysis.real_world_implications %}
                         <div class="row" id="implicationsCardRow">
                             {% for implication in analysis.real_world_implications %}
+                                {% if implication.error %}
+                                <div class="col-12 mb-4">
+                                    <div class="alert alert-danger mb-0">
+                                        <strong>{{ implication.title or 'Error generating implications' }}:</strong>
+                                        {{ implication.error }}
+                                        <div class="small mt-1">Fix your AI key or provider above, then click Regenerate.</div>
+                                    </div>
+                                </div>
+                                {% else %}
                                 <div class="col-md-6 mb-4">
                                     <div class="card h-100 border-primary">
                                         <div class="card-header bg-primary text-white">
@@ -102,7 +111,7 @@
                                         <div class="card-body">
                                             <h6 class="card-subtitle mb-2 text-primary">Scenario:</h6>
                                             <p class="card-text">{{ implication.scenario }}</p>
-                                            
+
                                             <h6 class="card-subtitle mb-2 text-primary">Explanation:</h6>
                                             <p class="card-text">{{ implication.explanation }}</p>
                                             
@@ -119,6 +128,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                {% endif %}
                             {% endfor %}
                         </div>
                     {% else %}
