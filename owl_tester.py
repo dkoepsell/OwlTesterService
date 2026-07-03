@@ -951,9 +951,31 @@ class OwlTester:
             expressivity += "O"
         return expressivity
 
+    @staticmethod
+    def _kill_stray_java_children():
+        """Best-effort SIGKILL of Java subprocesses spawned by this worker, so a
+        timed-out Pellet run stops burning CPU (and the helper thread waiting on
+        it exits). Linux-only via /proc; silently a no-op elsewhere."""
+        import signal
+        me = os.getpid()
+        try:
+            pids = os.listdir('/proc')
+        except OSError:
+            return
+        for pid in pids:
+            if not pid.isdigit():
+                continue
+            try:
+                with open(f'/proc/{pid}/stat') as f:
+                    parts = f.read().split()
+                if int(parts[3]) == me and 'java' in parts[1]:
+                    os.kill(int(pid), signal.SIGKILL)
+            except (OSError, ValueError, IndexError):
+                continue
+
     def _try_reasoner_with_budget(self, onto, budget_seconds=60):
         """
-        Run owlready2 / Pellet with a SIGALRM-based timeout.
+        Run owlready2 / Pellet with a thread-based timeout.
         Returns: (consistent: bool, methodology_extras: dict, derivation_steps: list,
                   inferred_axioms: list, skipped_reason: Optional[str],
                   unsatisfiable_classes: list[dict])
@@ -962,37 +984,21 @@ class OwlTester:
         owl:Nothing (each {name, label, iri}). This is coherence, separate from the
         global consistency flag, and is empty when reasoning was skipped or failed.
 
-        Note: SIGALRM only interrupts Python — if Pellet's Java subprocess is mid-run,
-        it may keep running briefly after timeout. Not a leak in practice (gunicorn
-        worker death via max_requests will eventually clear it).
+        The budget is enforced by running Pellet in a helper thread and waiting
+        with a timeout — NOT SIGALRM, which only works in the main thread and
+        crashed every analysis under gunicorn gthread workers. On timeout the
+        stray Java reasoner subprocess is killed so the helper thread exits soon
+        after instead of running to completion.
         """
-        import signal
-
-        if not hasattr(signal, 'SIGALRM'):
-            # Windows fallback: just don't reason
-            return True, {'reasoner_skipped': 'no SIGALRM on this platform'}, [], [], 'unsupported_platform', []
-
-        class _ReasonerTimeout(Exception):
-            pass
-
-        def _handler(signum, frame):
-            raise _ReasonerTimeout(f"reasoner exceeded {budget_seconds}s budget")
-
-        old_handler = signal.signal(signal.SIGALRM, _handler)
-        signal.alarm(int(budget_seconds))
+        import concurrent.futures
 
         # Capture pre-reasoning hierarchy so we can diff for inferences afterwards
         pre = {}
-        try:
-            for cls in onto.classes():
-                if hasattr(cls, 'name') and hasattr(cls, 'is_a'):
-                    pre[cls.name] = [p.name for p in cls.is_a if hasattr(p, 'name')]
-        except _ReasonerTimeout:
-            signal.alarm(0); signal.signal(signal.SIGALRM, old_handler)
-            return True, {'reasoner_skipped': 'class enumeration exceeded budget'}, [], [], 'enumeration_timeout', []
+        for cls in onto.classes():
+            if hasattr(cls, 'name') and hasattr(cls, 'is_a'):
+                pre[cls.name] = [p.name for p in cls.is_a if hasattr(p, 'name')]
 
-        t = time.perf_counter()
-        try:
+        def _run_reasoner():
             # Reason over the ontology's own world (isolated per analysis), not the
             # global default world. Pass the world explicitly so inconsistent_classes()
             # below reflects only this ontology plus its BFO import.
@@ -1001,19 +1007,20 @@ class OwlTester:
                 owlready2.sync_reasoner_pellet(reason_world,
                                                infer_property_values=True,
                                                infer_data_property_values=True)
+
+        t = time.perf_counter()
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            executor.submit(_run_reasoner).result(timeout=budget_seconds)
             elapsed = time.perf_counter() - t
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
             logger.info(f"[STAGE] reasoner: {elapsed:.2f}s")
-        except _ReasonerTimeout as e:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+        except concurrent.futures.TimeoutError:
+            self._kill_stray_java_children()
             logger.warning(f"[STAGE] reasoner: TIMED OUT after {budget_seconds}s")
-            return True, {'reasoner_skipped': str(e), 'reasoner_budget_seconds': budget_seconds}, [], [], 'reasoner_timeout', []
+            return True, {'reasoner_skipped': f'reasoner exceeded {budget_seconds}s budget',
+                          'reasoner_budget_seconds': budget_seconds}, [], [], 'reasoner_timeout', []
         except owlready2.OwlReadyInconsistentOntologyError as e:
             # A genuine logical inconsistency: Pellet proved no model exists.
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
             logger.warning(f"[STAGE] reasoner: ontology is INCONSISTENT ({e})")
             return False, {'inconsistency_reason': str(e)}, [{
                 'axiom_type': 'Inconsistency',
@@ -1028,10 +1035,10 @@ class OwlTester:
             # This is NOT a logical inconsistency — do not claim the ontology is
             # inconsistent. Degrade to "could not determine", like the timeout path,
             # so the report does not mislabel a tooling failure as a contradiction.
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
             logger.warning(f"[STAGE] reasoner: FAILED, not an inconsistency ({e})")
             return True, {'reasoner_skipped': f'reasoner error: {e}'}, [], [], 'reasoner_error', []
+        finally:
+            executor.shutdown(wait=False)
 
         # Diff pre/post for new SubClassOf inferences
         derivation_steps = []
