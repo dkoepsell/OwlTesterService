@@ -62,8 +62,10 @@ class BVSSValidator:
             Validation results with errors, warnings, and valid elements
         """
         try:
-            # Load ontology
-            onto = get_ontology(f"file://{ontology_path}").load()
+            # Load into an isolated world — same reasoning as bvss_model: the
+            # shared default world corrupts under repeated loads in threads.
+            world = World()
+            onto = world.get_ontology(f"file://{ontology_path}").load()
             
             validation_result = {
                 "errors": [],

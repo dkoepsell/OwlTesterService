@@ -6,7 +6,7 @@ for visualization, with special focus on BFO (Basic Formal Ontology) alignment.
 """
 
 import logging
-from owlready2 import get_ontology
+from owlready2 import World
 from bfo_2020_definitions import BFO_2020_CLASSES, BFO_2020_RELATIONS
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,11 @@ class BVSSConverter:
             dict: Graph structure with nodes and edges for BVSS visualization
         """
         try:
-            onto = get_ontology(ontology_path).load()
+            # Load into an isolated world: the shared default world is
+            # process-global, and repeated/concurrent loads corrupt its store
+            # ("UNIQUE constraint failed: resources.storid") under threads.
+            world = World()
+            onto = world.get_ontology(f"file://{ontology_path}").load()
             nodes = []
             edges = []
             
