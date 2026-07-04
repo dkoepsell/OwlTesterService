@@ -10,6 +10,19 @@ keepalive = 5
 max_requests = 500
 max_requests_jitter = 50
 preload_app = True
+
+
+def post_fork(server, worker):
+    # preload_app forks workers after the app module has run db.create_all(),
+    # so pooled DB connections exist in the master and are inherited as shared
+    # sockets by every worker — concurrent use corrupts the wire protocol
+    # (psycopg2 "PGRES_TUPLES_OK and no message"). Give each worker a fresh pool.
+    try:
+        from app import app, db
+        with app.app_context():
+            db.engine.dispose()
+    except Exception:
+        pass
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"

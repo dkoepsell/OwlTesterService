@@ -2263,11 +2263,32 @@ def bvss_visualize(filename):
         
         # Extract BVSS graph data
         bvss_data = extract_bvss_graph(file_path)
-        
-        return render_template('bvss_fixed.html', 
+
+        # Findings for the explorer: flagged entities get a red ring and the
+        # first one is the default focus. Pulled from the latest analysis.
+        # Best-effort: a DB without the newer analysis columns just means no flags.
+        findings = []
+        try:
+            latest = (max(file_record.analyses, key=lambda a: a.id)
+                      if file_record.analyses else None)
+            if latest:
+                for f in (latest.lint_findings or []):
+                    findings.append({
+                        'entity': f.get('class'), 'iri': f.get('class_iri'),
+                        'kind': 'straddle', 'message': f.get('message')})
+                for u in (latest.unsatisfiable_classes or []):
+                    findings.append({
+                        'entity': u.get('name'), 'iri': u.get('iri'),
+                        'kind': 'unsatisfiable',
+                        'message': 'Provably equivalent to owl:Nothing'})
+        except Exception as find_err:
+            app.logger.warning(f"BVSS findings unavailable: {find_err}")
+
+        return render_template('bvss_fixed.html',
                              file=file_record,
                              filename=filename,
-                             bvss_data=bvss_data)
+                             bvss_data=bvss_data,
+                             bvss_findings=findings)
             
     except Exception as e:
         app.logger.error(f"Error generating BVSS visualization: {str(e)}")

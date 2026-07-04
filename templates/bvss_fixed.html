@@ -1,132 +1,135 @@
 {% extends "layout.html" %}
-{% block title %}BVSS Visualization: {{ filename }}{% endblock %}
+{% block title %}BVSS Explorer: {{ filename }}{% endblock %}
 
 {% block content %}
     <div class="container mt-4">
         <div class="row">
             <div class="col-12">
-                <h2>BVSS Visualization: {{ filename }}</h2>
+                <h2>BVSS Explorer: {{ file.original_filename or filename }}</h2>
                 <div class="alert alert-info">
                     <h6>BFO Visual Syntax System (BVSS)</h6>
-                    <p>The BFO Visual Syntax System (BVSS) provides a standardized, intuitive, and expressive visual language for representing the full set of Basic Formal Ontology (BFO) entities and relations across domains. It enables the creation of legible, interoperable diagrams that support teaching, modeling, and ontology validation.</p>
+                    <p class="mb-0">Navigate the ontology one neighborhood at a time: focus an entity to see its
+                    parents, children and lateral relations; switch to the BFO backbone for the category overview,
+                    or Hubs for the flat-hierarchy audit. Scale comes from navigation, not from drawing every node.</p>
                 </div>
             </div>
         </div>
 
         <div class="card mb-4">
             <div class="card-body">
-                <h6>Ontology Information</h6>
-                <p id="ontology-stats"><strong>Classes:</strong> <span id="class-count">Loading...</span> | <strong>Properties:</strong> <span id="property-count">Loading...</span></p>
-                
-                <div class="btn-group mb-3" role="group">
-                    <button type="button" class="btn btn-outline-secondary" onclick="resetView()">Reset View</button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="centerGraph()">Center Graph</button>
-                    <button type="button" class="btn btn-outline-primary" onclick="downloadSVG()">Download SVG</button>
-                    <button type="button" class="btn btn-outline-warning" onclick="validateGraph()">Validate Logic</button>
+                <p id="ontology-stats" class="mb-2"><strong>Classes:</strong> <span id="class-count">–</span> |
+                   <strong>Properties:</strong> <span id="property-count">–</span></p>
+
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <div class="btn-group" role="group" aria-label="Explorer mode">
+                        <button type="button" class="btn btn-outline-light mode-btn" data-mode="neighborhood">Neighborhood</button>
+                        <button type="button" class="btn btn-outline-light mode-btn" data-mode="backbone">BFO backbone</button>
+                        <button type="button" class="btn btn-outline-light mode-btn" data-mode="hubs">Hubs</button>
+                    </div>
+                    <div class="btn-group" role="group" aria-label="History">
+                        <button type="button" id="nav-back" class="btn btn-outline-secondary" title="Back (Alt+←)">←</button>
+                        <button type="button" id="nav-fwd" class="btn btn-outline-secondary" title="Forward (Alt+→)">→</button>
+                    </div>
+                    <div class="position-relative" style="min-width:220px;">
+                        <input type="search" id="entity-search" class="form-control form-control-sm"
+                               placeholder="Search classes… ( / )" autocomplete="off" aria-label="Search classes">
+                        <div id="search-results" class="list-group position-absolute w-100 d-none" style="z-index:1050; max-height:300px; overflow-y:auto;"></div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="downloadSVG()">Download SVG</button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="validateGraph()">Validate Logic</button>
                 </div>
-                
+
+                <nav id="breadcrumbs" class="d-flex flex-wrap align-items-center gap-1 mb-2 small" aria-label="Visited entities"></nav>
+
                 <!-- Validation Status Panel -->
-                <div id="validation-panel" class="card mt-3" style="display: none;">
+                <div id="validation-panel" class="card mt-2 mb-2" style="display: none;">
                     <div class="card-header d-flex justify-content-between">
                         <h6 class="mb-0">Validation Results</h6>
-                        <button type="button" class="btn-close btn-sm" onclick="hideValidation()"></button>
+                        <button type="button" class="btn-close btn-sm" onclick="hideValidation()" aria-label="Close"></button>
                     </div>
-                    <div class="card-body">
-                        <div id="validation-content">
-                            <!-- Validation results will be populated here -->
+                    <div class="card-body"><div id="validation-content"></div></div>
+                </div>
+
+                <div id="viz-wrap" class="position-relative">
+                    <svg id="bvss-canvas" role="img" aria-label="BVSS explorer canvas" tabindex="0"
+                         style="width:100%; height:70vh; min-height:420px; background:#1f2937; border-radius:6px; touch-action:none; display:block;">
+                        <g id="viewport"></g>
+                    </svg>
+                    <div id="cam-controls" class="position-absolute d-flex flex-column gap-1" style="top:10px; right:10px;">
+                        <button type="button" class="btn btn-sm btn-dark border" onclick="camZoom(1.3)" title="Zoom in">+</button>
+                        <button type="button" class="btn btn-sm btn-dark border" onclick="camZoom(1/1.3)" title="Zoom out">−</button>
+                        <button type="button" class="btn btn-sm btn-dark border" onclick="fitToContent(true)" title="Fit content">Fit</button>
+                        <button type="button" class="btn btn-sm btn-dark border" onclick="resetCam()" title="Reset camera (Esc)">Reset</button>
+                    </div>
+                    <div id="focus-strip" class="position-absolute small text-light px-2 py-1 rounded"
+                         style="left:10px; top:10px; background:rgba(17,24,39,.85); max-width:60%;"></div>
+
+                    <!-- Lane drawer (backbone mode) -->
+                    <div id="lane-drawer" class="position-absolute d-none flex-column"
+                         style="top:0; right:0; width:320px; max-width:85%; height:100%; background:rgba(17,24,39,.97); border-left:1px solid #374151; border-radius:0 6px 6px 0; z-index:1040;">
+                        <div class="d-flex justify-content-between align-items-center p-2 border-bottom border-secondary">
+                            <strong id="lane-drawer-title" class="text-light small"></strong>
+                            <button type="button" class="btn-close btn-close-white btn-sm" onclick="closeLaneDrawer()" aria-label="Close lane"></button>
                         </div>
+                        <div class="p-2"><input type="search" id="lane-drawer-search" class="form-control form-control-sm" placeholder="Filter within lane…" aria-label="Filter within lane"></div>
+                        <div id="lane-drawer-list" class="flex-grow-1 overflow-auto px-2 pb-2"></div>
                     </div>
                 </div>
-                <div id="viz-container"></div>
+                <p class="text-muted small mt-2 mb-0">
+                    Wheel / pinch to zoom · drag to pan · click a node to focus ·
+                    <kbd>↑</kbd>/<kbd>↓</kbd> parent/child · <kbd>←</kbd>/<kbd>→</kbd> cycle neighbors · <kbd>Enter</kbd> focus ·
+                    <kbd>Esc</kbd> reset · <kbd>/</kbd> search · <kbd>Alt+←/→</kbd> history
+                </p>
             </div>
         </div>
 
         <div class="card">
             <div class="card-body">
-                <h6>Enhanced BFO Visual Syntax (BVSS) Legend</h6>
+                <h6>BVSS Legend</h6>
                 <div class="row">
                     <div class="col-md-4">
-                        <h6 class="text-muted">Entity Types</h6>
+                        <h6 class="text-muted">Continuants</h6>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <circle cx="10" cy="10" r="8" fill="none" stroke="#000000" stroke-width="2"/>
-                            </svg>
-                            <strong>●</strong> Independent Continuant
+                            <svg width="20" height="20" class="me-2"><circle cx="10" cy="10" r="8" fill="none" stroke="#60a5fa" stroke-width="2"/></svg>
+                            Independent Continuant
                         </div>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <rect x="2" y="2" width="16" height="16" fill="#808080" stroke="#000000" stroke-width="2"/>
-                            </svg>
-                            <strong>■</strong> Material Entity
+                            <svg width="20" height="20" class="me-2"><circle cx="10" cy="10" r="8" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="3,2"/></svg>
+                            Dependent Continuant
                         </div>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <rect x="2" y="2" width="16" height="16" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="3,3"/>
-                            </svg>
-                            <strong>□</strong> Immaterial Entity
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <polygon points="2,10 15,6 15,8 18,10 15,12 15,14" fill="#000000"/>
-                            </svg>
-                            <strong>⟶</strong> Process (Occurrent)
+                            <svg width="20" height="20" class="me-2"><rect x="3" y="3" width="14" height="14" fill="none" stroke="#34d399" stroke-width="2"/></svg>
+                            Spatial Region
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <h6 class="text-muted">Dependent Types</h6>
+                        <h6 class="text-muted">Occurrents</h6>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
-                            </svg>
-                            <strong>◌</strong> Dependent Continuant
+                            <svg width="22" height="20" class="me-2"><polygon points="3,4 14,4 19,10 14,16 3,16" fill="none" stroke="#fbbf24" stroke-width="2"/></svg>
+                            Process
                         </div>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
-                                <text x="10" y="5" font-size="8" text-anchor="middle" fill="#000000">⚒</text>
-                            </svg>
-                            <strong>⚒</strong> Function
+                            <svg width="20" height="20" class="me-2"><polygon points="10,2 18,10 10,18 2,10" fill="none" stroke="#f472b6" stroke-width="2"/></svg>
+                            Temporal Region
                         </div>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
-                                <text x="10" y="5" font-size="8" text-anchor="middle" fill="#000000">⚏</text>
-                            </svg>
-                            <strong>⚏</strong> Disposition
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <circle cx="10" cy="10" r="6" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="2,2"/>
-                                <text x="15" y="6" font-size="10" text-anchor="middle" fill="#000000">↺</text>
-                            </svg>
-                            <strong>↺</strong> Generic Dependent
+                            <svg width="20" height="20" class="me-2"><polygon points="6,3 14,3 18,10 14,17 6,17 2,10" fill="none" stroke="#9ca3af" stroke-width="2"/></svg>
+                            Relation (object property)
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <h6 class="text-muted">Relations</h6>
+                        <h6 class="text-muted">Edges &amp; flags</h6>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <line x1="2" y1="10" x2="18" y2="10" stroke="#000000" stroke-width="3"/>
-                            </svg>
-                            <strong>↑</strong> is_a (taxonomic)
+                            <svg width="20" height="20" class="me-2"><line x1="2" y1="10" x2="18" y2="10" stroke="#e5e7eb" stroke-width="2.5"/></svg>
+                            is_a (taxonomic)
                         </div>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <line x1="2" y1="10" x2="18" y2="10" stroke="#666666" stroke-width="2" stroke-dasharray="3,3"/>
-                            </svg>
-                            <strong>→</strong> has_role
+                            <svg width="20" height="20" class="me-2"><line x1="2" y1="10" x2="18" y2="10" stroke="#9ca3af" stroke-width="2" stroke-dasharray="4,3"/></svg>
+                            has_property / points_to / lateral
                         </div>
                         <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <line x1="2" y1="10" x2="18" y2="10" stroke="#555555" stroke-width="4"/>
-                            </svg>
-                            <strong>⇨</strong> participates_in
-                        </div>
-                        <div class="d-flex align-items-center mb-2">
-                            <svg width="20" height="20" class="me-2">
-                                <path d="M2,10 Q10,5 18,10" fill="none" stroke="#333333" stroke-width="2"/>
-                            </svg>
-                            <strong>↻</strong> realizes
+                            <svg width="20" height="20" class="me-2"><circle cx="10" cy="10" r="8" fill="none" stroke="#ef4444" stroke-width="3"/></svg>
+                            Flagged finding (straddle / unsatisfiable)
                         </div>
                     </div>
                 </div>
@@ -134,789 +137,697 @@
         </div>
     </div>
 
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script>
-        // Global variables
-        let simulation, svg, container, nodes, links;
-        const width = 800;
-        const height = 600;
+    <style>
+        .mode-btn.active { background:#0d6efd; border-color:#0d6efd; color:#fff; }
+        #bvss-canvas:focus { outline: 2px solid #0d6efd; outline-offset: 2px; }
+        #viewport .node { cursor: pointer; }
+        #viewport .node text { fill:#f3f4f6; font-size:11px; pointer-events:none;
+                               font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        #viewport .edge-label { fill:#9ca3af; font-size:9px; opacity:0;
+                                font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        #viewport .edge:hover + .edge-label, #viewport .edge-label.hot { opacity:1; }
+        /* Hover highlight: pure class toggles, no re-layout (spec N-3) */
+        #viewport.dim .node, #viewport.dim .edge, #viewport.dim .edge-label { opacity:0.25; transition:opacity .12s; }
+        #viewport.dim .node.hot, #viewport.dim .edge.hot { opacity:1; }
+        #viewport.dim .edge-label.hot { opacity:1; }
+        #viewport .node.kb-highlight .glyph { stroke:#38bdf8 !important; stroke-width:4 !important; }
+        #viewport .node.invalid .glyph { stroke:#ef4444 !important; stroke-width:3.5 !important; }
+        .crumb { border:1px solid #4b5563; border-radius:12px; padding:1px 8px; cursor:pointer;
+                 background:#111827; color:#e5e7eb; }
+        .crumb.current { border-color:#0d6efd; color:#fff; }
+        .lane-row { cursor:pointer; }
+        .lane-row:hover { background:#1f2937; }
+        @media (prefers-reduced-motion: reduce) {
+            #viewport.dim .node, #viewport.dim .edge { transition:none; }
+        }
+    </style>
 
-        // Initialize visualization
-        function initVisualization() {
-            try {
-                console.log("Initializing BVSS visualization...");
-                
-                // Load ontology data
-                const bvssData = {{ bvss_data | tojson | safe }};
-                console.log("Raw BVSS data:", bvssData);
-                
-                // Process nodes
-                nodes = [];
-                links = [];
-                
-                if (bvssData && bvssData.nodes) {
-                    // Add BFO core nodes
-                    const bfoNodes = [
-                        {id: "Entity", name: "Entity", shape: "circle", group: 0, bfo: true},
-                        {id: "Continuant", name: "Continuant", shape: "circle", group: 0, bfo: true},
-                        {id: "Occurrent", name: "Occurrent", shape: "arrow", group: 0, bfo: true},
-                        {id: "IndependentContinuant", name: "Independent Continuant", shape: "circle", group: 1, bfo: true},
-                        {id: "MaterialEntity", name: "Material Entity", shape: "square", group: 1, bfo: true},
-                        {id: "DependentContinuant", name: "Dependent Continuant", shape: "small-dashed-circle", group: 2, bfo: true},
-                        {id: "SpatialRegion", name: "Spatial Region", shape: "hollow-square", group: 5, bfo: true},
-                        {id: "Process", name: "Process", shape: "arrow", group: 4, bfo: true},
-                        {id: "GenericallyDependentContinuant", name: "Generically Dependent Continuant", shape: "small-dashed-circle-migrate", group: 3, bfo: true}
-                    ];
-                    
-                    // Add ontology nodes with proper extraction
-                    const ontologyNodes = bvssData.nodes
-                        .filter(node => node.type !== "Relation")
-                        .map(node => {
-                            const nodeName = extractName(node.name || node.label || node.id);
-                            return {
-                                id: nodeName,
-                                name: nodeName,
-                                shape: classifyShape(nodeName),
-                                group: classifyGroup(nodeName),
-                                bfo: false
-                            };
-                        });
-                    
-                    nodes = [...bfoNodes, ...ontologyNodes];
-                    
-                    // Add BFO hierarchy links
-                    links = [
-                        {source: "Entity", target: "Continuant", type: "is_a"},
-                        {source: "Entity", target: "Occurrent", type: "is_a"},
-                        {source: "Continuant", target: "IndependentContinuant", type: "is_a"},
-                        {source: "Continuant", target: "DependentContinuant", type: "is_a"},
-                        {source: "Continuant", target: "SpatialRegion", type: "is_a"},
-                        {source: "IndependentContinuant", target: "MaterialEntity", type: "is_a"},
-                        {source: "DependentContinuant", target: "GenericallyDependentContinuant", type: "is_a"},
-                        {source: "Occurrent", target: "Process", type: "is_a"}
-                    ];
-                    
-                    // Add ontology inheritance links
-                    if (bvssData.edges) {
-                        bvssData.edges
-                            .filter(edge => edge.type === "inheritance")
-                            .forEach(edge => {
-                                const sourceId = extractName(edge.source);
-                                const targetId = extractName(edge.target);
-                                
-                                // Check if both nodes exist
-                                const sourceExists = nodes.some(n => n.id === sourceId);
-                                const targetExists = nodes.some(n => n.id === targetId);
-                                
-                                if (sourceExists && targetExists) {
-                                    links.push({
-                                        source: sourceId,
-                                        target: targetId,
-                                        type: "is_a"
-                                    });
-                                } else {
-                                    // Connect ontology classes to appropriate BFO classes
-                                    if (targetExists && !sourceExists) {
-                                        const bfoParent = classifyBFOParent(targetId);
-                                        if (bfoParent) {
-                                            links.push({
-                                                source: bfoParent,
-                                                target: targetId,
-                                                type: "is_a"
-                                            });
-                                        }
-                                    }
-                                }
-                            });
-                    }
-                }
-                
-                console.log(`Processed ${nodes.length} nodes and ${links.length} links`);
-                
-                // Update stats
-                const classCount = nodes.filter(n => !n.bfo).length;
-                document.getElementById('class-count').textContent = classCount;
-                document.getElementById('property-count').textContent = bvssData?.ontology_info?.property_count || 0;
-                
-                // Create visualization
-                createVisualization();
-                
-            } catch (error) {
-                console.error("Error initializing visualization:", error);
-                document.getElementById('viz-container').innerHTML = 
-                    '<div class="alert alert-danger">Error loading visualization: ' + error.message + '</div>';
+    <script>
+    (function() {
+        'use strict';
+        // ================= data =================
+        const RAW = {{ bvss_data | tojson | safe }};
+        const FINDINGS = {{ bvss_findings | tojson | safe }};
+        const FILENAME = {{ filename | tojson | safe }};
+
+        const SVGNS = 'http://www.w3.org/2000/svg';
+        const canvas = document.getElementById('bvss-canvas');
+        const viewport = document.getElementById('viewport');
+        const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const TYPE_COLOR = {
+            IndependentContinuant: '#60a5fa', DependentContinuant: '#a78bfa',
+            Process: '#fbbf24', SpatialRegion: '#34d399', TemporalRegion: '#f472b6',
+            Relation: '#9ca3af', Unknown: '#d1d5db'
+        };
+        const BFO_ROOTS = new Set(['entity','thing','owl:thing','continuant','occurrent',
+            'independentcontinuant','dependentcontinuant','specificallydependentcontinuant',
+            'genericallydependentcontinuant','materialentity','immaterialentity','process']);
+
+        // Build the model: entities by id, adjacency, findings flags.
+        const entities = new Map();
+        (RAW.nodes || []).forEach(n => {
+            if (!entities.has(n.id)) entities.set(n.id, Object.assign({}, n, {
+                parents: [], children: [], lateral: [], flags: []
+            }));
+        });
+        (RAW.edges || []).forEach(e => {
+            const s = entities.get(e.source), t = entities.get(e.target);
+            if (!s || !t || s === t) return;
+            if (e.relation === 'is_a') {           // source = parent, target = child
+                t.parents.push({ ent: s, rel: 'is_a' });
+                s.children.push({ ent: t, rel: 'is_a' });
+            } else {
+                s.lateral.push({ ent: t, rel: e.relation, dir: 'out' });
+                t.lateral.push({ ent: s, rel: e.relation, dir: 'in' });
             }
+        });
+        const byName = new Map();
+        entities.forEach(ent => byName.set(ent.name.toLowerCase(), ent));
+        (FINDINGS || []).forEach(f => {
+            const ent = (f.iri && entities.get(f.iri)) ||
+                        (f.entity && byName.get(String(f.entity).toLowerCase()));
+            if (ent) ent.flags.push(f);
+        });
+        const flagged = [...entities.values()].filter(e => e.flags.length);
+        const classes = [...entities.values()].filter(e => e.type !== 'Relation');
+        document.getElementById('class-count').textContent = (RAW.ontology_info || {}).class_count ?? classes.length;
+        document.getElementById('property-count').textContent = (RAW.ontology_info || {}).property_count ?? 0;
+
+        // ================= camera (spec N-1) =================
+        const cam = { k: 1, tx: 0, ty: 0 };
+        function applyCam() {
+            viewport.setAttribute('transform', `translate(${cam.tx},${cam.ty}) scale(${cam.k})`);
         }
-        
-        function extractName(uri) {
-            if (!uri) return "Unknown";
-            if (uri.includes('#')) return uri.split('#').pop();
-            if (uri.includes('/')) return uri.split('/').pop();
-            return uri;
+        function canvasSize() {
+            const r = canvas.getBoundingClientRect();
+            return { w: r.width, h: r.height };
         }
-        
-        function classifyShape(name) {
-            const n = name.toLowerCase();
-            
-            // Process (Occurrent) - directed arrow ⟶
-            if (n.includes('process') || n.includes('trial') || n.includes('adjudication') || n.includes('performance')) return 'arrow';
-            
-            // Spatial/Temporal Regions - hollow square □
-            if (n.includes('jurisdiction') || n.includes('region') || n.includes('spatial') || n.includes('temporal')) return 'hollow-square';
-            
-            // Material Entity - filled gray square ■
-            if (n.includes('document') || n.includes('contract') || n.includes('evidence') || n.includes('judgment') || 
-                n.includes('molecule') || n.includes('rock') || n.includes('cell') || n.includes('agent')) return 'square';
-            
-            // Object Aggregate - thick square ⬛
-            if (n.includes('team') || n.includes('flock') || n.includes('aggregate') || n.includes('group')) return 'thick-square';
-            
-            // Fiat Object Part - hatched rectangle ▭
-            if (n.includes('part') || n.includes('hemisphere') || n.includes('component')) return 'hatched-rectangle';
-            
-            // Function/Disposition - hammer icon ⚒
-            if (n.includes('function') || n.includes('disposition') || n.includes('fragility') || n.includes('ability') || n.includes('obligation')) return 'disposition-circle';
-            
-            // Quality - tiny dot ◦
-            if (n.includes('quality') || n.includes('color') || n.includes('redness') || n.includes('hue')) return 'quality-dot';
-            
-            // Role - dashed circle with role annotation ◌
-            if (n.includes('role') || n.includes('authority')) return 'role-circle';
-            
-            // Generically Dependent - dashed circle with migration symbol ◌ + ↺
-            if (n.includes('regulation') || n.includes('statute') || n.includes('license') || n.includes('text') || n.includes('information')) return 'small-dashed-circle-migrate';
-            
-            // Specifically Dependent - anchored dashed circle ◌ + anchor
-            if (n.includes('specific') || n.includes('anchored')) return 'anchored-circle';
-            
-            // Dependent Continuant - dashed circle ◌
-            if (n.includes('claim') || n.includes('right') || n.includes('liability')) return 'small-dashed-circle';
-            
-            // Independent Continuant - solid circle ●
-            return 'circle';
-        }
-        
-        function classifyGroup(name) {
-            const n = name.toLowerCase();
-            if (n.includes('process') || n.includes('trial')) return 4;
-            if (n.includes('jurisdiction')) return 5;
-            if (n.includes('regulation') || n.includes('statute')) return 3;
-            if (n.includes('role') || n.includes('claim') || n.includes('right')) return 2;
-            return 1;
-        }
-        
-        function classifyBFOParent(name) {
-            const n = name.toLowerCase();
-            if (n.includes('process') || n.includes('trial') || n.includes('adjudication')) return 'Process';
-            if (n.includes('jurisdiction') || n.includes('region')) return 'SpatialRegion';
-            if (n.includes('document') || n.includes('contract') || n.includes('evidence') || n.includes('judgment')) return 'MaterialEntity';
-            if (n.includes('regulation') || n.includes('statute')) return 'GenericallyDependentContinuant';
-            if (n.includes('role') || n.includes('claim') || n.includes('right') || n.includes('obligation') || n.includes('liability')) return 'DependentContinuant';
-            return 'IndependentContinuant'; // Default for entities, persons, institutions, etc.
-        }
-        
-        function getGroupColor(group) {
-            const colors = {
-                0: "#000000", // BFO core classes - black
-                1: "#1e40af", // Independent Continuants - blue
-                2: "#dc2626", // Dependent Continuants - red
-                3: "#16a34a", // Generically Dependent - green
-                4: "#d97706", // Processes - orange
-                5: "#7c3aed"  // Spatial Regions - purple
+        let camAnim = null;
+        function setCam(k, tx, ty, animate) {
+            k = Math.min(4, Math.max(0.2, k));
+            if (camAnim) { cancelAnimationFrame(camAnim); camAnim = null; }
+            if (!animate || REDUCED) { cam.k = k; cam.tx = tx; cam.ty = ty; applyCam(); return; }
+            const from = { k: cam.k, tx: cam.tx, ty: cam.ty }, t0 = performance.now(), dur = 220;
+            const step = now => {
+                const t = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - t, 3);
+                cam.k = from.k + (k - from.k) * e;
+                cam.tx = from.tx + (tx - from.tx) * e;
+                cam.ty = from.ty + (ty - from.ty) * e;
+                applyCam();
+                if (t < 1) camAnim = requestAnimationFrame(step); else camAnim = null;
             };
-            return colors[group] || "#6b7280"; // Default gray
+            camAnim = requestAnimationFrame(step);
         }
-        
-        function getBVSSArrowType(relation) {
-            if (!relation) return "isa";
-            const r = relation.toLowerCase();
-            if (r.includes("participates") || r.includes("participant")) return "participates";
-            if (r.includes("inheres") || r.includes("inherence")) return "inheres";
-            if (r.includes("realizes") || r.includes("realization")) return "realizes";
-            return "isa"; // Default to is_a
+        function fitToContent(animate) {
+            let bb;
+            try { bb = viewport.getBBox(); } catch (e) { return; }
+            if (!bb || !bb.width || !bb.height) return;
+            const { w, h } = canvasSize(), pad = 40;
+            const k = Math.min(4, Math.max(0.2, Math.min((w - 2 * pad) / bb.width, (h - 2 * pad) / bb.height)));
+            setCam(k, w / 2 - k * (bb.x + bb.width / 2), h / 2 - k * (bb.y + bb.height / 2), animate);
         }
-        
-        function getBVSSArrowColor(relation) {
-            if (!relation) return "#999";
-            const r = relation.toLowerCase();
-            if (r.includes("participates")) return "#ff6b35"; // Orange for participation
-            if (r.includes("inheres")) return "#dc2626"; // Red for inherence
-            if (r.includes("realizes")) return "#16a34a"; // Green for realization
-            return "#999"; // Gray for is_a
+        function resetCam() { const { w, h } = canvasSize(); setCam(1, w / 2, h / 2, true); clearKbHighlight(); }
+        function camZoom(f, cx, cy) {
+            const { w, h } = canvasSize();
+            cx = cx ?? w / 2; cy = cy ?? h / 2;
+            const k2 = Math.min(4, Math.max(0.2, cam.k * f));
+            setCam(k2, cx - (cx - cam.tx) * (k2 / cam.k), cy - (cy - cam.ty) * (k2 / cam.k), false);
         }
-        
-        function getBVSSArrowWidth(relation) {
-            if (!relation) return 2;
-            const r = relation.toLowerCase();
-            if (r.includes("participates")) return 3;
-            if (r.includes("inheres")) return 2.5;
-            if (r.includes("realizes")) return 2;
-            return 2; // Default width
-        }
-        
-        function getBVSSArrowDash(relation) {
-            if (!relation) return "none";
-            const r = relation.toLowerCase();
-            if (r.includes("realizes")) return "5,5"; // Dashed for realization
-            return "none"; // Solid for others
-        }
-        
-        function getBVSSRelationSymbol(relation) {
-            if (!relation) return "is_a";
-            const r = relation.toLowerCase();
-            if (r.includes("part_of")) return "part_of";
-            if (r.includes("participates")) return "participates_in";
-            if (r.includes("has_role") || r.includes("has_quality")) return "has_role";
-            if (r.includes("inheres")) return "inheres_in";
-            if (r.includes("located")) return "located_in";
-            if (r.includes("realizes")) return "realizes";
-            if (r.includes("has_participant")) return "has_participant";
-            if (r.includes("is_a") || r.includes("inheritance")) return "is_a";
-            return relation; // Return the actual relation name
-        }
-        
-        function createVisualization() {
-            // Clear existing visualization
-            d3.select("#viz-container").selectAll("*").remove();
-            
-            // Create SVG
-            svg = d3.select("#viz-container")
-                .append("svg")
-                .attr("width", width)
-                .attr("height", height);
-            
-            container = svg.append("g");
-            
-            // Create simulation
-            simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-                .force("charge", d3.forceManyBody().strength(-300))
-                .force("center", d3.forceCenter(width / 2, height / 2));
-            
-            // Add zoom
-            const zoom = d3.zoom()
-                .scaleExtent([0.1, 4])
-                .on("zoom", (event) => {
-                    container.attr("transform", event.transform);
-                });
-            
-            svg.call(zoom);
-            
-            // Create link group for lines and labels
-            const linkGroup = container.append("g");
-            
-            // Create links with BVSS-specific styling
-            const link = linkGroup
-                .selectAll("line")
-                .data(links)
-                .join("line")
-                .attr("stroke", d => getBVSSArrowColor(d.relation))
-                .attr("stroke-opacity", 0.8)
-                .attr("stroke-width", d => getBVSSArrowWidth(d.relation))
-                .attr("stroke-dasharray", d => getBVSSArrowDash(d.relation))
-                .attr("marker-end", d => `url(#arrow-${getBVSSArrowType(d.relation)})`);
-            
-            // Define BVSS arrow markers and patterns
-            const defs = svg.append("defs");
-            
-            // Add hatching pattern for fiat object parts
-            const hatchPattern = defs.append("pattern")
-                .attr("id", "hatch")
-                .attr("patternUnits", "userSpaceOnUse")
-                .attr("width", 8)
-                .attr("height", 8);
-            
-            hatchPattern.append("path")
-                .attr("d", "M0,0 L8,8 M0,8 L8,0")
-                .attr("stroke", "#666")
-                .attr("stroke-width", 1);
-            
-            // Standard is_a arrow (⇧) - larger and more visible
-            defs.append("marker")
-                .attr("id", "arrow-isa")
-                .attr("viewBox", "0 -8 16 16")
-                .attr("refX", 14)
-                .attr("refY", 0)
-                .attr("markerWidth", 8)
-                .attr("markerHeight", 8)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M0,-6L14,0L0,6L3,0Z")
-                .attr("fill", "#999")
-                .attr("stroke", "#333")
-                .attr("stroke-width", 1);
-            
-            // Participation arrow (⇨)
-            defs.append("marker")
-                .attr("id", "arrow-participates")
-                .attr("viewBox", "0 -5 15 10")
-                .attr("refX", 12)
-                .attr("refY", 0)
-                .attr("markerWidth", 8)
-                .attr("markerHeight", 8)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M0,-3L8,0L0,3 M6,-3L12,0L6,3")
-                .attr("fill", "none")
-                .attr("stroke", "#ff6b35")
-                .attr("stroke-width", 1.5);
-            
-            // Inherence arrow (⇒)
-            defs.append("marker")
-                .attr("id", "arrow-inheres")
-                .attr("viewBox", "0 -5 12 10")
-                .attr("refX", 10)
-                .attr("refY", 0)
-                .attr("markerWidth", 7)
-                .attr("markerHeight", 7)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M0,-4L8,0L0,4 M3,-2L8,0L3,2")
-                .attr("fill", "#dc2626");
-            
-            // Realization arrow (↻)
-            defs.append("marker")
-                .attr("id", "arrow-realizes")
-                .attr("viewBox", "0 -8 16 16")
-                .attr("refX", 12)
-                .attr("refY", 0)
-                .attr("markerWidth", 10)
-                .attr("markerHeight", 10)
-                .attr("orient", "auto")
-                .append("path")
-                .attr("d", "M2,0 A6,6 0 1,1 12,0 M8,-3L12,0L8,3")
-                .attr("fill", "none")
-                .attr("stroke", "#16a34a")
-                .attr("stroke-width", 2);
-            
-            // Create link labels with BVSS symbols
-            const linkLabels = linkGroup
-                .selectAll("text")
-                .data(links)
-                .join("text")
-                .attr("class", "link-label")
-                .attr("font-size", "11px")
-                .attr("font-weight", "bold")
-                .attr("fill", "#ffffff")
-                .attr("text-anchor", "middle")
-                .attr("stroke", "#000000")
-                .attr("stroke-width", 0.8)
-                .text(d => getBVSSRelationSymbol(d.relation));
-            
-            // Create node groups
-            const node = container.append("g")
-                .selectAll("g")
-                .data(nodes)
-                .join("g")
-                .call(d3.drag()
-                    .on("start", dragstarted)
-                    .on("drag", dragged)
-                    .on("end", dragended));
-            
-            // Draw shapes with authentic BVSS styling
-            node.each(function(d) {
-                const group = d3.select(this);
-                const nodeColor = d.bfo ? "#000000" : getGroupColor(d.group);
-                const strokeWidth = d.bfo ? 3 : 2;
-                const fillColor = d.bfo && d.shape === "square" ? "#808080" : "none";
-                
-                switch(d.shape) {
-                    case "circle": // ● Independent Continuant
-                        group.append("circle")
-                            .attr("r", 20)
-                            .attr("fill", fillColor)
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth);
-                        break;
-                    case "square": // ■ Material Entity
-                        group.append("rect")
-                            .attr("x", -20)
-                            .attr("y", -20)
-                            .attr("width", 40)
-                            .attr("height", 40)
-                            .attr("fill", d.bfo ? "#808080" : "#e5e7eb")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth);
-                        break;
-                    case "hollow-square": // □ Spatial Region
-                        group.append("rect")
-                            .attr("x", -20)
-                            .attr("y", -20)
-                            .attr("width", 40)
-                            .attr("height", 40)
-                            .attr("fill", "none")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth)
-                            .attr("stroke-dasharray", "4,4");
-                        break;
-                    case "small-dashed-circle": // ◌ Dependent Continuant
-                        group.append("circle")
-                            .attr("r", 15)
-                            .attr("fill", "none")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth)
-                            .attr("stroke-dasharray", "3,3");
-                        break;
-                    case "role-circle": // ◌ Role with annotation
-                        group.append("circle")
-                            .attr("r", 15)
-                            .attr("fill", "none")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth)
-                            .attr("stroke-dasharray", "3,3");
-                        group.append("text")
-                            .attr("x", 0)
-                            .attr("y", -20)
-                            .attr("font-size", "8px")
-                            .attr("text-anchor", "middle")
-                            .attr("fill", "#666666")
-                            .text("role");
-                        break;
-                    case "disposition-circle": // ◌ Disposition
-                        group.append("circle")
-                            .attr("r", 15)
-                            .attr("fill", "none")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth)
-                            .attr("stroke-dasharray", "3,3");
-                        group.append("text")
-                            .attr("x", 0)
-                            .attr("y", 3)
-                            .attr("font-size", "10px")
-                            .attr("text-anchor", "middle")
-                            .attr("fill", nodeColor)
-                            .text("⚏");
-                        break;
-                    case "small-dashed-circle-migrate": // ◌ + ↺ Generically Dependent
-                        group.append("circle")
-                            .attr("r", 15)
-                            .attr("fill", "none")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth)
-                            .attr("stroke-dasharray", "3,3");
-                        group.append("text")
-                            .attr("x", 18)
-                            .attr("y", -15)
-                            .attr("font-size", "12px")
-                            .attr("fill", nodeColor)
-                            .text("↺");
-                        break;
-                    case "arrow": // ⟶ Process (Occurrent)
-                        group.append("polygon")
-                            .attr("points", "-20,0 15,-8 15,-3 25,0 15,3 15,8")
-                            .attr("fill", nodeColor)
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", 1);
-                        break;
-                    case "thick-square": // ⬛ Object Aggregate
-                        group.append("rect")
-                            .attr("x", -20)
-                            .attr("y", -20)
-                            .attr("width", 40)
-                            .attr("height", 40)
-                            .attr("fill", nodeColor)
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", 4);
-                        break;
-                    case "hatched-rectangle": // ▭ Fiat Object Part
-                        group.append("rect")
-                            .attr("x", -25)
-                            .attr("y", -15)
-                            .attr("width", 50)
-                            .attr("height", 30)
-                            .attr("fill", "url(#hatch)")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth);
-                        break;
-                    case "quality-dot": // ◦ Quality - tiny dot
-                        group.append("circle")
-                            .attr("r", 8)
-                            .attr("fill", nodeColor)
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", 1);
-                        break;
-                    case "anchored-circle": // ◌ + anchor - Specifically Dependent
-                        group.append("circle")
-                            .attr("r", 15)
-                            .attr("fill", "none")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth)
-                            .attr("stroke-dasharray", "3,3");
-                        group.append("text")
-                            .attr("x", 18)
-                            .attr("y", -15)
-                            .attr("font-size", "12px")
-                            .attr("fill", nodeColor)
-                            .text("⚓");
-                        break;
-                    default:
-                        group.append("circle")
-                            .attr("r", 18)
-                            .attr("fill", "none")
-                            .attr("stroke", nodeColor)
-                            .attr("stroke-width", strokeWidth);
-                }
-            });
-            
-            // Add labels with better styling
-            node.append("text")
-                .text(d => d.name)
-                .attr("x", 0)
-                .attr("y", 35)
-                .attr("text-anchor", "middle")
-                .attr("font-size", "12px")
-                .attr("font-weight", "bold")
-                .attr("fill", "#ffffff")
-                .attr("stroke", "#000000")
-                .attr("stroke-width", 0.5);
-            
-            // Update positions on tick
-            simulation.on("tick", () => {
-                link
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
-                
-                // Update link labels to be positioned at the midpoint of each link
-                linkLabels
-                    .attr("x", d => (d.source.x + d.target.x) / 2)
-                    .attr("y", d => (d.source.y + d.target.y) / 2);
-                
-                node.attr("transform", d => `translate(${d.x},${d.y})`);
-            });
-        }
-        
-        function dragstarted(event, d) {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        }
-        
-        function dragged(event, d) {
-            d.fx = event.x;
-            d.fy = event.y;
-        }
-        
-        function dragended(event, d) {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        }
-        
-        function resetView() {
-            svg.transition().duration(750).call(
-                d3.zoom().transform,
-                d3.zoomIdentity
-            );
-        }
-        
-        function centerGraph() {
-            const bounds = container.node().getBBox();
-            const fullWidth = width;
-            const fullHeight = height;
-            const scale = Math.min(fullWidth / bounds.width, fullHeight / bounds.height) * 0.9;
-            const translate = [fullWidth / 2 - scale * (bounds.x + bounds.width / 2), 
-                             fullHeight / 2 - scale * (bounds.y + bounds.height / 2)];
-            
-            svg.transition().duration(750).call(
-                d3.zoom().transform,
-                d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
-            );
-        }
-        
-        function downloadSVG() {
-            const svg = document.querySelector("#viz-container svg");
-            if (!svg) {
-                alert("No visualization to download");
+        window.fitToContent = fitToContent; window.resetCam = resetCam; window.camZoom = camZoom;
+
+        // Wheel zoom toward cursor
+        canvas.addEventListener('wheel', ev => {
+            ev.preventDefault();
+            const r = canvas.getBoundingClientRect();
+            camZoom(Math.exp(-ev.deltaY * 0.0015), ev.clientX - r.left, ev.clientY - r.top);
+        }, { passive: false });
+
+        // Pointer pan / pinch / click-vs-drag (4px threshold, spec §6)
+        const pointers = new Map();
+        let panStart = null, pinchStart = null, downInfo = null;
+        canvas.addEventListener('pointerdown', ev => {
+            canvas.setPointerCapture(ev.pointerId);
+            pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+            if (pointers.size === 1) {
+                downInfo = { x: ev.clientX, y: ev.clientY, node: ev.target.closest('.node'), moved: false };
+                panStart = { x: ev.clientX, y: ev.clientY, tx: cam.tx, ty: cam.ty };
+            } else if (pointers.size === 2) {
+                const pts = [...pointers.values()];
+                pinchStart = { d: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y), k: cam.k,
+                               cx: (pts[0].x + pts[1].x) / 2, cy: (pts[0].y + pts[1].y) / 2,
+                               tx: cam.tx, ty: cam.ty };
+                panStart = null;
+            }
+        });
+        canvas.addEventListener('pointermove', ev => {
+            if (!pointers.has(ev.pointerId)) return;
+            pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+            if (pointers.size === 2 && pinchStart) {
+                const pts = [...pointers.values()];
+                const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                const r = canvas.getBoundingClientRect();
+                const k2 = Math.min(4, Math.max(0.2, pinchStart.k * d / pinchStart.d));
+                const cx = pinchStart.cx - r.left, cy = pinchStart.cy - r.top;
+                setCam(k2, cx - (cx - pinchStart.tx) * (k2 / pinchStart.k),
+                           cy - (cy - pinchStart.ty) * (k2 / pinchStart.k), false);
                 return;
             }
-
-            // Export the FULL graph at natural size, not the rasterized
-            // viewport: clone the SVG, strip the zoom/pan transform, and size
-            // the viewBox to the content so every node label is readable.
-            const SVG_NS = "http://www.w3.org/2000/svg";
-            const contentGroup = svg.querySelector("g");
-            let bbox = null;
-            try {
-                bbox = contentGroup ? contentGroup.getBBox() : null;
-            } catch (e) { /* detached or empty svg */ }
-
-            const clone = svg.cloneNode(true);
-            const cloneGroup = clone.querySelector("g");
-            if (cloneGroup) {
-                cloneGroup.removeAttribute("transform");  // undo current zoom/pan
+            if (panStart && downInfo) {
+                const dx = ev.clientX - downInfo.x, dy = ev.clientY - downInfo.y;
+                if (Math.hypot(dx, dy) > 4) downInfo.moved = true;
+                if (downInfo.moved) {
+                    setCam(cam.k, panStart.tx + (ev.clientX - panStart.x), panStart.ty + (ev.clientY - panStart.y), false);
+                }
             }
-
-            const pad = 40;
-            let x = 0, y = 0, w = svg.clientWidth || 1200, h = svg.clientHeight || 800;
-            if (bbox && bbox.width > 0 && bbox.height > 0) {
-                x = bbox.x - pad;
-                y = bbox.y - pad;
-                w = bbox.width + 2 * pad;
-                h = bbox.height + 2 * pad;
+        });
+        function pointerEnd(ev) {
+            pointers.delete(ev.pointerId);
+            if (pointers.size < 2) pinchStart = null;
+            if (pointers.size === 0) {
+                if (downInfo && !downInfo.moved && downInfo.node) {
+                    const id = downInfo.node.getAttribute('data-id');
+                    if (id && entities.has(id)) {
+                        if (mode !== 'neighborhood') setMode('neighborhood', { silent: true });
+                        setFocus(id);
+                    }
+                }
+                downInfo = null; panStart = null;
             }
-            clone.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
-            clone.setAttribute("width", Math.ceil(w));
-            clone.setAttribute("height", Math.ceil(h));
-            clone.setAttribute("xmlns", SVG_NS);
-            clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-
-            // Node labels are white — bake in the dark theme background so the
-            // standalone file is readable outside the app.
-            const bg = document.createElementNS(SVG_NS, "rect");
-            bg.setAttribute("x", x);
-            bg.setAttribute("y", y);
-            bg.setAttribute("width", w);
-            bg.setAttribute("height", h);
-            bg.setAttribute("fill", "#1f2937");
-            clone.insertBefore(bg, clone.firstChild);
-
-            const style = document.createElementNS(SVG_NS, "style");
-            style.textContent = "text { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }";
-            clone.insertBefore(style, clone.firstChild);
-
-            const svgData = new XMLSerializer().serializeToString(clone);
-            const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + svgData],
-                                  {type: "image/svg+xml;charset=utf-8"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "bvss-ontology-visualization.svg";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         }
-        
-        function validateGraph() {
-            const filename = "{{ filename }}";
-            const button = event.target;
-            const originalText = button.textContent;
-            
-            // Show loading state
-            button.textContent = "Validating...";
-            button.disabled = true;
-            
-            fetch(`/api/validate-bvss/${filename}`)
-                .then(response => response.json())
+        canvas.addEventListener('pointerup', pointerEnd);
+        canvas.addEventListener('pointercancel', pointerEnd);
+
+        // ================= history & breadcrumbs (spec N-2) =================
+        const hist = []; let histPtr = -1;
+        function renderCrumbs() {
+            const nav = document.getElementById('breadcrumbs');
+            nav.innerHTML = '';
+            let idxs = hist.map((_, i) => i);
+            if (hist.length > 6) idxs = [0, 1, -1, hist.length - 3, hist.length - 2, hist.length - 1];
+            idxs.forEach(i => {
+                if (i === -1) { const s = document.createElement('span'); s.textContent = '…'; s.className = 'text-muted'; nav.appendChild(s); return; }
+                const ent = entities.get(hist[i]);
+                if (!ent) return;
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'crumb' + (i === histPtr ? ' current' : '');
+                chip.innerHTML = `<span style="color:${TYPE_COLOR[ent.type] || '#d1d5db'}">●</span> ${ent.name}`;
+                chip.title = ent.name;
+                chip.addEventListener('click', () => { histPtr = i; setFocus(hist[i], { nav: true }); });
+                nav.appendChild(chip);
+            });
+            document.getElementById('nav-back').disabled = histPtr <= 0;
+            document.getElementById('nav-fwd').disabled = histPtr >= hist.length - 1;
+        }
+        function goBack() { if (histPtr > 0) { histPtr--; setFocus(hist[histPtr], { nav: true }); } }
+        function goFwd() { if (histPtr < hist.length - 1) { histPtr++; setFocus(hist[histPtr], { nav: true }); } }
+        document.getElementById('nav-back').addEventListener('click', goBack);
+        document.getElementById('nav-fwd').addEventListener('click', goFwd);
+
+        // ================= hash deep links (spec N-4) =================
+        let hashProgrammatic = false;
+        function writeHash() {
+            const ent = entities.get(focusEntity);
+            if (!ent) return;
+            hashProgrammatic = true;
+            history.replaceState(null, '', `#/e/${encodeURIComponent(ent.name)}?m=${mode}`);
+            setTimeout(() => { hashProgrammatic = false; }, 0);
+        }
+        function parseHash() {
+            const m = location.hash.match(/^#\/e\/([^?]+)(?:\?m=(\w+))?/);
+            if (!m) return null;
+            const ent = byName.get(decodeURIComponent(m[1]).toLowerCase());
+            if (!ent) return null;
+            return { id: ent.id, mode: ['neighborhood', 'backbone', 'hubs'].includes(m[2]) ? m[2] : 'neighborhood' };
+        }
+        window.addEventListener('hashchange', () => {
+            if (hashProgrammatic) return;
+            const st = parseHash();
+            if (st) { setMode(st.mode, { silent: true }); setFocus(st.id); }
+        });
+
+        // ================= drawing =================
+        let mode = 'neighborhood';
+        let focusEntity = null;
+        let drawnAdj = new Map();       // id -> Set(ids) for hover/keyboard on current drawing
+        let drawnNodes = new Map();     // id -> <g> element
+        let kbOrder = [];               // neighbor cycle order for ←/→
+        let kbIdx = -1;
+
+        function el(tag, attrs, parent) {
+            const e = document.createElementNS(SVGNS, tag);
+            for (const k in attrs) e.setAttribute(k, attrs[k]);
+            if (parent) parent.appendChild(e);
+            return e;
+        }
+        function clearViewport() {
+            viewport.innerHTML = '';
+            viewport.classList.remove('dim');
+            drawnAdj = new Map(); drawnNodes = new Map(); kbOrder = []; kbIdx = -1;
+        }
+        function glyphFor(ent, g, r) {
+            const color = TYPE_COLOR[ent.type] || TYPE_COLOR.Unknown;
+            const common = { fill: '#111827', stroke: color, 'stroke-width': 2.5, class: 'glyph' };
+            switch (ent.type) {
+                case 'DependentContinuant':
+                    return el('circle', Object.assign(common, { r, 'stroke-dasharray': '4,3' }), g);
+                case 'SpatialRegion':
+                    return el('rect', Object.assign(common, { x: -r, y: -r, width: 2 * r, height: 2 * r }), g);
+                case 'TemporalRegion':
+                    return el('polygon', Object.assign(common, { points: `0,${-r} ${r},0 0,${r} ${-r},0` }), g);
+                case 'Process':
+                    return el('polygon', Object.assign(common, { points: `${-r},${-r * 0.7} ${r * 0.5},${-r * 0.7} ${r},0 ${r * 0.5},${r * 0.7} ${-r},${r * 0.7}` }), g);
+                case 'Relation':
+                    return el('polygon', Object.assign(common, { points: `${-r * 0.6},${-r} ${r * 0.6},${-r} ${r},0 ${r * 0.6},${r} ${-r * 0.6},${r} ${-r},0` }), g);
+                default:
+                    return el('circle', Object.assign(common, { r }), g);
+            }
+        }
+        function drawNode(x, y, ent, opts) {
+            opts = opts || {};
+            const g = el('g', { class: 'node', 'data-id': ent.id, transform: `translate(${x},${y})` }, viewport);
+            const r = opts.focus ? 22 : 14;
+            if (ent.flags.length) el('circle', { r: r + 5, fill: 'none', stroke: '#ef4444', 'stroke-width': 3 }, g);
+            if (opts.focus) el('circle', { r: r + (ent.flags.length ? 10 : 5), fill: 'none', stroke: '#0d6efd', 'stroke-width': 2, 'stroke-dasharray': '2,3' }, g);
+            glyphFor(ent, g, r);
+            const label = ent.name.length > 28 ? ent.name.slice(0, 26) + '…' : ent.name;
+            const t = el('text', { y: r + 14, 'text-anchor': 'middle' }, g);
+            t.textContent = label;
+            if (opts.focus) t.setAttribute('font-weight', 'bold');
+            const title = el('title', {}, g);
+            title.textContent = ent.name + (ent.description ? ' — ' + ent.description : '') +
+                (ent.flags.length ? '\n⚠ ' + ent.flags.map(f => f.message || f.kind).join('; ') : '');
+            drawnNodes.set(ent.id, g);
+            g.setAttribute('data-x', x); g.setAttribute('data-y', y);
+            return g;
+        }
+        function drawEdge(x1, y1, x2, y2, rel, a, b) {
+            const isa = rel === 'is_a';
+            el('line', {
+                class: 'edge', 'data-a': a, 'data-b': b, x1, y1, x2, y2,
+                stroke: isa ? '#e5e7eb' : '#9ca3af', 'stroke-width': isa ? 2.5 : 1.8,
+                'stroke-dasharray': isa ? 'none' : '5,4'
+            }, viewport);
+            if (!isa) {
+                const lbl = el('text', { class: 'edge-label', x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 4, 'text-anchor': 'middle', 'data-a': a, 'data-b': b }, viewport);
+                lbl.textContent = rel;
+            }
+            if (!drawnAdj.has(a)) drawnAdj.set(a, new Set());
+            if (!drawnAdj.has(b)) drawnAdj.set(b, new Set());
+            drawnAdj.get(a).add(b); drawnAdj.get(b).add(a);
+        }
+
+        // ---- neighborhood mode: bounded k=1 ego view ----
+        function drawNeighborhood() {
+            clearViewport();
+            const ent = entities.get(focusEntity);
+            if (!ent) return;
+            const GX = 120, ROWY = 170;
+            // Parents above (row-wrapped by 8)
+            ent.parents.forEach((p, i) => {
+                const row = Math.floor(i / 8), col = i % 8, n = Math.min(8, ent.parents.length - row * 8);
+                const x = (col - (n - 1) / 2) * GX, y = -ROWY * (row + 1);
+                drawEdge(x, y + 24, 0, -26, 'is_a', p.ent.id, ent.id);
+                drawNode(x, y, p.ent);
+            });
+            // Children below (row-wrapped by 8)
+            ent.children.forEach((c, i) => {
+                const row = Math.floor(i / 8), col = i % 8, n = Math.min(8, ent.children.length - row * 8);
+                const x = (col - (n - 1) / 2) * GX, y = ROWY * (row + 1);
+                drawEdge(0, 26, x, y - 24, 'is_a', ent.id, c.ent.id);
+                drawNode(x, y, c.ent);
+            });
+            // Lateral: in on the left, out on the right, stacked
+            const lat = { in: ent.lateral.filter(l => l.dir === 'in'), out: ent.lateral.filter(l => l.dir === 'out') };
+            ['in', 'out'].forEach(dir => {
+                const sgn = dir === 'in' ? -1 : 1;
+                lat[dir].forEach((l, i) => {
+                    const col = Math.floor(i / 6);
+                    const x = sgn * (420 + col * 150), y = (i % 6 - (Math.min(6, lat[dir].length) - 1) / 2) * 80;
+                    drawEdge(sgn * 26, 0, x - sgn * 24, y, l.rel, dir === 'in' ? l.ent.id : ent.id, dir === 'in' ? ent.id : l.ent.id);
+                    drawNode(x, y, l.ent);
+                });
+            });
+            drawNode(0, 0, ent, { focus: true });
+            // keyboard cycle order: parents, children, laterals
+            kbOrder = [...ent.parents.map(p => p.ent.id), ...ent.children.map(c => c.ent.id),
+                       ...lat.in.map(l => l.ent.id), ...lat.out.map(l => l.ent.id)];
+        }
+
+        // ---- backbone mode: BFO lanes (spec N-5) ----
+        const LANE_ORDER = ['IndependentContinuant', 'DependentContinuant', 'Process',
+                            'SpatialRegion', 'TemporalRegion', 'Relation', 'Unknown'];
+        function laneMembers(type) {
+            const m = [...entities.values()].filter(e => (e.type || 'Unknown') === type);
+            m.sort((a, b) => (b.flags.length - a.flags.length) || a.name.localeCompare(b.name));
+            return m;
+        }
+        function drawBackbone() {
+            clearViewport();
+            const lanes = LANE_ORDER.map(t => ({ type: t, members: laneMembers(t) })).filter(l => l.members.length);
+            const LW = 190, CHIP = 62;
+            lanes.forEach((lane, li) => {
+                const x = li * LW;
+                const hdr = el('g', { class: 'node lane-header', 'data-lane': lane.type, transform: `translate(${x},0)`, cursor: 'pointer' }, viewport);
+                const ht = el('text', { 'text-anchor': 'middle', 'font-weight': 'bold' }, hdr);
+                ht.textContent = lane.type;
+                ht.setAttribute('fill', TYPE_COLOR[lane.type] || '#d1d5db');
+                ht.setAttribute('font-size', '13');
+                const ct = el('text', { y: 16, 'text-anchor': 'middle', fill: '#9ca3af', 'font-size': '11' }, hdr);
+                ct.textContent = `${lane.members.length} classes — open all`;
+                lane.members.slice(0, 6).forEach((m, i) => {
+                    drawNode(x, 60 + i * CHIP, m);
+                });
+                if (lane.members.length > 6) {
+                    const more = el('g', { class: 'node lane-header', 'data-lane': lane.type, transform: `translate(${x},${60 + 6 * CHIP})`, cursor: 'pointer' }, viewport);
+                    const mt = el('text', { 'text-anchor': 'middle', fill: '#60a5fa', 'font-size': '12' }, more);
+                    mt.textContent = `+${lane.members.length - 6} more…`;
+                }
+            });
+            kbOrder = [];
+        }
+        function openLaneDrawer(type) {
+            const drawer = document.getElementById('lane-drawer');
+            drawer.classList.remove('d-none'); drawer.classList.add('d-flex');
+            document.getElementById('lane-drawer-title').textContent = `${type} — ${laneMembers(type).length} classes`;
+            const search = document.getElementById('lane-drawer-search');
+            search.value = ''; search.dataset.lane = type;
+            renderLaneList(type, '');
+            search.focus();
+        }
+        function renderLaneList(type, filter) {
+            const list = document.getElementById('lane-drawer-list');
+            list.innerHTML = '';
+            const f = filter.toLowerCase();
+            laneMembers(type).filter(m => !f || m.name.toLowerCase().includes(f)).forEach(m => {
+                const row = document.createElement('div');
+                row.className = 'lane-row d-flex align-items-center gap-2 px-2 py-1 rounded text-light small';
+                row.innerHTML = `<span style="color:${m.flags.length ? '#ef4444' : (TYPE_COLOR[m.type] || '#d1d5db')}">${m.flags.length ? '◉' : '●'}</span><span>${m.name}</span>` +
+                                (m.flags.length ? '<span class="badge bg-danger ms-auto">flagged</span>' : '');
+                row.addEventListener('click', () => { closeLaneDrawer(); setMode('neighborhood', { silent: true }); setFocus(m.id); });
+                list.appendChild(row);
+            });
+        }
+        function closeLaneDrawer() {
+            const drawer = document.getElementById('lane-drawer');
+            drawer.classList.add('d-none'); drawer.classList.remove('d-flex');
+        }
+        window.closeLaneDrawer = closeLaneDrawer;
+        document.getElementById('lane-drawer-search').addEventListener('input', function () {
+            renderLaneList(this.dataset.lane, this.value);
+        });
+
+        // ---- hubs mode: subclass-count audit (spec N-6) ----
+        function drawHubs() {
+            clearViewport();
+            const HUB_FLAG_MIN = 15;
+            const ranked = classes.filter(e => e.children.length > 0)
+                .sort((a, b) => b.children.length - a.children.length).slice(0, 20);
+            if (!ranked.length) return;
+            const maxCount = ranked[0].children.length, BARMAX = 520, ROW = 34;
+            const cap = el('text', { x: 0, y: -30, fill: '#9ca3af', 'font-size': '12' }, viewport);
+            cap.textContent = `Top classes by direct subclass count. ⚠ = non-BFO-root with ≥${HUB_FLAG_MIN} children (flat hierarchy / missing intermediates).`;
+            ranked.forEach((ent, i) => {
+                const y = i * ROW;
+                const w = Math.max(4, BARMAX * ent.children.length / maxCount);
+                const smell = !BFO_ROOTS.has(ent.name.toLowerCase()) && ent.children.length >= HUB_FLAG_MIN;
+                const g = el('g', { class: 'node', 'data-id': ent.id, transform: `translate(0,${y})` }, viewport);
+                const nm = el('text', { x: -8, y: 4, 'text-anchor': 'end', 'font-size': '11' }, g);
+                nm.textContent = (smell ? '⚠ ' : '') + (ent.name.length > 30 ? ent.name.slice(0, 28) + '…' : ent.name);
+                nm.setAttribute('fill', smell ? '#fbbf24' : '#e5e7eb');
+                el('rect', { class: 'glyph', x: 0, y: -10, width: w, height: 20, rx: 3,
+                             fill: TYPE_COLOR[ent.type] || '#d1d5db', 'fill-opacity': 0.75,
+                             stroke: ent.flags.length ? '#ef4444' : 'none', 'stroke-width': 2.5 }, g);
+                const cnt = el('text', { x: w + 8, y: 4, 'font-size': '11', fill: '#e5e7eb' }, g);
+                cnt.textContent = ent.children.length;
+                const title = el('title', {}, g);
+                title.textContent = `${ent.name}: ${ent.children.length} direct subclasses — click to open its neighborhood`;
+            });
+            kbOrder = ranked.map(e => e.id);
+        }
+
+        // ================= mode / focus =================
+        function draw() {
+            if (mode === 'neighborhood') drawNeighborhood();
+            else if (mode === 'backbone') drawBackbone();
+            else drawHubs();
+            fitToContent(true);
+            updateFocusStrip();
+        }
+        function setMode(m, opts) {
+            opts = opts || {};
+            if (mode === m && !opts.force) { if (!opts.silent) draw(); return; }
+            mode = m;
+            closeLaneDrawer();
+            document.querySelectorAll('.mode-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.mode === m));
+            if (!opts.silent) { draw(); writeHash(); }
+        }
+        function setFocus(id, opts) {
+            opts = opts || {};
+            if (!entities.has(id)) return;
+            focusEntity = id;
+            if (!opts.nav) {
+                if (hist[histPtr] !== id) {           // dedupe consecutive
+                    hist.splice(histPtr + 1);          // branch: drop forward tail
+                    hist.push(id); histPtr = hist.length - 1;
+                }
+            }
+            renderCrumbs();
+            draw();
+            writeHash();
+        }
+        function updateFocusStrip() {
+            const strip = document.getElementById('focus-strip');
+            const ent = entities.get(focusEntity);
+            if (!ent) { strip.textContent = ''; canvas.setAttribute('aria-label', `BVSS explorer, ${mode} view`); return; }
+            const flags = ent.flags.length ? ` — ⚠ ${ent.flags.map(f => f.kind).join(', ')}` : '';
+            strip.innerHTML = `<span style="color:${TYPE_COLOR[ent.type] || '#d1d5db'}">●</span> <strong>${ent.name}</strong>
+                <span class="text-muted">(${ent.type}) ${ent.parents.length}↑ ${ent.children.length}↓${flags}</span>`;
+            canvas.setAttribute('aria-label',
+                `BVSS explorer, ${mode} view, focused on ${ent.name}, type ${ent.type}, ` +
+                `${ent.parents.length} parents, ${ent.children.length} children` + flags);
+        }
+        document.querySelectorAll('.mode-btn').forEach(b =>
+            b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+        // ================= hover highlight (spec N-3: class toggles only) =================
+        viewport.addEventListener('mouseover', ev => {
+            const node = ev.target.closest('.node');
+            const edge = ev.target.classList && ev.target.classList.contains('edge') ? ev.target : null;
+            if (!node && !edge) return;
+            viewport.classList.add('dim');
+            viewport.querySelectorAll('.hot').forEach(e => e.classList.remove('hot'));
+            if (node) {
+                const id = node.getAttribute('data-id');
+                node.classList.add('hot');
+                const adj = drawnAdj.get(id) || new Set();
+                adj.forEach(nid => { const n = drawnNodes.get(nid); if (n) n.classList.add('hot'); });
+                viewport.querySelectorAll('.edge, .edge-label').forEach(e => {
+                    if (e.getAttribute('data-a') === id || e.getAttribute('data-b') === id) e.classList.add('hot');
+                });
+            } else {
+                edge.classList.add('hot');
+                [edge.getAttribute('data-a'), edge.getAttribute('data-b')].forEach(nid => {
+                    const n = drawnNodes.get(nid); if (n) n.classList.add('hot');
+                });
+                viewport.querySelectorAll('.edge-label').forEach(l => {
+                    if (l.getAttribute('data-a') === edge.getAttribute('data-a') &&
+                        l.getAttribute('data-b') === edge.getAttribute('data-b')) l.classList.add('hot');
+                });
+            }
+        });
+        viewport.addEventListener('mouseout', ev => {
+            if (ev.relatedTarget && viewport.contains(ev.relatedTarget)) return;
+            viewport.classList.remove('dim');
+            viewport.querySelectorAll('.hot').forEach(e => e.classList.remove('hot'));
+        });
+        // Lane header clicks (backbone) — delegated, uses the same click-vs-drag gate
+        viewport.addEventListener('click', ev => {
+            const hdr = ev.target.closest('.lane-header');
+            if (hdr && (!downInfo || !downInfo.moved)) openLaneDrawer(hdr.getAttribute('data-lane'));
+        });
+
+        // ================= keyboard (spec N-7) =================
+        function clearKbHighlight() {
+            viewport.querySelectorAll('.kb-highlight').forEach(e => e.classList.remove('kb-highlight'));
+            kbIdx = -1;
+        }
+        function kbCycle(delta) {
+            if (!kbOrder.length) return;
+            kbIdx = (kbIdx + delta + kbOrder.length) % kbOrder.length;
+            viewport.querySelectorAll('.kb-highlight').forEach(e => e.classList.remove('kb-highlight'));
+            const g = drawnNodes.get(kbOrder[kbIdx]);
+            if (g) g.classList.add('kb-highlight');
+        }
+        document.addEventListener('keydown', ev => {
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+            if (ev.key === '/' && !typing) { ev.preventDefault(); document.getElementById('entity-search').focus(); return; }
+            if (ev.altKey && ev.key === 'ArrowLeft') { ev.preventDefault(); goBack(); return; }
+            if (ev.altKey && ev.key === 'ArrowRight') { ev.preventDefault(); goFwd(); return; }
+            if (typing) return;
+            const ent = entities.get(focusEntity);
+            switch (ev.key) {
+                case 'ArrowUp':
+                    if (mode === 'neighborhood' && ent && ent.parents.length) { ev.preventDefault(); setFocus(ent.parents[0].ent.id); }
+                    break;
+                case 'ArrowDown':
+                    if (mode === 'neighborhood' && ent && ent.children.length) { ev.preventDefault(); setFocus(ent.children[0].ent.id); }
+                    break;
+                case 'ArrowLeft': ev.preventDefault(); kbCycle(-1); break;
+                case 'ArrowRight': ev.preventDefault(); kbCycle(1); break;
+                case 'Enter':
+                    if (kbIdx >= 0 && kbOrder[kbIdx]) {
+                        ev.preventDefault();
+                        if (mode !== 'neighborhood') setMode('neighborhood', { silent: true });
+                        setFocus(kbOrder[kbIdx]);
+                    }
+                    break;
+                case 'Escape':
+                    resetCam();
+                    hideValidation();
+                    closeLaneDrawer();
+                    break;
+            }
+        });
+
+        // ================= search =================
+        const searchInput = document.getElementById('entity-search');
+        const searchResults = document.getElementById('search-results');
+        function renderSearch() {
+            const q = searchInput.value.trim().toLowerCase();
+            searchResults.innerHTML = '';
+            if (!q) { searchResults.classList.add('d-none'); return; }
+            const hits = [...entities.values()]
+                .filter(e => e.name.toLowerCase().includes(q))
+                .sort((a, b) => (b.flags.length - a.flags.length) ||
+                    (a.name.toLowerCase().indexOf(q) - b.name.toLowerCase().indexOf(q)) ||
+                    a.name.localeCompare(b.name))
+                .slice(0, 12);
+            hits.forEach(e => {
+                const a = document.createElement('button');
+                a.type = 'button';
+                a.className = 'list-group-item list-group-item-action list-group-item-dark py-1 small';
+                a.innerHTML = `<span style="color:${TYPE_COLOR[e.type] || '#d1d5db'}">●</span> ${e.name}` +
+                              (e.flags.length ? ' <span class="badge bg-danger">flagged</span>' : '');
+                a.addEventListener('click', () => {
+                    searchResults.classList.add('d-none'); searchInput.value = '';
+                    setMode('neighborhood', { silent: true }); setFocus(e.id);
+                });
+                searchResults.appendChild(a);
+            });
+            searchResults.classList.toggle('d-none', !hits.length);
+        }
+        searchInput.addEventListener('input', renderSearch);
+        searchInput.addEventListener('keydown', ev => {
+            if (ev.key === 'Enter') {
+                const first = searchResults.querySelector('button');
+                if (first) first.click();
+            } else if (ev.key === 'Escape') {
+                searchResults.classList.add('d-none'); searchInput.blur();
+            }
+        });
+        document.addEventListener('click', ev => {
+            if (!searchResults.contains(ev.target) && ev.target !== searchInput) searchResults.classList.add('d-none');
+        });
+
+        // ================= validation (kept behavior, new highlights) =================
+        window.validateGraph = function () {
+            const content = document.getElementById('validation-content');
+            document.getElementById('validation-panel').style.display = 'block';
+            content.innerHTML = '<div class="text-muted">Validating…</div>';
+            fetch(`/api/validate-bvss/${encodeURIComponent(FILENAME)}`)
+                .then(r => r.json())
                 .then(data => {
-                    displayValidationResults(data);
-                    applyValidationHighlights(data);
+                    viewport.querySelectorAll('.invalid').forEach(e => e.classList.remove('invalid'));
+                    const errors = data.errors || [];
+                    const warnings = data.warnings || [];
+                    if (!errors.length && !warnings.length) {
+                        content.innerHTML = '<div class="alert alert-success mb-0">No logical issues detected.</div>';
+                        return;
+                    }
+                    let html = '';
+                    const renderItem = (it, cls) => {
+                        const names = [it.entity, it.source, it.target].filter(Boolean);
+                        const links = names.map(n => {
+                            const ent = byName.get(String(n).toLowerCase());
+                            return ent ? `<a href="#/e/${encodeURIComponent(ent.name)}?m=neighborhood" class="vl-focus" data-id="${ent.id}">${n}</a>` : n;
+                        }).join(' → ');
+                        names.forEach(n => {
+                            const ent = byName.get(String(n).toLowerCase());
+                            const g = ent && drawnNodes.get(ent.id);
+                            if (g) g.classList.add('invalid');
+                        });
+                        return `<div class="alert ${cls} py-2 mb-2">${it.description || it.message || it.type || 'Issue'}${links ? ' — ' + links : ''}</div>`;
+                    };
+                    errors.forEach(e => { html += renderItem(e, 'alert-danger'); });
+                    warnings.forEach(w => { html += renderItem(w, 'alert-warning'); });
+                    content.innerHTML = html;
+                    content.querySelectorAll('.vl-focus').forEach(a => a.addEventListener('click', ev2 => {
+                        ev2.preventDefault();
+                        setMode('neighborhood', { silent: true });
+                        setFocus(a.getAttribute('data-id'));
+                    }));
                 })
-                .catch(error => {
-                    console.error('Validation error:', error);
-                    displayValidationError(error.message);
-                })
-                .finally(() => {
-                    button.textContent = originalText;
-                    button.disabled = false;
+                .catch(err => {
+                    content.innerHTML = `<div class="alert alert-danger">Validation failed: ${err.message || err}</div>`;
                 });
-        }
-        
-        function displayValidationResults(data) {
-            const panel = document.getElementById('validation-panel');
-            const content = document.getElementById('validation-content');
-            
-            let html = '';
-            
-            // Display errors
-            if (data.errors && data.errors.length > 0) {
-                html += '<div class="alert alert-danger"><h6>Errors Found:</h6><ul class="mb-0">';
-                data.errors.forEach(error => {
-                    html += `<li><strong>${error.type}:</strong> ${error.description}`;
-                    if (error.source && error.target) {
-                        html += ` (${error.source} → ${error.target})`;
-                    }
-                    html += '</li>';
-                });
-                html += '</ul></div>';
-            }
-            
-            // Display warnings
-            if (data.warnings && data.warnings.length > 0) {
-                html += '<div class="alert alert-warning"><h6>Warnings:</h6><ul class="mb-0">';
-                data.warnings.forEach(warning => {
-                    html += `<li>${warning.description}</li>`;
-                });
-                html += '</ul></div>';
-            }
-            
-            // Display valid relations
-            if (data.valid && data.valid.length > 0) {
-                html += `<div class="alert alert-success"><h6>Valid Relations (${data.valid.length}):</h6>`;
-                html += '<small>These relationships passed all validation checks.</small></div>';
-            }
-            
-            // If no issues found
-            if ((!data.errors || data.errors.length === 0) && 
-                (!data.warnings || data.warnings.length === 0)) {
-                html += '<div class="alert alert-success">No logical violations detected. Ontology appears consistent with BFO constraints.</div>';
-            }
-            
-            content.innerHTML = html;
-            panel.style.display = 'block';
-        }
-        
-        function displayValidationError(message) {
-            const panel = document.getElementById('validation-panel');
-            const content = document.getElementById('validation-content');
-            
-            content.innerHTML = `<div class="alert alert-danger">Validation failed: ${message}</div>`;
-            panel.style.display = 'block';
-        }
-        
-        function applyValidationHighlights(data) {
-            // Reset all highlighting first
-            d3.selectAll('.validation-error').classed('validation-error', false);
-            d3.selectAll('.validation-warning').classed('validation-warning', false);
-            
-            // Apply error highlighting
-            if (data.errors) {
-                data.errors.forEach(error => {
-                    if (error.source && error.target && error.property) {
-                        // Highlight problematic edges
-                        d3.selectAll('line')
-                            .filter(d => d && d.source && d.target &&
-                                    d.source.name === error.source && d.target.name === error.target)
-                            .classed('validation-error', true)
-                            .attr('stroke', '#dc3545')
-                            .attr('stroke-width', 4)
-                            .attr('stroke-dasharray', '5,5');
-                    }
-                    
-                    if (error.entity) {
-                        // Highlight problematic nodes
-                        d3.selectAll('g')
-                            .filter(d => d && d.name === error.entity)
-                            .classed('validation-error', true)
-                            .select('circle, rect, polygon')
-                            .attr('stroke', '#dc3545')
-                            .attr('stroke-width', 4);
-                    }
-                });
-            }
-        }
-        
-        function hideValidation() {
+        };
+        window.hideValidation = function () {
             document.getElementById('validation-panel').style.display = 'none';
-            // Reset highlighting
-            d3.selectAll('.validation-error').classed('validation-error', false);
-            d3.selectAll('.validation-warning').classed('validation-warning', false);
-            
-            // Restore original styles (only elements with bound graph data —
-            // selectAll also matches unbound lines/groups elsewhere on the page)
-            d3.selectAll('line').filter(d => !!d)
-                .attr('stroke', d => getBVSSArrowColor(d.relation))
-                .attr('stroke-width', d => getBVSSArrowWidth(d.relation))
-                .attr('stroke-dasharray', d => getBVSSArrowDash(d.relation));
+            viewport.querySelectorAll('.invalid').forEach(e => e.classList.remove('invalid'));
+        };
 
-            d3.selectAll('g').selectAll('circle, rect, polygon').filter(d => !!d)
-                .attr('stroke', d => d.bfo ? "#000000" : getGroupColor(d.group))
-                .attr('stroke-width', d => d.bfo ? 3 : 2);
+        // ================= SVG export (full graph, standalone) =================
+        window.downloadSVG = function () {
+            let bb;
+            try { bb = viewport.getBBox(); } catch (e) { bb = null; }
+            const clone = canvas.cloneNode(true);
+            const cg = clone.querySelector('#viewport');
+            if (cg) cg.removeAttribute('transform');
+            clone.querySelectorAll('.edge-label').forEach(l => l.setAttribute('opacity', '1'));
+            const pad = 40;
+            let x = 0, y = 0, w = canvas.clientWidth || 1200, h = canvas.clientHeight || 800;
+            if (bb && bb.width > 0 && bb.height > 0) {
+                x = bb.x - pad; y = bb.y - pad; w = bb.width + 2 * pad; h = bb.height + 2 * pad;
+            }
+            clone.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+            clone.setAttribute('width', Math.ceil(w));
+            clone.setAttribute('height', Math.ceil(h));
+            clone.setAttribute('xmlns', SVGNS);
+            clone.removeAttribute('style');
+            const bg = document.createElementNS(SVGNS, 'rect');
+            bg.setAttribute('x', x); bg.setAttribute('y', y);
+            bg.setAttribute('width', w); bg.setAttribute('height', h);
+            bg.setAttribute('fill', '#1f2937');
+            clone.insertBefore(bg, clone.firstChild);
+            const style = document.createElementNS(SVGNS, 'style');
+            style.textContent = "text{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;fill:#f3f4f6;font-size:11px}.edge-label{fill:#9ca3af;font-size:9px}";
+            clone.insertBefore(style, clone.firstChild);
+            const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone)],
+                                  { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'bvss-explorer.svg';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        // ================= boot =================
+        function defaultEntity() {
+            if (flagged.length) return flagged[0].id;
+            let best = null;
+            classes.forEach(e => { if (!best || e.children.length > best.children.length) best = e; });
+            return best ? best.id : (classes[0] || [...entities.values()][0] || {}).id;
         }
-        
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', initVisualization);
+        const initial = parseHash();
+        setMode(initial ? initial.mode : 'neighborhood', { silent: true });
+        document.querySelectorAll('.mode-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.mode === mode));
+        const startId = initial ? initial.id : defaultEntity();
+        if (startId) setFocus(startId); else draw();
+        window.addEventListener('resize', () => fitToContent(false));
+    })();
     </script>
 {% endblock %}
