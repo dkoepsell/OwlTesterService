@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ontology Report — {{ analysis.ontology_name or file.original_filename }}</title>
+    <style>
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: Georgia, 'Times New Roman', serif;
+            color: #1a1a1a;
+            background: #f0f0f0;
+            margin: 0;
+            line-height: 1.5;
+        }
+        .page {
+            max-width: 860px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 48px 56px;
+            min-height: 100vh;
+        }
+        h1, h2, h3, h4 { font-family: Helvetica, Arial, sans-serif; color: #111; }
+        h1 { font-size: 1.7rem; margin: 0 0 4px 0; }
+        h2 {
+            font-size: 1.15rem;
+            border-bottom: 2px solid #333;
+            padding-bottom: 4px;
+            margin-top: 2.2em;
+            page-break-after: avoid;
+        }
+        h2 .secnum { color: #888; margin-right: 8px; }
+        h3 { font-size: 1rem; margin-bottom: 0.3em; page-break-after: avoid; }
+        p { margin: 0.5em 0; }
+        code, pre { font-family: 'Courier New', monospace; font-size: 0.85em; }
+        pre {
+            background: #f6f6f6;
+            border: 1px solid #ddd;
+            padding: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        table { border-collapse: collapse; width: 100%; margin: 0.6em 0; font-size: 0.9rem; }
+        th, td { border: 1px solid #bbb; padding: 5px 9px; text-align: left; vertical-align: top; }
+        th { background: #ececec; font-family: Helvetica, Arial, sans-serif; font-size: 0.82rem; }
+        tr { page-break-inside: avoid; }
+        .meta-table td:first-child { width: 200px; font-weight: bold; background: #f7f7f7; }
+        .badge {
+            display: inline-block;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 0.78rem;
+            font-weight: bold;
+            padding: 2px 10px;
+            border-radius: 3px;
+            border: 1px solid transparent;
+        }
+        .badge-pass { background: #e3f2e3; color: #1b5e20; border-color: #1b5e20; }
+        .badge-fail { background: #fbe4e4; color: #8b0000; border-color: #8b0000; }
+        .badge-warn { background: #fdf3dc; color: #7a5a00; border-color: #7a5a00; }
+        .badge-na   { background: #eee; color: #555; border-color: #888; }
+        .verdict-note { font-size: 0.85rem; color: #444; }
+        .muted { color: #666; }
+        .small { font-size: 0.85rem; }
+        .cols {
+            column-count: 3;
+            column-gap: 24px;
+            font-size: 0.82rem;
+            font-family: 'Courier New', monospace;
+        }
+        .cols div { break-inside: avoid; padding: 1px 0; }
+        .callout {
+            border-left: 4px solid #999;
+            background: #f7f7f7;
+            padding: 8px 14px;
+            margin: 0.8em 0;
+            page-break-inside: avoid;
+        }
+        .callout.danger { border-color: #8b0000; background: #fbe4e4; }
+        .callout.warn { border-color: #b8860b; background: #fdf3dc; }
+        .callout.ok { border-color: #1b5e20; background: #e3f2e3; }
+        .titleblock { border-bottom: 3px double #333; padding-bottom: 14px; margin-bottom: 20px; }
+        .subtitle { font-family: Helvetica, Arial, sans-serif; color: #555; margin: 0; }
+        .report-footer {
+            margin-top: 3em;
+            border-top: 1px solid #999;
+            padding-top: 8px;
+            font-size: 0.78rem;
+            color: #666;
+        }
+        .step { border: 1px solid #ddd; padding: 8px 12px; margin-bottom: 8px; page-break-inside: avoid; }
+        .step .origin { font-size: 0.78rem; color: #666; font-family: Helvetica, Arial, sans-serif; }
+        .toolbar {
+            position: sticky; top: 0; z-index: 10;
+            background: #222; color: #fff;
+            padding: 10px 16px;
+            display: flex; gap: 12px; align-items: center;
+            font-family: Helvetica, Arial, sans-serif; font-size: 0.9rem;
+        }
+        .toolbar a, .toolbar button {
+            font-family: inherit; font-size: 0.85rem;
+            color: #fff; background: #444; border: 1px solid #666;
+            padding: 6px 14px; border-radius: 4px; text-decoration: none; cursor: pointer;
+        }
+        .toolbar button.primary { background: #0d6efd; border-color: #0d6efd; }
+        @media print {
+            .toolbar { display: none; }
+            body { background: #fff; }
+            .page { max-width: none; padding: 0; min-height: 0; }
+            a { color: inherit; text-decoration: none; }
+            h2 { margin-top: 1.6em; }
+            @page { margin: 18mm 16mm; }
+        }
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <span style="flex:1">Full Ontology Report — printable view</span>
+    <a href="{{ url_for('analyze_owl', filename=file.filename) }}">&larr; Back to analysis</a>
+    <button class="primary" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="page">
+
+    <!-- Title block -->
+    <div class="titleblock">
+        <h1>Full Ontology Assessment Report</h1>
+        <p class="subtitle">{{ analysis.ontology_name or file.original_filename }}</p>
+    </div>
+
+    <table class="meta-table">
+        <tr><td>Ontology name</td><td>{{ analysis.ontology_name or 'Not declared' }}</td></tr>
+        <tr><td>Ontology IRI</td><td><code>{{ analysis.ontology_iri or 'Not declared' }}</code></td></tr>
+        <tr><td>Source file</td><td>{{ file.original_filename }} ({{ '%.1f' | format(file.file_size / 1024) }} KB, uploaded {{ file.upload_date.strftime('%Y-%m-%d %H:%M UTC') if file.upload_date else 'unknown' }})</td></tr>
+        <tr><td>Analysis performed</td><td>{{ analysis.analysis_date.strftime('%Y-%m-%d %H:%M UTC') if analysis.analysis_date else 'unknown' }} (analysis #{{ analysis.id }})</td></tr>
+        <tr><td>Report generated</td><td>{{ generated_at.strftime('%Y-%m-%d %H:%M UTC') }}</td></tr>
+        <tr><td>DL expressivity</td><td>{{ analysis.expressivity or 'Not determined' }}</td></tr>
+    </table>
+
+    <!-- Executive summary -->
+    <h2><span class="secnum">1.</span>Executive Summary</h2>
+    <table>
+        <tr>
+            <th style="width:220px">Assessment</th>
+            <th style="width:140px">Verdict</th>
+            <th>Notes</th>
+        </tr>
+        <tr>
+            <td>Logical consistency</td>
+            <td>
+                {% if analysis.is_consistent == True %}<span class="badge badge-pass">CONSISTENT</span>
+                {% elif analysis.is_consistent == False %}<span class="badge badge-fail">INCONSISTENT</span>
+                {% else %}<span class="badge badge-na">UNKNOWN</span>{% endif %}
+            </td>
+            <td class="verdict-note">
+                {% if analysis.is_consistent == True %}A model satisfying all axioms exists; no logical contradiction was derived.
+                {% elif analysis.is_consistent == False %}No model can satisfy the axioms; {{ (analysis.consistency_issues or []) | length }} issue(s) reported in §2.
+                {% else %}The reasoner could not establish consistency (see §2 and §5 for details).{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td>Coherence (class satisfiability)</td>
+            <td>
+                {% if analysis.coherence_status == 'coherent' %}<span class="badge badge-pass">COHERENT</span>
+                {% elif analysis.coherence_status == 'incoherent' %}<span class="badge badge-warn">INCOHERENT</span>
+                {% elif analysis.coherence_status == 'inconsistent' %}<span class="badge badge-fail">INCONSISTENT</span>
+                {% else %}<span class="badge badge-na">UNKNOWN</span>{% endif %}
+            </td>
+            <td class="verdict-note">
+                {% set unsat_n = (analysis.unsatisfiable_classes or []) | length %}
+                {% if analysis.coherence_status == 'coherent' %}Every named class can have instances.
+                {% elif analysis.coherence_status == 'incoherent' %}{{ unsat_n }} named class{{ 'es are' if unsat_n != 1 else ' is' }} unsatisfiable (equivalent to owl:Nothing); see §3.
+                {% elif analysis.coherence_status == 'inconsistent' %}Coherence is moot: the ontology as a whole admits no model.
+                {% else %}Class satisfiability was not determined.{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td>Contradictions / conformance findings</td>
+            <td>
+                {% set lint_n = (analysis.lint_findings or []) | length %}
+                {% if lint_n == 0 %}<span class="badge badge-pass">NONE FOUND</span>
+                {% else %}<span class="badge badge-warn">{{ lint_n }} FINDING{{ 'S' if lint_n != 1 }}</span>{% endif %}
+            </td>
+            <td class="verdict-note">
+                {% if lint_n == 0 %}No BFO category-disjointness violations or structural contradictions detected.
+                {% else %}Detected placements under mutually disjoint BFO categories; itemized in §4.{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td>Independent prover cross-check</td>
+            <td>
+                {% set pcc = analysis.prover_cross_check %}
+                {% if pcc and pcc.get('ran') %}<span class="badge badge-pass">RAN</span>
+                {% else %}<span class="badge badge-na">NOT RUN</span>{% endif %}
+            </td>
+            <td class="verdict-note">
+                {% if pcc and pcc.get('ran') %}FOL translation checked with Prover9/Mace4; results in §8.
+                {% else %}The on-demand Prover9/Mace4 cross-check has not been run for this analysis.{% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <h3>Ontology metrics</h3>
+    <table>
+        <tr>
+            <th>Classes</th><th>Object properties</th><th>Data properties</th>
+            <th>Individuals</th><th>Annotation properties</th><th>Axioms</th><th>DL expressivity</th>
+        </tr>
+        <tr>
+            <td>{{ analysis.class_count or 0 }}</td>
+            <td>{{ analysis.object_property_count or 0 }}</td>
+            <td>{{ analysis.data_property_count or 0 }}</td>
+            <td>{{ analysis.individual_count or 0 }}</td>
+            <td>{{ analysis.annotation_property_count or 0 }}</td>
+            <td>{{ analysis.axiom_count or 0 }}</td>
+            <td>{{ analysis.expressivity or '—' }}</td>
+        </tr>
+    </table>
+
+    <!-- Consistency -->
+    <h2><span class="secnum">2.</span>Logical Consistency</h2>
+    <p class="small muted">Consistency asks whether at least one model satisfies every axiom
+        of the ontology. An inconsistent ontology entails everything and supports no reliable
+        inference.</p>
+    {% if analysis.is_consistent == True %}
+    <div class="callout ok"><strong>Result: consistent.</strong> The reasoner found no contradiction among the asserted axioms.</div>
+    {% elif analysis.is_consistent == False %}
+    <div class="callout danger"><strong>Result: inconsistent.</strong> The following issues were detected:</div>
+    {% else %}
+    <div class="callout warn"><strong>Result: unknown.</strong> The reasoner did not complete; any issues encountered are listed below.</div>
+    {% endif %}
+    {% if analysis.consistency_issues %}
+    <ul>
+        {% for issue in analysis.consistency_issues %}
+        <li class="small">{{ issue }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Coherence -->
+    <h2><span class="secnum">3.</span>Coherence (Class Satisfiability)</h2>
+    <p class="small muted">Coherence asks whether every named class can, in principle, have
+        instances. A consistent ontology may still be incoherent: unsatisfiable classes are
+        equivalent to owl:Nothing and usually indicate modelling errors such as placement under
+        disjoint categories.</p>
+    {% if analysis.coherence_status == 'coherent' %}
+    <div class="callout ok"><strong>Result: coherent.</strong> All named classes are satisfiable.</div>
+    {% elif analysis.coherence_status == 'incoherent' %}
+    <div class="callout warn"><strong>Result: incoherent.</strong> The following named classes cannot have any instances:</div>
+    <table>
+        <tr><th>Class</th><th>Justification</th><th>IRI</th></tr>
+        {% for cls in analysis.unsatisfiable_classes %}
+        <tr>
+            <td><strong>{{ cls.label or cls.name if cls is mapping else cls }}</strong></td>
+            <td class="small">{{ cls.justification or '—' if cls is mapping else '—' }}</td>
+            <td class="small"><code>{{ cls.iri or '—' if cls is mapping else '—' }}</code></td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% elif analysis.coherence_status == 'inconsistent' %}
+    <div class="callout danger"><strong>Result: not applicable.</strong> The ontology is globally inconsistent, so per-class satisfiability cannot be assessed.</div>
+    {% else %}
+    <div class="callout"><strong>Result: unknown.</strong> Class satisfiability was not determined for this analysis.</div>
+    {% endif %}
+
+    <!-- Contradictions / lint -->
+    <h2><span class="secnum">4.</span>Contradictions &amp; BFO Conformance Findings</h2>
+    <p class="small muted">Structural lint against the BFO-2020 upper ontology: a class asserted
+        (directly or by inheritance) under two mutually disjoint BFO categories is contradictory
+        and will be unsatisfiable under reasoning.</p>
+    {% if analysis.lint_findings %}
+    <table>
+        <tr><th>#</th><th>Class</th><th>Disjoint categories</th><th>Finding</th></tr>
+        {% for f in analysis.lint_findings %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td><strong>{{ f.get('class', '—') }}</strong></td>
+            <td class="small">{{ f.get('category_a', '?') }} &nbsp;⊥&nbsp; {{ f.get('category_b', '?') }}</td>
+            <td class="small">{{ f.get('message', '') }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <div class="callout ok">No BFO category-disjointness violations were found.</div>
+    {% endif %}
+
+    <!-- Methodology -->
+    <h2><span class="secnum">5.</span>Reasoning Methodology &amp; Transparency</h2>
+    {% set m = analysis.reasoning_methodology or {} %}
+    {% if m %}
+    <table class="meta-table">
+        {% if m.get('reasoners_used') %}
+        <tr><td>Reasoners used</td><td>{{ m['reasoners_used'] | join(', ') if m['reasoners_used'] is iterable and m['reasoners_used'] is not string else m['reasoners_used'] }}</td></tr>
+        {% endif %}
+        {% if m.get('reasoning_tasks') %}
+        <tr><td>Reasoning tasks</td><td>{{ m['reasoning_tasks'] | join('; ') if m['reasoning_tasks'] is iterable and m['reasoning_tasks'] is not string else m['reasoning_tasks'] }}</td></tr>
+        {% endif %}
+        {% if m.get('inference_rules') %}
+        <tr><td>Inference rules</td><td>{{ m['inference_rules'] | join('; ') if m['inference_rules'] is iterable and m['inference_rules'] is not string else m['inference_rules'] }}</td></tr>
+        {% endif %}
+        {% if m.get('performance') %}
+        <tr><td>Performance</td><td class="small">
+            {% for k, v in m['performance'].items() %}{{ k | replace('_', ' ') }}: {{ v }}{{ '; ' if not loop.last }}{% endfor %}
+        </td></tr>
+        {% endif %}
+        {% if m.get('inconsistency_reason') %}
+        <tr><td>Inconsistency reason</td><td class="small">{{ m['inconsistency_reason'] }}</td></tr>
+        {% endif %}
+        {% if m.get('reasoner_error') %}
+        <tr><td>Reasoner error</td><td class="small">{{ m['reasoner_error'] }}</td></tr>
+        {% endif %}
+        {% if m.get('timestamp') %}
+        <tr><td>Reasoning timestamp</td><td>{{ m['timestamp'] }}</td></tr>
+        {% endif %}
+    </table>
+    {% if m.get('theoretical_guarantees') %}
+    <h3>Theoretical guarantees</h3>
+    <table>
+        {% for k, v in m['theoretical_guarantees'].items() %}
+        <tr><td style="width:220px">{{ k | replace('_', ' ') | capitalize }}</td><td class="small">{{ v }}</td></tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+    {% if m.get('limitations') %}
+    <h3>Known limitations</h3>
+    <ul>
+        {% for item in m['limitations'] %}
+        <li class="small">{{ item }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p class="muted">No methodology metadata was recorded for this analysis.</p>
+    {% endif %}
+
+    <!-- Derivation trace -->
+    <h2><span class="secnum">6.</span>Derivation Trace</h2>
+    <p class="small muted">Step-by-step record of how the conclusions above were derived,
+        including their origin and the supporting facts.</p>
+    {% if analysis.derivation_steps %}
+        {% for step in analysis.derivation_steps %}
+        <div class="step">
+            <div class="origin">{{ step.get('axiom_type', 'Step') }}
+                {%- if step.get('origin') %} · origin: {{ step['origin'] }}{% endif %}
+                {%- if step.get('confidence') %} · confidence: {{ step['confidence'] }}{% endif %}</div>
+            <div>{{ step.get('description', '') }}</div>
+            {% if step.get('reason') %}<div class="small muted">Reason: {{ step['reason'] }}</div>{% endif %}
+            {% if step.get('supporting_facts') %}
+            <ul class="small" style="margin:4px 0 0 0">
+                {% for fact in step['supporting_facts'] %}<li>{{ fact }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+    <p class="muted">No derivation steps were recorded (nothing beyond the asserted axioms needed explaining, or the reasoner did not produce a trace).</p>
+    {% endif %}
+
+    <!-- Inferred axioms -->
+    <h2><span class="secnum">7.</span>Inferred Axioms</h2>
+    {% if analysis.inferred_axioms %}
+    <p class="small muted">{{ analysis.inferred_axioms | length }} axiom(s) entailed by the ontology but not explicitly asserted{% if analysis.inferred_axioms | length > 200 %} (first 200 shown){% endif %}.</p>
+    <table>
+        <tr><th style="width:160px">Type</th><th>Axiom</th></tr>
+        {% for ax in analysis.inferred_axioms[:200] %}
+        <tr>
+            <td class="small">{{ ax.get('type', '—') if ax is mapping else '—' }}</td>
+            <td class="small">{{ ax.get('description', ax) if ax is mapping else ax }}
+                {% if ax is mapping and ax.get('derivation') %}<div class="muted">{{ ax['derivation'] }}</div>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No inferred axioms were recorded for this analysis.</p>
+    {% endif %}
+
+    <!-- FOL / prover -->
+    <h2><span class="secnum">8.</span>First-Order Formalization &amp; Prover Cross-Check</h2>
+    {% if analysis.fol_export_stats %}
+    <h3>FOL export statistics</h3>
+    <table>
+        <tr>{% for k in analysis.fol_export_stats.keys() %}<th>{{ k | replace('_', ' ') }}</th>{% endfor %}</tr>
+        <tr>{% for v in analysis.fol_export_stats.values() %}<td>{{ v }}</td>{% endfor %}</tr>
+    </table>
+    <p class="small muted">The ontology's subsumption and disjointness axioms were rendered as a
+        Prover9 (LADR) and CLIF first-order theory ({{ (analysis.fol_premises or []) | length }}
+        FOL premises extracted).</p>
+    {% else %}
+    <p class="muted">No FOL export was generated for this analysis
+        ({{ (analysis.fol_premises or []) | length }} FOL premises extracted).</p>
+    {% endif %}
+    {% set pcc = analysis.prover_cross_check %}
+    <h3>Prover9/Mace4 cross-check</h3>
+    {% if pcc and pcc.get('ran') %}
+    <p class="small">An independent first-order prover was run against the exported theory and
+        compared with the OWL reasoner's verdicts:</p>
+    <pre>{{ pcc | tojson(indent=2) }}</pre>
+    {% elif pcc %}
+    <div class="callout warn">Cross-check did not run{% if pcc.get('reason') %}: {{ pcc['reason'] }}{% endif %}.</div>
+    {% else %}
+    <p class="muted">Not run. The cross-check is available on demand from the analysis page
+        (it invokes Prover9/Mace4 once per class and is therefore slow).</p>
+    {% endif %}
+
+    <!-- Entity inventory -->
+    <h2><span class="secnum">9.</span>Entity Inventory</h2>
+    {% set max_list = 600 %}
+    {% for title, items in [('Classes', analysis.class_list or []),
+                            ('Object properties', analysis.object_property_list or []),
+                            ('Data properties', analysis.data_property_list or []),
+                            ('Individuals', analysis.individual_list or [])] %}
+    <h3>{{ title }} ({{ items | length }})</h3>
+    {% if items %}
+    <div class="cols">
+        {% for item in items[:max_list] %}<div>{{ item }}</div>{% endfor %}
+    </div>
+    {% if items | length > max_list %}
+    <p class="small muted">… and {{ items | length - max_list }} more (truncated for print).</p>
+    {% endif %}
+    {% else %}
+    <p class="muted small">None.</p>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Asserted axioms -->
+    <h2><span class="secnum">10.</span>Asserted Axioms</h2>
+    {% if analysis.axioms %}
+    <p class="small muted">{{ analysis.axioms | length }} axiom(s) asserted in the ontology{% if analysis.axioms | length > 300 %} (first 300 shown){% endif %}.</p>
+    <table>
+        <tr><th style="width:160px">Type</th><th>Axiom</th></tr>
+        {% for ax in analysis.axioms[:300] %}
+        <tr>
+            <td class="small">{{ ax.get('type', '—') if ax is mapping else '—' }}</td>
+            <td class="small">{{ ax.get('description', ax) if ax is mapping else ax }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No axiom list was recorded for this analysis.</p>
+    {% endif %}
+
+    <!-- Implications -->
+    {% if analysis.implications_generated and analysis.real_world_implications %}
+    <h2><span class="secnum">11.</span>Real-World Implications (AI-Generated)</h2>
+    <p class="small muted">Generated by a large language model from the ontology's FOL premises;
+        these are interpretive illustrations, not formal entailments.</p>
+    {% for imp in analysis.real_world_implications %}
+    <div class="step">
+        {% if imp is mapping %}
+        <h3 style="margin-top:0">{{ imp.get('title', 'Implication ' ~ loop.index) }}</h3>
+        {% if imp.get('scenario') %}<p class="small"><strong>Scenario:</strong> {{ imp['scenario'] }}</p>{% endif %}
+        {% if imp.get('explanation') %}<p class="small"><strong>Explanation:</strong> {{ imp['explanation'] }}</p>{% endif %}
+        {% if imp.get('premises_used') %}
+        <div class="small muted">Premises used:
+            {% for p in imp['premises_used'] %}<code>{{ p }}</code>{{ ', ' if not loop.last }}{% endfor %}
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="small">{{ imp }}</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="report-footer">
+        Generated by the OWL Tester Service on {{ generated_at.strftime('%Y-%m-%d at %H:%M UTC') }}
+        from analysis #{{ analysis.id }} of {{ file.original_filename }}.
+        Consistency and coherence verdicts reflect the reasoner run recorded at analysis time;
+        re-run the analysis to refresh them.
+    </div>
+</div>
+
+{% if autoprint %}
+<script>window.addEventListener('load', function () { window.print(); });</script>
+{% endif %}
+</body>
+</html>

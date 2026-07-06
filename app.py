@@ -878,6 +878,28 @@ def analyze_owl(filename):
         flash(f"Error analyzing OWL file: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+@app.route('/analyze/<filename>/report')
+def full_report(filename):
+    """Print-friendly full ontology assessment report.
+
+    Aggregates everything the latest analysis recorded — consistency, coherence,
+    BFO lint findings (contradictions), reasoning methodology, derivation trace,
+    inferred/asserted axioms, FOL export stats, prover cross-check, entity
+    inventory and AI implications — into one standalone printable document.
+    """
+    file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+    analysis = OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id) \
+        .order_by(OntologyAnalysis.id.desc()).first()
+    if not analysis:
+        flash("No analysis exists for this file yet — running one now.", "info")
+        return redirect(url_for('api_analyze_owl', filename=filename))
+    return render_template('report.html',
+                           file=file_record,
+                           analysis=analysis,
+                           generated_at=datetime.datetime.utcnow(),
+                           autoprint=request.args.get('print') in ('1', 'true'))
+
+
 @app.route('/api/analyze/<filename>')
 def api_analyze_owl(filename):
     """API endpoint for analyzing an uploaded OWL file."""
