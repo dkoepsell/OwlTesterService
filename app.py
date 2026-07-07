@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 import uuid
 import datetime
 import base64
@@ -1113,6 +1114,15 @@ def api_analyze_owl(filename):
         logger.info(f"[STAGE] db_commit: {_time.perf_counter()-t:.2f}s")
         logger.info(f"[STAGE] REQUEST TOTAL for {filename}: {_time.perf_counter()-t_request:.2f}s")
 
+        # Kick off the Prover9/Mace4 cross-check in the background so every
+        # analyzed file — uploaded or sandbox-generated — gets a prover verdict
+        # without a manual trigger. Best-effort: a failure to start must not
+        # block the analysis response.
+        try:
+            start_prover_check(analysis)
+        except Exception as e:
+            app.logger.error(f"Could not start background prover check: {e}")
+
         app.logger.info(f"Using analysis ID {analysis.id} for API calls")
         app.logger.info(f"Statistics: Classes={analysis.class_count}, Object Props={analysis.object_property_count}, Data Props={analysis.data_property_count}, Individuals={analysis.individual_count}")
         
@@ -1270,49 +1280,146 @@ def fol_export(analysis_id):
     return resp
 
 
-@app.route('/api/analysis/<analysis_id>/prover-check', methods=['POST'])
-def prover_check(analysis_id):
-    """Run the Prover9/Mace4 cross-check and compare with the OWL reasoner.
+# -- Prover9/Mace4 cross-check (background) ---------------------------------
+# The cross-check invokes the prover once per class, so it can take minutes on
+# a large ontology. It therefore runs in a daemon thread: automatically after
+# every analysis (uploaded and sandbox-generated files alike), and again on
+# demand from the analysis page. The thread writes its verdict back into
+# OntologyAnalysis.prover_cross_check with status 'running' -> 'done'.
 
-    Slow (one prover invocation per class), so it runs on demand rather than at
-    analysis time. Degrades gracefully when the prover9 binary is absent.
+_prover_runs_lock = threading.Lock()
+_prover_runs = set()  # analysis ids with an in-flight check in this worker
+_PROVER_STALE_SECONDS = 15 * 60
+
+
+def _prover_marker_running(pc):
+    """True while a stored 'running' marker is fresh enough to be trusted.
+
+    A worker restart can strand a marker at 'running' forever; past the stale
+    window it no longer blocks a new run.
+    """
+    if not pc or pc.get('status') != 'running':
+        return False
+    try:
+        started = datetime.datetime.fromisoformat(pc['started_at'])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return (datetime.datetime.utcnow() - started).total_seconds() < _PROVER_STALE_SECONDS
+
+
+def _prover_check_worker(analysis_id, bfo_background):
+    """Thread body: build the FOL theory, run the cross-check, store the result."""
+    from fol_export import build_theory
+    from prover9_runner import cross_check
+    from bfo.catalog import DEFAULT_OWL_PATH
+
+    try:
+        with app.app_context():
+            analysis = OntologyAnalysis.query.get(analysis_id)
+            if analysis is None:
+                return
+            try:
+                file_record = OntologyFile.query.get(analysis.ontology_file_id)
+                if not file_record or not os.path.exists(file_record.file_path):
+                    result = {'ran': False,
+                              'reason': 'source ontology file is no longer on disk'}
+                else:
+                    theory = build_theory(file_path=file_record.file_path,
+                                          bfo_path=DEFAULT_OWL_PATH)
+                    # The OWL reasoner's unsatisfiable set, by label, for the
+                    # agreement test.
+                    reasoner_unsat = []
+                    for c in (analysis.unsatisfiable_classes or []):
+                        if isinstance(c, dict):
+                            reasoner_unsat.append(c.get('label') or c.get('name'))
+                        else:
+                            reasoner_unsat.append(str(c))
+                    reasoner_unsat = [n for n in reasoner_unsat if n]
+                    result = cross_check(theory,
+                                         reasoner_unsat_names=reasoner_unsat,
+                                         bfo_background=bfo_background)
+            except Exception as e:  # noqa: BLE001
+                app.logger.error(
+                    f"Prover cross-check failed for analysis {analysis_id}: {e}")
+                result = {'ran': False, 'reason': f"{type(e).__name__}: {e}"}
+            result['status'] = 'done'
+            result['finished_at'] = datetime.datetime.utcnow().isoformat()
+            try:
+                analysis.prover_cross_check = result
+                db.session.commit()
+            except Exception as e:  # noqa: BLE001
+                # A failed store must not strand the 'running' marker silently;
+                # log it — the marker goes stale after _PROVER_STALE_SECONDS and
+                # the check becomes re-runnable.
+                db.session.rollback()
+                app.logger.error(
+                    f"Could not store prover cross-check for analysis "
+                    f"{analysis_id}: {e}")
+    finally:
+        with _prover_runs_lock:
+            _prover_runs.discard(analysis_id)
+
+
+def start_prover_check(analysis, bfo_background=False):
+    """Start the Prover9/Mace4 cross-check for an analysis in the background.
+
+    Stores (and returns) a 'running' marker on the analysis row; returns the
+    existing marker instead when a fresh run is already in flight, so page
+    reloads and double-clicks cannot stack prover processes.
+    """
+    pc = analysis.prover_cross_check
+    if _prover_marker_running(pc):
+        return pc
+    with _prover_runs_lock:
+        if analysis.id in _prover_runs:
+            return pc if pc and pc.get('status') == 'running' else \
+                {'ran': False, 'status': 'running',
+                 'bfo_background': bool(bfo_background),
+                 'started_at': datetime.datetime.utcnow().isoformat()}
+        _prover_runs.add(analysis.id)
+    marker = {'ran': False, 'status': 'running',
+              'bfo_background': bool(bfo_background),
+              'started_at': datetime.datetime.utcnow().isoformat()}
+    analysis.prover_cross_check = marker
+    db.session.commit()
+    threading.Thread(target=_prover_check_worker,
+                     args=(analysis.id, bfo_background),
+                     daemon=True, name=f"prover-check-{analysis.id}").start()
+    return marker
+
+
+@app.route('/api/analysis/<analysis_id>/prover-check', methods=['GET', 'POST'])
+def prover_check(analysis_id):
+    """Prover9/Mace4 cross-check against the OWL reasoner.
+
+    POST starts (or restarts) the check in the background and returns the
+    'running' marker immediately; GET polls the stored result. The check also
+    auto-starts after every analysis, so both uploaded and sandbox-generated
+    ontologies get a prover verdict without a manual trigger. Degrades
+    gracefully when the prover9 binary is absent.
     """
     analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+
+    if request.method == 'GET':
+        pc = analysis.prover_cross_check
+        if not pc:
+            return jsonify({'status': 'none'}), 200
+        if pc.get('status') == 'running' and not _prover_marker_running(pc):
+            pc = dict(pc)
+            pc['status'] = 'stale'
+        return jsonify(pc), 200
+
     try:
-        from fol_export import build_theory
-        from prover9_runner import cross_check
-        from bfo.catalog import DEFAULT_OWL_PATH
-
-        file_record = OntologyFile.query.get(analysis.ontology_file_id)
-        if not file_record or not os.path.exists(file_record.file_path):
-            return jsonify({'ran': False,
-                            'reason': 'source ontology file is no longer on disk'}), 200
-
-        theory = build_theory(file_path=file_record.file_path,
-                              bfo_path=DEFAULT_OWL_PATH)
-
-        # The OWL reasoner's unsatisfiable set, by label, for the agreement test.
-        reasoner_unsat = []
-        for c in (analysis.unsatisfiable_classes or []):
-            if isinstance(c, dict):
-                reasoner_unsat.append(c.get('label') or c.get('name'))
-            else:
-                reasoner_unsat.append(str(c))
-        reasoner_unsat = [n for n in reasoner_unsat if n]
-
         # Opt-in: feed the full BFO-2020 first-order theory as background so the
         # check uses BFO's category axioms, not just derived disjointness. Heavier
         # and may report classes as undetermined within the per-class limits.
         bfo_background = request.values.get('bfo_background') in ('1', 'true', 'on')
-
-        result = cross_check(theory, reasoner_unsat_names=reasoner_unsat,
-                             bfo_background=bfo_background)
-        analysis.prover_cross_check = result
-        db.session.commit()
-        return jsonify(result), 200
+        marker = start_prover_check(analysis, bfo_background=bfo_background)
+        return jsonify(marker), 202
     except Exception as e:
         app.logger.error(f"Error in prover_check: {e}")
-        return jsonify({'ran': False, 'reason': f"{type(e).__name__}: {e}"}), 200
+        return jsonify({'ran': False, 'status': 'done',
+                        'reason': f"{type(e).__name__}: {e}"}), 200
 
 
 # -- Bring Your Own AI API key ----------------------------------------------

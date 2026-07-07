@@ -192,11 +192,13 @@
             <td>
                 {% set pcc = analysis.prover_cross_check %}
                 {% if pcc and pcc.get('ran') %}<span class="badge badge-pass">RAN</span>
+                {% elif pcc and pcc.get('status') == 'running' %}<span class="badge badge-warn">IN PROGRESS</span>
                 {% else %}<span class="badge badge-na">NOT RUN</span>{% endif %}
             </td>
             <td class="verdict-note">
                 {% if pcc and pcc.get('ran') %}FOL translation checked with Prover9/Mace4; results in §8.
-                {% else %}The on-demand Prover9/Mace4 cross-check has not been run for this analysis.{% endif %}
+                {% elif pcc and pcc.get('status') == 'running' %}The Prover9/Mace4 cross-check is still running; regenerate this report in a few minutes for its verdict.
+                {% else %}The Prover9/Mace4 cross-check has not produced a verdict for this analysis.{% endif %}
             </td>
         </tr>
     </table>
@@ -397,11 +399,16 @@
     <p class="small">An independent first-order prover was run against the exported theory and
         compared with the OWL reasoner's verdicts:</p>
     <pre>{{ pcc | tojson(indent=2) }}</pre>
+    {% elif pcc and pcc.get('status') == 'running' %}
+    <div class="callout warn">The Prover9/Mace4 cross-check is still running in the background
+        (it invokes the prover once per class and is therefore slow). Regenerate this report
+        in a few minutes for its verdict.</div>
     {% elif pcc %}
     <div class="callout warn">Cross-check did not run{% if pcc.get('reason') %}: {{ pcc['reason'] }}{% endif %}.</div>
     {% else %}
-    <p class="muted">Not run. The cross-check is available on demand from the analysis page
-        (it invokes Prover9/Mace4 once per class and is therefore slow).</p>
+    <p class="muted">Not run. The cross-check starts automatically after each analysis and can
+        be re-run from the analysis page (it invokes Prover9/Mace4 once per class and is
+        therefore slow).</p>
     {% endif %}
 
     <!-- Entity inventory -->
