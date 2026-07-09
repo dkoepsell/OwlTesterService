@@ -330,6 +330,18 @@ The foundation, and the direct lift of the demo's core mechanic.
 Small–medium effort. Generic value immediately: every ontology user gets
 minimal-core explanations instead of a bare "unsatisfiable".
 
+> **SHIPPED 2026-07-09.** `render_prover9(labels=True)` + `axiom_table()` in
+> `fol_export.py` (download exports unchanged — labels are opt-in);
+> `_extract_proof_cores()` in `prover9_runner.py` re-proves each unsatisfiable
+> class (capped at 10) over the labeled export and stores
+> `proof_cores` inside the existing `prover_cross_check` JSON — **no
+> migration**. Rendered on the analysis page (server-side block + the JS
+> poller) and in report.html §8 as "these N axioms cannot all hold", with BFO
+> category axioms badged and a caveat when a background theory participates.
+> Verified end-to-end on `quality_disposition_straddle.owl`: Force's core is
+> exactly {Force ⊑ quality, Force ⊑ disposition, disposition ⊥ quality [BFO]}.
+> Tests in `tests/test_proof_cores.py`.
+
 ### Phase 2 — user-declared satisfiability probes ("checked positions")
 
 Generalize the demo's one-button check into an analysis-page feature: pick any

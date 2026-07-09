@@ -396,6 +396,25 @@
     {% set pcc = analysis.prover_cross_check %}
     <h3>Prover9/Mace4 cross-check</h3>
     {% if pcc and pcc.get('ran') %}
+    {% if pcc.get('proof_cores') %}
+    <h3>Why these classes are unsatisfiable</h3>
+    {% for core in pcc['proof_cores'] %}
+    <p class="small"><strong>{{ core['class'] }}</strong> — these {{ core['axioms'] | length }}
+        axioms cannot all hold:</p>
+    <ul class="small">
+        {% for ax in core['axioms'] %}
+        <li><code>{{ ax['text'] }}</code>{% if ax.get('origin') == 'bfo' %} <em>(BFO category axiom)</em>{% endif %}</li>
+        {% endfor %}
+    </ul>
+    {% if core.get('may_use_background') %}
+    <p class="small muted">BFO-2020 background axioms may also participate in this proof.</p>
+    {% endif %}
+    {% endfor %}
+    {% if pcc.get('proof_cores_capped') %}
+    <p class="small muted">Justifications shown for the first {{ pcc['proof_cores'] | length }}
+        of {{ pcc['proof_cores_capped'] }} unsatisfiable classes.</p>
+    {% endif %}
+    {% endif %}
     <p class="small">An independent first-order prover was run against the exported theory and
         compared with the OWL reasoner's verdicts:</p>
     <pre>{{ pcc | tojson(indent=2) }}</pre>

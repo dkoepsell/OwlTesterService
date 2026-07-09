@@ -793,6 +793,25 @@
                         {% else %}
                             <div class="alert alert-secondary mb-0">Prover found {{ pc.prover_unsatisfiable|length }} unsatisfiable classes{{ bg }} ({{ pc.tested }} tested{% if pc.capped %}, capped{% endif %}{% if pc.undetermined %}, {{ pc.undetermined|length }} undetermined{% endif %}).</div>
                         {% endif %}
+                        {% for core in pc.proof_cores or [] %}
+                        <div class="card mt-2"><div class="card-body py-2">
+                            <div class="small fw-bold mb-1">Why <code>{{ core.class }}</code> is
+                                unsatisfiable — these {{ core.axioms|length }} axioms cannot all hold:</div>
+                            <ul class="small mb-1">
+                                {% for ax in core.axioms %}
+                                <li><code>{{ ax.text }}</code>
+                                    {% if ax.origin == 'bfo' %}<span class="badge text-bg-secondary">BFO category</span>{% endif %}</li>
+                                {% endfor %}
+                            </ul>
+                            {% if core.may_use_background %}
+                            <div class="small text-muted">BFO-2020 background axioms may also participate in this proof.</div>
+                            {% endif %}
+                        </div></div>
+                        {% endfor %}
+                        {% if pc.proof_cores_capped %}
+                        <div class="small text-muted mt-1">Justifications shown for the first
+                            {{ pc.proof_cores|length }} of {{ pc.proof_cores_capped }} unsatisfiable classes.</div>
+                        {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -1007,7 +1026,40 @@
                        pc.prover_unsatisfiable.length + ' unsatisfiable classes' + bg + ' (' + pc.tested +
                        ' tested' + (pc.capped ? ', capped' : '') + undet + ').</div>';
             }
-            proverOut.innerHTML = html;
+            proverOut.innerHTML = html + renderProofCores(pc);
+        }
+
+        // "Why is this class unsatisfiable" — the minimal set of the ontology's
+        // own axioms the prover's proof actually used (cross_check.proof_cores).
+        function renderProofCores(pc) {
+            if (!pc.proof_cores || !pc.proof_cores.length) return '';
+            const esc = function (s) {
+                return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            };
+            let out = '';
+            pc.proof_cores.forEach(function (core) {
+                out += '<div class="card mt-2"><div class="card-body py-2">' +
+                       '<div class="small fw-bold mb-1">Why <code>' + esc(core.class) +
+                       '</code> is unsatisfiable — these ' + core.axioms.length +
+                       ' axioms cannot all hold:</div><ul class="small mb-1">';
+                core.axioms.forEach(function (ax) {
+                    out += '<li><code>' + esc(ax.text) + '</code>' +
+                           (ax.origin === 'bfo'
+                               ? ' <span class="badge text-bg-secondary">BFO category</span>' : '') +
+                           '</li>';
+                });
+                out += '</ul>';
+                if (core.may_use_background) {
+                    out += '<div class="small text-muted">BFO-2020 background axioms may also participate in this proof.</div>';
+                }
+                out += '</div></div>';
+            });
+            if (pc.proof_cores_capped) {
+                out += '<div class="small text-muted mt-1">Justifications shown for the first ' +
+                       pc.proof_cores.length + ' of ' + pc.proof_cores_capped +
+                       ' unsatisfiable classes.</div>';
+            }
+            return out;
         }
 
         function setProverBusy(busy, useBg) {

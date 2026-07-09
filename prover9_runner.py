@@ -143,6 +143,42 @@ def check_class_unsat(assumptions_p9, sym, kind, timeout=5, background="",
     return stalled
 
 
+_MAX_PROOF_CORES = 10
+
+
+def _extract_proof_cores(theory, unsat_records, background, align, timeout,
+                         max_seconds=None, max_megs=None):
+    """Re-prove each unsatisfiable class over the label-annotated export and map
+    the proof's used assumption labels back to the source axioms.
+
+    Returns [{'class', 'axioms': [{'label','kind','text','iris'[,'origin']}],
+    'may_use_background': bool}]. With a background theory in play the proof may
+    also use unlabeled background axioms — the listed axioms are the ontology's
+    own contribution, and may_use_background flags the caveat for the UI.
+    """
+    from fol_export import axiom_table, render_prover9
+    labeled = render_prover9(theory, align_bfo=align, labels=True)
+    table = axiom_table(theory)
+    base = _limits_block(max_seconds, max_megs) + background + labeled
+    cores = []
+    for sym, kind, label in unsat_records:
+        if kind == "occurrent" and not align:
+            goal = f"all X (-instance_of_at(X,{sym}))."
+        else:
+            goal = f"all X all T (-instance_of(X,{sym},T))."
+        proof = prove_goal(base, goal, timeout=timeout)
+        if proof["status"] != "proved":
+            continue  # the labeled re-run can time out where the first didn't
+        axioms = [dict(table[l], label=l) for l in proof["used_labels"]
+                  if l in table]
+        cores.append({
+            "class": label,
+            "axioms": axioms,
+            "may_use_background": bool(background),
+        })
+    return cores
+
+
 _PROOF_SECTION_RE = re.compile(
     r"={5,}\s*PROOF\s*={5,}(.*?)={5,}\s*end of proof\s*={5,}", re.S)
 _LABEL_RE = re.compile(r"# label\((\w+)\)")
@@ -300,6 +336,7 @@ def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
         candidates = candidates[:max_classes]
 
     prover_unsat = []
+    unsat_records = []  # (sym, kind, label) of unsat classes, for proof cores
     undetermined = []
     for sym, kind, label in candidates:
         verdict = check_class_unsat(
@@ -309,6 +346,7 @@ def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
         result["tested"] += 1
         if verdict == "unsatisfiable":
             prover_unsat.append(label)
+            unsat_records.append((sym, kind, label))
         elif verdict == "undetermined":
             undetermined.append(label)
 
@@ -317,6 +355,17 @@ def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
     result["engine"] = engine + "+bfo" if bfo_background else engine
     result["prover_unsatisfiable"] = sorted(prover_unsat)
     result["undetermined"] = sorted(undetermined)
+
+    # For each unsatisfiable class, re-prove over the label-annotated export and
+    # record the minimal set of the ontology's own axioms the proof used — the
+    # "these N axioms cannot all hold" justification the UI renders.
+    if unsat_records and theory is not None:
+        result["proof_cores"] = _extract_proof_cores(
+            theory, unsat_records[:_MAX_PROOF_CORES], background,
+            align=bfo_background, timeout=per_class_timeout,
+            max_seconds=max_secs, max_megs=max_megs)
+        if len(unsat_records) > _MAX_PROOF_CORES:
+            result["proof_cores_capped"] = len(unsat_records)
 
     prover_set = set(prover_unsat)
     # Compare on the intersection of names we actually tested vs reasoner output.
