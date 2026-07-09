@@ -1,8 +1,19 @@
 """Shared pytest fixtures for the BFO coherence foundation tests."""
 
 import os
+import tempfile
 
 import pytest
+
+# The app module is a process-wide singleton that binds its database engine at
+# import time; every test file that imports `app` shares that one binding, and
+# whichever file imports it FIRST decides the database for the whole run.
+# Point the suite at a scratch database here — conftest imports before any test
+# module — so no collection order can bind the tests to the developer's real
+# owl_tester.db (whose schema may be stale) or to a per-test path that later
+# files silently miss.
+os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(
+    tempfile.mkdtemp(prefix="owltester-tests-"), "suite.db")
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 

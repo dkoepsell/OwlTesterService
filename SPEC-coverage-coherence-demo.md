@@ -358,6 +358,18 @@ instance?"* → COHERENT with a Mace4 witness, or EMPTY with the Phase-1 core.
 
 Medium effort. Depends on Phase 1's label side-table.
 
+> **SHIPPED 2026-07-09** (named classes; class-expression input deferred to a
+> follow-up). `probe_class()` in `prover9_runner.py` — Prover9-first ordering,
+> Phase-1 core on EMPTY; on COHERENT the Mace4 interpretation is decoded
+> (`_parse_interpretation` / `_witness_from_model`) into the witness
+> individual's class memberships, rendered as "an individual that instantiates
+> X, Y, Z" rather than a full instance diagram (the diagram remains open).
+> `POST /api/analysis/<id>/probe` resolves the target by IRI, FOL symbol, or
+> label and runs synchronously; nothing is stored. Probe panel on the analysis
+> page under the cross-check card. Tests in `tests/test_probe.py`; suite-wide
+> scratch DATABASE_URL moved into tests/conftest.py so app-importing test
+> files can no longer poison each other's database binding.
+
 ### Phase 3 — coherence profiles (the productized typology)
 
 The insurance overlay, data-ized. A **profile** is a JSON bundle:

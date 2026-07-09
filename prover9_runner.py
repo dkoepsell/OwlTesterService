@@ -245,6 +245,130 @@ def find_model(assumptions_p9, timeout=5):
     return out
 
 
+# -- satisfiability probes (SPEC-coverage-coherence-demo.md §11 Phase 2) --------
+
+_INTERP_SIZE_RE = re.compile(r"interpretation\(\s*(\d+)")
+_INTERP_CONST_RE = re.compile(r"function\((\w+),\s*\[\s*(\d+)\s*\]\)")
+_INTERP_REL_RE = re.compile(r"relation\((\w+)\(([_,]+)\),\s*\[([\d,\s]+)\]\)")
+
+
+def _parse_interpretation(model_text):
+    """Parse a Mace4 interpretation into (domain_size, constants, relations).
+
+    constants: {name: element}; relations: {name: (arity, flat row-major
+    0/1 table)}. Returns None when the text doesn't look like a model.
+    """
+    size = _INTERP_SIZE_RE.search(model_text or "")
+    if not size:
+        return None
+    consts = {m.group(1): int(m.group(2))
+              for m in _INTERP_CONST_RE.finditer(model_text)}
+    rels = {}
+    for m in _INTERP_REL_RE.finditer(model_text):
+        arity = m.group(2).count("_")
+        table = [int(v) for v in re.findall(r"\d", m.group(3))]
+        rels[m.group(1)] = (arity, table)
+    return int(size.group(1)), consts, rels
+
+
+def _witness_from_model(model_text, theory, target_sym, kind, align):
+    """Read the Mace4 model back as a witness: which classes the witness
+    individual instantiates. Returns {'memberships': [labels], 'domain_size': n}
+    or None when the model can't be decoded (the caller degrades to a bare
+    'a model exists' verdict)."""
+    parsed = _parse_interpretation(model_text)
+    if not parsed:
+        return None
+    dom, consts, rels = parsed
+    ternary = kind != "occurrent" or align
+
+    def member(x, class_val, t):
+        if ternary:
+            arity_table = rels.get("instance_of")
+            if not arity_table or arity_table[0] != 3:
+                return False
+            return bool(arity_table[1][x * dom * dom + class_val * dom + t])
+        arity_table = rels.get("instance_of_at")
+        if not arity_table or arity_table[0] != 2:
+            return False
+        return bool(arity_table[1][x * dom + class_val])
+
+    target_val = consts.get(target_sym)
+    if target_val is None:
+        return None
+    witness = next(((x, t) for x in range(dom) for t in range(dom)
+                    if member(x, target_val, t)), None)
+    if witness is None:
+        return None
+    x, t = witness
+    memberships = sorted({rec["label"] for rec in theory.classes.values()
+                          if rec["sym"] in consts
+                          and member(x, consts[rec["sym"]], t)})
+    return {"memberships": memberships, "domain_size": dom}
+
+
+def probe_class(theory, class_iri, timeout=10, bfo_background=False):
+    """Satisfiability probe: can this class have any instance at all?
+
+    Returns {'status': 'empty'|'inhabited'|'undetermined'|'unknown', 'class',
+    plus 'core' (the Phase-1 proof core) when empty and 'witness' (decoded
+    Mace4 model memberships) when inhabited}. Same engine ordering as the
+    coverage demo: Prover9 decides emptiness first; Mace4 only runs on the
+    no-proof side, because it does not terminate on unsatisfiable input.
+    """
+    rec = (theory.classes or {}).get(class_iri)
+    if rec is None:
+        return {"status": "unknown", "reason": "class not in the FOL export"}
+    sym, kind, label = rec["sym"], rec["kind"], rec["label"]
+    result = {"status": "unknown", "class": label}
+    if not prover9_available():
+        result["reason"] = "prover9 binary not available"
+        return result
+
+    from fol_export import axiom_table, render_prover9
+    background, max_secs, max_megs = "", None, None
+    if bfo_background:
+        from clif_theory import render_prover9_theory
+        background = render_prover9_theory()
+        max_secs, max_megs = 10, 500
+    labeled = render_prover9(theory, align_bfo=bfo_background, labels=True)
+    base = _limits_block(max_secs, max_megs) + background + labeled
+
+    started = time.perf_counter()
+    if kind == "occurrent" and not bfo_background:
+        goal = f"all X (-instance_of_at(X,{sym}))."
+    else:
+        goal = f"all X all T (-instance_of(X,{sym},T))."
+    proof = prove_goal(base, goal, timeout=timeout)
+    engine = "prover9"
+    if proof["status"] == "proved":
+        table = axiom_table(theory)
+        result["status"] = "empty"
+        result["core"] = {
+            "axioms": [dict(table[l], label=l) for l in proof["used_labels"]
+                       if l in table],
+            "may_use_background": bool(background),
+        }
+    else:
+        existence = _existence_block(sym, kind, align=bfo_background)
+        model = find_model(base + existence, timeout=timeout)
+        if model["found"]:
+            engine = "prover9+mace4"
+            result["status"] = "inhabited"
+            result["witness"] = _witness_from_model(
+                model["model_text"], theory, sym, kind, bfo_background)
+        elif proof["status"] == "no_proof":
+            # Prover9 exhausted its search without a proof: not provably empty.
+            # Without a decoded model we still can't show a witness.
+            result["status"] = "inhabited"
+            result["witness"] = None
+        else:
+            result["status"] = "undetermined"
+    result["engine"] = engine + ("+bfo" if bfo_background else "")
+    result["elapsed_ms"] = int((time.perf_counter() - started) * 1000)
+    return result
+
+
 def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
                 max_classes=60, per_class_timeout=5, bfo_background=False,
                 background_max_seconds=10, background_max_megs=500):

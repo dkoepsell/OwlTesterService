@@ -1431,6 +1431,56 @@ def prover_check(analysis_id):
                         'reason': f"{type(e).__name__}: {e}"}), 200
 
 
+@app.route('/api/analysis/<analysis_id>/probe', methods=['POST'])
+def analysis_probe(analysis_id):
+    """Satisfiability probe: can the named class have any instance at all?
+
+    Body: {"class": <label | FOL symbol | IRI>, "bfo_background": bool}.
+    Runs synchronously (a single class is fast — the same Prover9-first,
+    Mace4-on-the-no-proof-side ordering as the coverage demo) and returns
+    {'status': 'empty'|'inhabited'|'undetermined'|'unknown', plus 'core'
+    (the axioms that cannot all hold) when empty and 'witness' (decoded
+    Mace4 model memberships) when inhabited}. Nothing is stored.
+    """
+    from fol_export import build_theory
+    from prover9_runner import probe_class
+    from bfo.catalog import DEFAULT_OWL_PATH
+
+    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    data = request.get_json(silent=True) or {}
+    target = (data.get('class') or '').strip()
+    if not target:
+        return jsonify({'status': 'unknown', 'reason': "missing 'class'"}), 400
+    bfo_background = bool(data.get('bfo_background'))
+
+    file_record = OntologyFile.query.get(analysis.ontology_file_id)
+    if not file_record or not os.path.exists(file_record.file_path):
+        return jsonify({'status': 'unknown',
+                        'reason': 'source ontology file is no longer on disk'}), 404
+    try:
+        theory = build_theory(file_path=file_record.file_path,
+                              bfo_path=DEFAULT_OWL_PATH)
+        # Resolve by IRI, then FOL symbol, then label (case-insensitive).
+        iri = None
+        if target in theory.classes:
+            iri = target
+        else:
+            folded = target.lower()
+            for candidate, rec in theory.classes.items():
+                if rec['sym'] == target or rec['label'].lower() == folded:
+                    iri = candidate
+                    break
+        if iri is None:
+            return jsonify({'status': 'unknown',
+                            'reason': f"class '{target}' not found in the FOL "
+                                      f"export"}), 404
+        return jsonify(probe_class(theory, iri, bfo_background=bfo_background))
+    except Exception as e:  # noqa: BLE001
+        app.logger.error(f"Probe failed for analysis {analysis_id}: {e}")
+        return jsonify({'status': 'unknown',
+                        'reason': f"{type(e).__name__}: {e}"}), 200
+
+
 # -- Bring Your Own AI API key ----------------------------------------------
 
 @app.context_processor
