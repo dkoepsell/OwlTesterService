@@ -143,6 +143,72 @@ def check_class_unsat(assumptions_p9, sym, kind, timeout=5, background="",
     return stalled
 
 
+_PROOF_SECTION_RE = re.compile(
+    r"={5,}\s*PROOF\s*={5,}(.*?)={5,}\s*end of proof\s*={5,}", re.S)
+_LABEL_RE = re.compile(r"# label\((\w+)\)")
+
+
+def prove_goal(assumptions_p9, goal_p9, timeout=5):
+    """Ask Prover9 to prove one goal, returning the proof's used labels.
+
+    `assumptions_p9` is a complete assumptions block whose formulas may carry
+    `# label(name)` attributes; `goal_p9` is a single goal formula (no block
+    wrapper). Returns {'status': 'proved'|'no_proof'|'unknown',
+    'used_labels': [names], 'proof_text': str} — used_labels are the labels of
+    the assumption formulas Prover9 actually used, i.e. the minimal clause set
+    behind the contradiction, which is what callers render as justification.
+    """
+    out = {"status": "unknown", "used_labels": [], "proof_text": ""}
+    if not prover9_available():
+        return out
+    p9_input = assumptions_p9 + f"\nformulas(goals).\n  {goal_p9}\nend_of_list.\n"
+    try:
+        proc = _run(["prover9"], p9_input, timeout)
+    except subprocess.TimeoutExpired:
+        return out
+    except Exception as e:  # noqa: BLE001
+        logger.warning("prover9 invocation failed: %s", e)
+        return out
+    if proc.returncode == _P9_PROVED or _PROOF_RE.search(proc.stdout or ""):
+        out["status"] = "proved"
+        m = _PROOF_SECTION_RE.search(proc.stdout or "")
+        if m:
+            out["proof_text"] = m.group(1).strip()
+            labels = set(_LABEL_RE.findall(m.group(1)))
+            labels.discard("non_clause")
+            labels.discard("goal")
+            out["used_labels"] = sorted(labels)
+    elif proc.returncode == _P9_EXHAUSTED:
+        out["status"] = "no_proof"
+    return out
+
+
+def find_model(assumptions_p9, timeout=5):
+    """Ask Mace4 for a finite model of the assumptions.
+
+    Returns {'found': bool|None, 'model_text': str}: True with the raw model
+    text when a model exists, False when the search space is exhausted, None
+    when Mace4 is unavailable or undecided within the timeout. Callers should
+    run Prover9 first — Mace4 does not terminate on unsatisfiable input.
+    """
+    out = {"found": None, "model_text": ""}
+    if not mace4_available():
+        return out
+    try:
+        m4 = _run(["mace4"], assumptions_p9, timeout)
+    except subprocess.TimeoutExpired:
+        return out
+    except Exception as e:  # noqa: BLE001
+        logger.warning("mace4 invocation failed: %s", e)
+        return out
+    if m4.returncode == 0 or _MODEL_RE.search(m4.stdout or ""):
+        out["found"] = True
+        out["model_text"] = (m4.stdout or "").strip()
+    elif m4.returncode == _P9_EXHAUSTED:
+        out["found"] = False
+    return out
+
+
 def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
                 max_classes=60, per_class_timeout=5, bfo_background=False,
                 background_max_seconds=10, background_max_megs=500):
