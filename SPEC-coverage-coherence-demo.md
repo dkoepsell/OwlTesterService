@@ -288,6 +288,102 @@ Deviations, each found during build:
 
 Verified: fixture round-trip live (sound → Mace4 model + witness; illusory →
 proof, core E1/C1/D1, ~3 ms), cache fallback with engines absent, page + API
-smoke, full prover-related suite green. Not yet done: on-stage rehearsal (§9.4),
-stretch fixture (§9.5), and no screenshot check (no headless browser on the dev
-box) — eyeball the page once before presenting.
+smoke, full prover-related suite green. Not yet done: on-stage rehearsal (§9.4)
+and no screenshot check (no headless browser on the dev box) — eyeball the page
+once before presenting.
+
+**Stretch fixture shipped (same day):** `crime-definitional-gutting` — the
+grant's Fraudulent Instruction extension requires (via D2) constituting
+Computer Fraud, which (via D1) requires a transfer no Employee initiated;
+core {G1, D1, D2}, with G1 carrying two axioms to exercise the multi-axiom
+clause mapping. Fixtures may now declare explicit diagram `edges` and per-clause
+`pos` (needed when a role occurs twice); role-based defaults still cover the
+cyber pair. The page renders all fixtures, centerpiece pair first; the
+definitional-gutting taxonomy card is marked "shown live".
+
+---
+
+## 11. Generalization path — from demo to OwlTesterService feature
+
+The demo hard-codes one domain. What it actually demonstrates is a general
+capability the main service does not yet have: **named satisfiability probes
+with proof-derived justification cores mapped back to human-meaningful source
+units.** The path from one to the other is four phases, each independently
+shippable and each reusing the previous.
+
+### Phase 1 — labeled axioms and proof cores in the existing analysis pipeline
+
+The foundation, and the direct lift of the demo's core mechanic.
+
+- Extend `fol_export.py` to attach `# label(ax_<n>)` attributes to every emitted
+  formula and return a side-table `label → {source axiom, entity IRIs, rendered
+  form}`. (The demo bypassed this by authoring labeled formulas directly; the
+  service must generate them from OWL.)
+- Where the auto-run `cross_check` (commit `7ec6535`) finds an unsatisfiable
+  class, re-run `prove_goal` (already in `prover9_runner.py`) to get the used
+  labels, and store the core in `OntologyAnalysis` (new JSON column, migration
+  per house style).
+- Surface in `analysis.html` and `report.html`: "these N axioms cannot all
+  hold", rendered as the original axioms, not FOL. This is the demo's verdict
+  card with axioms in place of clauses.
+
+Small–medium effort. Generic value immediately: every ontology user gets
+minimal-core explanations instead of a bare "unsatisfiable".
+
+### Phase 2 — user-declared satisfiability probes ("checked positions")
+
+Generalize the demo's one-button check into an analysis-page feature: pick any
+class (or enter a simple class expression) and ask *"can this class have any
+instance?"* → COHERENT with a Mace4 witness, or EMPTY with the Phase-1 core.
+
+- `POST /api/analysis/<id>/probe` running the demo's exact
+  `prove_goal`/`find_model` ordering (Prover9 first; Mace4 never on unsat).
+- Witness rendering cannot use hand-written sentences for arbitrary ontologies:
+  render the Mace4 model as a small instance diagram instead (BVSS visual
+  language — the explorer already draws individuals).
+- Extract the demo's verdict card into a shared template partial + JS module so
+  the demo page and the analysis page render verdicts identically.
+
+Medium effort. Depends on Phase 1's label side-table.
+
+### Phase 3 — coherence profiles (the productized typology)
+
+The insurance overlay, data-ized. A **profile** is a JSON bundle:
+
+- a role vocabulary and how ontologies declare it (an annotation property —
+  e.g. `cov:role = grant|exclusion|carveback|definition`, or BFO-native roles);
+- **position templates** that expand mechanically over the role structure: "for
+  every carveback C restoring from exclusion E, probe C's restored class";
+  "for every definition D used by grant G, probe G's advertised class";
+- named findings (the four failure patterns are the insurance profile's
+  finding set) with prose templates;
+- diagram layout hints (the demo's `pos`/`edges` fields, generalized).
+
+The engine is a profile interpreter: expand templates → run Phase-2 probes →
+emit named findings into the `owltester/` pipeline as a new stage, feeding the
+BVSS explorer's findings rings and a report section. **Profiles as data keeps
+the method boundary**: the interpreter is generic and shippable; the insurance
+profile (and future deontic/regulatory or BFO-pattern profiles) can stay
+private, per-client, and priced. The sandbox builder is the authoring surface:
+add role annotations there and "check coherence" becomes a button on any
+sandbox ontology — also how new demo fixtures get built without hand-writing
+FOL.
+
+Large effort; this is the product. Depends on Phases 1–2.
+
+### Phase 4 — real Contradiction Debt (the portfolio panel, un-mocked)
+
+Define CD as a weighted count of empty load-bearing positions (weights from the
+profile's position importance), computed per file. Batch-run over a user's
+uploaded files (`OntologyFile` history already exists), and replace the demo's
+synthetic scatter with a dashboard: real distribution, the exception register as
+a sorted drill-down list linking each high-CD file to its named findings.
+
+Medium effort once 1–3 exist. This is the "bounded review" deliverable as a
+screen.
+
+### What stays out, permanently
+
+Free-text/NL intake of policy or ontology prose. The service consumes formal
+artifacts (OWL/CLIF/sandbox structures); formalization of natural-language
+documents remains the paid method, exactly as the demo's paste box says.

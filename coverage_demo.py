@@ -48,7 +48,7 @@ FAILURE_PATTERNS = [
     {"key": "definitional-gutting",
      "name": "Definitional gutting",
      "line": "crime",
-     "shown_live": False,
+     "shown_live": True,
      "blurb": "A defined term is narrowed until the grant that uses it can no "
               "longer pay the scenarios it advertises.",
      "example": "“Computer Fraud” defined so tightly that the social-"
@@ -207,13 +207,17 @@ def _public_view(fixture):
     Everything embedded in the page is visible in view-source; the page must
     show clauses and scores only, so formalization details never ship with it.
     """
-    return {k: fixture[k] for k in ("id", "title", "line_of_business",
-                                    "baseline_score", "clauses")}
+    keys = ("id", "title", "line_of_business", "baseline_score", "clauses", "edges")
+    return {k: fixture[k] for k in keys if k in fixture}
+
+# The two same-score snippets render first — they are the demo's opening beat.
+_CENTERPIECE = ["cyber-sound", "cyber-illusory-carveback"]
 
 @coverage_bp.route("/coverage")
 def coverage_page():
-    fixtures = [load_fixture("cyber-sound"), load_fixture("cyber-illusory-carveback")]
-    fixtures = [_public_view(f) for f in fixtures if f]
+    ids = _CENTERPIECE + sorted(f["id"] for f in list_fixtures()
+                                if f["id"] not in _CENTERPIECE)
+    fixtures = [_public_view(f) for f in (load_fixture(i) for i in ids) if f]
     return render_template(
         "coverage_demo.html",
         fixtures=fixtures,

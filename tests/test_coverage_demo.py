@@ -67,9 +67,21 @@ def test_illusory_fixture_core_is_proof_derived():
 
 # -- cache fallback (SPEC §8.6 — works with engines absent) ----------------------
 
+@requires_provers
+def test_gutting_fixture_core_spans_multiaxiom_clause():
+    """G1 carries two axioms (ax_g1, ax_g1b); the proof uses only ax_g1b but the
+    core must still name clause G1 once, alongside both definitions."""
+    verdict = run_check(load_fixture("crime-definitional-gutting"))
+    assert verdict["coherent"] is False
+    core = verdict["checked_positions"][0]["contradicting_clauses"]
+    assert core == ["G1", "D1", "D2"]
+    assert "ax_g1b" in verdict["debug"]["used_labels"]
+
+
 def test_cache_fallback_when_provers_absent(monkeypatch):
     monkeypatch.setattr(coverage_demo, "prover9_available", lambda: False)
-    for fid, coherent in (("cyber-sound", True), ("cyber-illusory-carveback", False)):
+    for fid, coherent in (("cyber-sound", True), ("cyber-illusory-carveback", False),
+                          ("crime-definitional-gutting", False)):
         verdict = check_with_fallback(load_fixture(fid))
         assert verdict is not None, f"{fid}: no cache served"
         assert verdict["coherent"] is coherent
@@ -99,6 +111,8 @@ def test_coverage_page_smoke(client):
     html = resp.get_data(as_text=True)
     assert "Coverage Coherence Checker" in html
     assert "Endorsement 7" in html
+    assert "Funds Transfer Fraud" in html  # the stretch fixture renders too
+    assert html.index("cyber-sound") < html.index("crime-definitional-gutting")
     # SPEC §8.4 — no mechanism on the page without ?debug=1.
     for forbidden in ("prover9", "Prover9", "mace4", "Mace4", "CLIF", "axiom",
                       "restored_by_c1"):

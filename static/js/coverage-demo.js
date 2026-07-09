@@ -32,22 +32,34 @@
              x2: b[0] - ux * shrink, y2: b[1] - uy * shrink };
   }
 
+  function nodePos(clause) {
+    return clause.pos || NODE_POS[clause.role] || [210, 152];
+  }
+
   function buildDiagram(fix) {
     const svg = document.querySelector(`#verdict-${fix.id} .clause-diagram`);
     if (!svg) return;
-    const byRole = {};
-    fix.clauses.forEach((c) => { byRole[c.role] = c; });
+    const byRole = {}, byId = {};
+    fix.clauses.forEach((c) => { byRole[c.role] = c; byId[c.id] = c; });
 
-    // Edges by role logic: the exclusion limits the grant, the carveback
-    // restores from the exclusion, the definition feeds both.
-    const edges = [];
-    if (byRole.exclusion && byRole.grant) edges.push([byRole.exclusion, byRole.grant, "limits"]);
-    if (byRole.carveback && byRole.exclusion) edges.push([byRole.carveback, byRole.exclusion, "restores from"]);
-    if (byRole.definition && byRole.exclusion) edges.push([byRole.definition, byRole.exclusion, "defines term in"]);
-    if (byRole.definition && byRole.carveback) edges.push([byRole.definition, byRole.carveback, "defines term in"]);
+    // A fixture may declare its own structure edges (needed when a role occurs
+    // more than once); otherwise fall back to role logic: the exclusion limits
+    // the grant, the carveback restores from the exclusion, the definition
+    // feeds both.
+    let edges;
+    if (fix.edges) {
+      edges = fix.edges.map((e) => [byId[e.from], byId[e.to], e.label])
+                       .filter(([a, b]) => a && b);
+    } else {
+      edges = [];
+      if (byRole.exclusion && byRole.grant) edges.push([byRole.exclusion, byRole.grant, "limits"]);
+      if (byRole.carveback && byRole.exclusion) edges.push([byRole.carveback, byRole.exclusion, "restores from"]);
+      if (byRole.definition && byRole.exclusion) edges.push([byRole.definition, byRole.exclusion, "defines term in"]);
+      if (byRole.definition && byRole.carveback) edges.push([byRole.definition, byRole.carveback, "defines term in"]);
+    }
 
     edges.forEach(([from, to, label]) => {
-      const p = edgePath(NODE_POS[from.role], NODE_POS[to.role], 44);
+      const p = edgePath(nodePos(from), nodePos(to), 44);
       const line = svgEl("line", { class: "diag-edge", x1: p.x1, y1: p.y1, x2: p.x2, y2: p.y2,
                                    "data-edge": `${from.id}-${to.id}` });
       svg.appendChild(line);
@@ -57,7 +69,7 @@
     });
 
     fix.clauses.forEach((c) => {
-      const [cx, cy] = NODE_POS[c.role] || [210, 152];
+      const [cx, cy] = nodePos(c);
       const g = svgEl("g", { class: "diag-node", "data-node-id": c.id, cursor: "pointer" });
       g.appendChild(svgEl("rect", { x: cx - NODE_W / 2, y: cy - NODE_H / 2,
                                     width: NODE_W, height: NODE_H, rx: 6 }));
