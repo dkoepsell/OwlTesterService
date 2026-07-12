@@ -203,6 +203,370 @@
   </section>
   {% endif %}
 
+  <!-- Track 2: pre-bind check. Same reasoning layer, applied at the moment an
+       endorsement is attached to a base form — before any exposure exists.
+       Scoped under #prebind; inherits the page's --demo-* tokens and reuses the
+       Track 1 verdict/clause components. Reveal capability, never mechanism. -->
+  <style>
+    #prebind .t2-endorsements { display: grid; gap: .5rem; }
+    #prebind .t2-endo {
+      display: block; width: 100%; text-align: left; cursor: pointer;
+      background: var(--demo-surface); color: inherit;
+      border: 1px solid var(--demo-hairline); border-radius: 6px;
+      padding: .6rem .75rem; transition: border-color .12s, background .12s;
+    }
+    #prebind .t2-endo:hover { border-color: rgba(255,255,255,0.25); }
+    #prebind .t2-endo[aria-pressed="true"] {
+      border-color: var(--demo-series);
+      background: rgba(57,135,229,0.10);
+    }
+    #prebind .t2-endo:focus-visible {
+      outline: 2px solid var(--demo-series); outline-offset: 2px;
+    }
+    #prebind .t2-endo-id {
+      display: inline-block; font-weight: 600; font-size: .8rem;
+      letter-spacing: .04em; margin-right: .5rem;
+    }
+    #prebind .t2-endo-desc { font-size: .8rem; color: var(--demo-ink-muted, #898781); }
+    #prebind .t2-clause-list { list-style: none; padding: 0; margin: 0; }
+    #prebind .t2-clause-list li {
+      padding: .35rem 0; border-top: 1px solid var(--demo-hairline);
+    }
+    #prebind .t2-clause-list li:first-child { border-top: 0; }
+    #prebind .t2-matrix-scroll { overflow-x: auto; }
+    #prebind .t2-matrix { width: 100%; border-collapse: collapse; font-size: .8rem; }
+    #prebind .t2-matrix th, #prebind .t2-matrix td {
+      padding: .4rem .6rem; border: 1px solid var(--demo-hairline);
+      text-align: center; white-space: nowrap;
+    }
+    #prebind .t2-matrix th { color: var(--demo-ink-muted, #898781); font-weight: 600; }
+    #prebind .t2-matrix td.form { text-align: left; }
+    #prebind .t2-cell-ok { color: var(--demo-good); }
+    #prebind .t2-cell-bad { color: var(--demo-critical); }
+    #prebind .t2-cell-na { color: var(--demo-ink-muted, #898781); }
+    @media (max-width: 400px) { #prebind .t2-matrix { font-size: 12px; } }
+    @media (prefers-reduced-motion: reduce) {
+      #prebind .t2-endo { transition: none; }
+      #prebind .spinner-border { animation: none; }
+    }
+  </style>
+
+  <section id="prebind" class="reveal-hidden mt-5 mb-4">
+    <div class="t2-wrap">
+      <h2 class="h5 mb-1">Before it binds: the same engine, applied at creation</h2>
+      <p class="text-secondary small mb-3">
+        Track&nbsp;1 audits wording already on risk. Here the same check runs the moment an
+        endorsement is attached to a base form — before any policy is issued and before any
+        exposure exists.
+      </p>
+
+      <div class="row g-4">
+        <!-- Choose an endorsement to attach -->
+        <div class="col-lg-5">
+          <div class="card demo-card h-100">
+            <div class="card-body">
+              <div class="small text-secondary mb-2" id="t2-context">
+                Base form <strong>CYB-100</strong> · attaching one endorsement
+              </div>
+              <div class="t2-endorsements" role="group"
+                   aria-label="Choose an endorsement to attach to the base form">
+                <button type="button" class="t2-endo" data-endo="e7" aria-pressed="false">
+                  <span class="t2-endo-id">E-7</span>
+                  <span class="t2-endo-desc">Notice-conditioned carveback to Exclusion&nbsp;4(f)</span>
+                </button>
+                <button type="button" class="t2-endo" data-endo="e7b" aria-pressed="false">
+                  <span class="t2-endo-id">E-7b</span>
+                  <span class="t2-endo-desc">Standards-conditioned carveback to Exclusion&nbsp;4(f)</span>
+                </button>
+                <button type="button" class="t2-endo" data-endo="e19" aria-pressed="false">
+                  <span class="t2-endo-id">E-19</span>
+                  <span class="t2-endo-desc">Excess follow-form (XS-200 over CYB-100)</span>
+                </button>
+              </div>
+              <button id="t2-run" class="btn btn-primary w-100 mt-3" disabled>
+                <i class="fa-solid fa-scale-balanced me-2"></i>Check before binding
+              </button>
+              <p class="small text-secondary mt-2 mb-0">
+                Runs on pre-formalized fragments. Free-text intake is part of the full review.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Base form clauses + verdict -->
+        <div class="col-lg-7">
+          <div class="card demo-card h-100">
+            <div class="card-body">
+              <div class="small text-secondary mb-2">Base form — CYB-100</div>
+
+              <div class="clause" data-clause-id="G1">
+                <div class="heading d-flex justify-content-between">
+                  <span>Insuring Agreement A</span>
+                  <span class="role-chip">grant</span>
+                </div>
+                <div class="small">We will pay Loss resulting from a Network Security Event first discovered during the Policy Period.</div>
+              </div>
+              <div class="clause" data-clause-id="E1">
+                <div class="heading d-flex justify-content-between">
+                  <span>Exclusion 4(f)</span>
+                  <span class="role-chip">exclusion</span>
+                </div>
+                <div class="small">This Policy does not apply to Loss arising out of the Insured's failure to maintain the Minimum Security Standards.</div>
+              </div>
+              <div class="clause" data-clause-id="D1">
+                <div class="heading d-flex justify-content-between">
+                  <span>Definitions — Minimum Security Standards</span>
+                  <span class="role-chip">definition</span>
+                </div>
+                <div class="small">"Minimum Security Standards" means the controls listed in Schedule B, maintained continuously.</div>
+              </div>
+
+              <!-- Attaching endorsement (verbatim; appears on selection) -->
+              <div id="t2-endo-clause" class="clause reveal-hidden" data-clause-id="ENDO">
+                <div class="heading d-flex justify-content-between">
+                  <span id="t2-endo-clause-title">Attaching endorsement</span>
+                  <span class="role-chip" id="t2-endo-clause-chip">E-7</span>
+                </div>
+                <div class="small" id="t2-endo-clause-text"></div>
+              </div>
+
+              <div id="t2-verdict-area" class="reveal-hidden mt-3">
+                <div class="verdict-banner"></div>
+                <div id="t2-clauses" class="mt-3 reveal-hidden">
+                  <div class="small text-secondary mb-1">Clauses responsible</div>
+                  <ul class="t2-clause-list"></ul>
+                </div>
+                <p id="t2-consequence" class="small mt-2 mb-0 reveal-hidden"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Illustrative form-library matrix -->
+      <div class="card demo-card mt-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="small text-secondary">
+              Form library — each endorsement checked against each base form as attached
+            </div>
+            <span class="role-chip flex-shrink-0 ms-2">Illustrative</span>
+          </div>
+          <div class="t2-matrix-scroll">
+            <table class="t2-matrix">
+              <thead>
+                <tr>
+                  <th class="form" scope="col">Base form</th>
+                  <th scope="col">E-7</th>
+                  <th scope="col">E-7b</th>
+                  <th scope="col">E-19</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="form">CYB-100</td>
+                  <td class="t2-cell-ok" aria-label="coherent">✓</td>
+                  <td class="t2-cell-bad" aria-label="conflict">✕</td>
+                  <td class="t2-cell-na" aria-label="not applicable">—</td>
+                </tr>
+                <tr>
+                  <td class="form">XS-200 (excess)</td>
+                  <td class="t2-cell-na" aria-label="not applicable">—</td>
+                  <td class="t2-cell-na" aria-label="not applicable">—</td>
+                  <td class="t2-cell-bad" aria-label="conflict">✕</td>
+                </tr>
+                <tr>
+                  <td class="form">PRO-300</td>
+                  <td class="t2-cell-ok" aria-label="coherent">✓</td>
+                  <td class="t2-cell-na" aria-label="not applicable">—</td>
+                  <td class="t2-cell-na" aria-label="not applicable">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Track 2 pre-bind check — self-contained IIFE, no dependencies, no globals.
+    // Verdicts are pre-computed for the demo. Reveal capability, never mechanism:
+    // we state WHAT collides in the policy's own terms, never HOW it was found.
+    (function () {
+      var section = document.getElementById("prebind");
+      if (!section) return;
+
+      // Verbatim endorsement wording. E-7 / E-7b reproduce the Policy A / Policy B
+      // carveback fragments audited in Track 1 — keep these character-for-character
+      // in sync with those fixtures.
+      var ENDOS = {
+        e7: {
+          title: "Endorsement 7 — Notice-conditioned carveback",
+          chip: "E-7",
+          text: "Exclusion 4(f) shall not apply to Loss resulting from a Network Security Event, provided the Insured complied with the notice obligations in Section 9.",
+          context: 'Base form <strong>CYB-100</strong> · attaching one endorsement',
+          verdict: {
+            ok: true,
+            headline: "this endorsement adds coverage the base form withholds."
+          }
+        },
+        e7b: {
+          title: "Endorsement 7b — Standards-conditioned carveback",
+          chip: "E-7b",
+          text: "Exclusion 4(f) shall not apply to Loss resulting from a Network Security Event occurring while the Insured maintained the Minimum Security Standards.",
+          context: 'Base form <strong>CYB-100</strong> · attaching one endorsement',
+          verdict: {
+            ok: false,
+            headline: "this endorsement restores coverage only where the base form never withdrew it.",
+            hot: ["E1", "D1"],
+            clauses: [
+              ["Exclusion 4(f)", "removes cover for Loss arising out of a failure to maintain the Minimum Security Standards."],
+              ["Endorsement 7b", "restores cover only while the Insured maintained those same Minimum Security Standards."],
+              ["Minimum Security Standards", "the single control set both clauses turn on."]
+            ],
+            consequence: "The carveback gives coverage back only in the situation where the exclusion was never triggered. Whenever Exclusion 4(f) would actually bite — a failure to maintain the standards — the endorsement is silent. As attached, it changes no outcome the base form does not already fix."
+          }
+        },
+        e19: {
+          title: "Endorsement 19 — Excess follow-form",
+          chip: "E-19",
+          text: "This excess Policy follows the terms, conditions, definitions and exclusions of the Underlying Policy CYB-100, except as to the limit and retention stated in the Declarations.",
+          context: 'Excess form <strong>XS-200</strong> follows <strong>CYB-100</strong> · checking the excess layer as attached',
+          verdict: {
+            ok: false,
+            headline: "the excess layer follows a form whose exclusion its own grant contradicts.",
+            hot: ["E1"],
+            clauses: [
+              ["Follow-Form Provision (XS-200)", "adopts the terms of CYB-100 in full, including Exclusion 4(f)."],
+              ["Exclusion 4(f) (followed)", "removes cover for Loss arising out of a failure to maintain the Minimum Security Standards."],
+              ["Endorsement 19 grant", "extends the excess grant to the same Loss the followed exclusion withholds."]
+            ],
+            consequence: "Because XS-200 follows CYB-100, it inherits Exclusion 4(f). The excess grant then reaches Loss that the followed exclusion has already removed — so at the excess layer the same Loss is both granted and excluded. The conflict the audit found inside one policy now spans two documents."
+          }
+        }
+      };
+
+      var buttons = Array.prototype.slice.call(section.querySelectorAll(".t2-endo"));
+      var runBtn = document.getElementById("t2-run");
+      var runDefault = runBtn ? runBtn.innerHTML : "";
+      var contextEl = document.getElementById("t2-context");
+      var endoClause = document.getElementById("t2-endo-clause");
+      var endoTitle = document.getElementById("t2-endo-clause-title");
+      var endoChip = document.getElementById("t2-endo-clause-chip");
+      var endoText = document.getElementById("t2-endo-clause-text");
+      var verdictArea = document.getElementById("t2-verdict-area");
+      var banner = verdictArea ? verdictArea.querySelector(".verdict-banner") : null;
+      var clausesBox = document.getElementById("t2-clauses");
+      var clausesList = clausesBox ? clausesBox.querySelector(".t2-clause-list") : null;
+      var consequenceEl = document.getElementById("t2-consequence");
+      var selected = null;
+
+      function clearHot() {
+        section.querySelectorAll(".clause.contra").forEach(function (el) {
+          el.classList.remove("contra");
+        });
+      }
+
+      function resetVerdict() {
+        if (verdictArea) verdictArea.classList.add("reveal-hidden");
+        if (banner) banner.innerHTML = "";
+        if (clausesBox) clausesBox.classList.add("reveal-hidden");
+        if (clausesList) clausesList.innerHTML = "";
+        if (consequenceEl) {
+          consequenceEl.classList.add("reveal-hidden");
+          consequenceEl.textContent = "";
+        }
+        clearHot();
+      }
+
+      function select(key) {
+        selected = key;
+        var e = ENDOS[key];
+        buttons.forEach(function (b) {
+          b.setAttribute("aria-pressed", b.getAttribute("data-endo") === key ? "true" : "false");
+        });
+        if (contextEl) contextEl.innerHTML = e.context;
+        // Show the attaching endorsement's wording verbatim.
+        if (endoText) endoText.textContent = e.text;
+        if (endoTitle) endoTitle.textContent = e.title;
+        if (endoChip) endoChip.textContent = e.chip;
+        if (endoClause) endoClause.classList.remove("reveal-hidden");
+        resetVerdict();
+        if (runBtn) {
+          runBtn.disabled = false;
+          runBtn.innerHTML = runDefault;
+        }
+      }
+
+      function render(key) {
+        var v = ENDOS[key].verdict;
+        if (v.ok) {
+          banner.innerHTML =
+            '<div class="alert alert-success py-2 mb-0">' +
+            '<i class="fa-solid fa-circle-check icon me-2"></i>' +
+            '<strong>COHERENT</strong> — ' + v.headline + '</div>';
+        } else {
+          banner.innerHTML =
+            '<div class="alert alert-danger py-2 mb-0">' +
+            '<i class="fa-solid fa-triangle-exclamation icon me-2"></i>' +
+            '<strong>INCOHERENT</strong> — ' + v.headline + '</div>';
+          // Name the clauses responsible, in the policy's own terms.
+          if (clausesList) {
+            clausesList.innerHTML = v.clauses.map(function (c) {
+              return '<li class="small"><strong>' + c[0] + '</strong> — ' + c[1] + '</li>';
+            }).join("");
+          }
+          if (clausesBox) clausesBox.classList.remove("reveal-hidden");
+          if (consequenceEl) {
+            consequenceEl.textContent = v.consequence;
+            consequenceEl.classList.remove("reveal-hidden");
+          }
+          // Highlight the implicated base-form clause(s).
+          (v.hot || []).forEach(function (id) {
+            var el = section.querySelector('.clause[data-clause-id="' + id + '"]');
+            if (el) el.classList.add("contra");
+          });
+        }
+        if (verdictArea) verdictArea.classList.remove("reveal-hidden");
+      }
+
+      buttons.forEach(function (b) {
+        b.addEventListener("click", function () {
+          select(b.getAttribute("data-endo"));
+        });
+      });
+
+      if (runBtn) {
+        runBtn.addEventListener("click", function () {
+          if (!selected) return;
+          var key = selected;
+          resetVerdict();
+          runBtn.disabled = true;
+          buttons.forEach(function (b) { b.disabled = true; });
+          runBtn.innerHTML =
+            '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Checking…';
+          // Brief pending state, then the pre-computed verdict.
+          setTimeout(function () {
+            render(key);
+            runBtn.innerHTML = runDefault;
+            runBtn.disabled = false;
+            buttons.forEach(function (b) { b.disabled = false; });
+          }, 650);
+        });
+      }
+
+      // Keep Track 2 in the same reveal flow as the Track 1 roll-up sections:
+      // it surfaces once the Track 1 check has run, preserving the narrative arc.
+      var t1Check = document.getElementById("check-btn");
+      if (t1Check) {
+        t1Check.addEventListener("click", function () {
+          section.classList.remove("reveal-hidden");
+        });
+      }
+    })();
+  </script>
+
 </div>
 
 <div class="viz-tooltip" id="viz-tooltip"></div>
