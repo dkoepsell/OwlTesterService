@@ -108,6 +108,16 @@ class OntologyAnalysis(db.Model):
     fol_export_stats = db.Column(db.JSON, nullable=True)
     prover_cross_check = db.Column(db.JSON, nullable=True)
 
+    # Recognition layer: the artifact evaluated as an institutional object.
+    # recognition_binding maps entity IRIs to recognition-chain loci, declared
+    # by the user where the automatic proposal cannot decide.
+    # institutional_record carries the world-facing and process evidence that
+    # Stratum D needs and that no OWL file can supply.
+    recognition_binding = db.Column(db.JSON, nullable=True)
+    institutional_record = db.Column(db.JSON, nullable=True)
+    recognition_report = db.Column(db.JSON, nullable=True)
+    declared_object_class = db.Column(db.String(32), nullable=True)
+
     def __repr__(self):
         return f"<OntologyAnalysis {self.id} for {self.ontology_file_id}>"
 

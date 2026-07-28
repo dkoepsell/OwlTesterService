@@ -1,0 +1,22 @@
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo:  <http://purl.obolibrary.org/obo/> .
+@prefix ex:   <http://example.org/rec#> .
+
+# Row one of Table 8: a scientific reference ontology. No authority, no
+# criteria, no conferring act -- nothing that could bear a recognition chain.
+# Stratum D must come back not-applicable here, and an empty D cell is the
+# correct result rather than missing data.
+
+<http://example.org/rec/scientific> a owl:Ontology .
+
+ex:Neuron        a owl:Class ; rdfs:subClassOf obo:BFO_0000040 ;
+                 rdfs:label "neuron" .
+ex:Synapse       a owl:Class ; rdfs:subClassOf obo:BFO_0000040 ;
+                 rdfs:label "synapse" .
+ex:PyramidalCell a owl:Class ; rdfs:subClassOf ex:Neuron ;
+                 rdfs:label "pyramidal cell" .
+ex:Depolarization a owl:Class ; rdfs:subClassOf obo:BFO_0000015 ;
+                 rdfs:label "depolarization" .
+ex:MembranePotential a owl:Class ; rdfs:subClassOf obo:BFO_0000019 ;
+                 rdfs:label "membrane potential" .

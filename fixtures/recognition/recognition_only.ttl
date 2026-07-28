@@ -1,0 +1,24 @@
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo:  <http://purl.obolibrary.org/obo/> .
+@prefix ex:   <http://example.org/rec#> .
+
+# Row two of Table 8: a recognition-only institution -- act-thin and
+# repair-external. An authority and a thick criteria layer, but the assessment
+# happens in a clinical encounter outside the manual and revision happens to
+# the manual rather than within it. No act locus, no remedy locus.
+
+<http://example.org/rec/recognition-only> a owl:Ontology .
+
+ex:ClassificationAuthority a owl:Class ; rdfs:subClassOf obo:BFO_0000027 ;
+    rdfs:label "classification authority" .
+
+ex:DiagnosticCriterion a owl:Class ; rdfs:subClassOf obo:IAO_0000033 ;
+    rdfs:label "diagnostic criterion" .
+ex:DurationCriterion a owl:Class ; rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "duration criterion" .
+ex:SeverityThreshold a owl:Class ; rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "severity threshold" .
+
+ex:PresentingSymptom a owl:Class ; rdfs:subClassOf obo:BFO_0000019 ;
+    rdfs:label "presenting symptom" .

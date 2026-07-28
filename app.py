@@ -99,6 +99,16 @@ try:
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("coverage demo not mounted: %s", _e)
 
+# Mount the recognition layer (GET /recognition/<filename> plus its JSON API),
+# which evaluates an uploaded ontology as an institutional object rather than
+# only as a logical one. Best-effort for the same reason as the gate above.
+try:
+    from recognition_layer import recognition_bp as _recognition_bp
+    app.register_blueprint(_recognition_bp)
+    logging.getLogger(__name__).info("recognition layer mounted at /recognition")
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("recognition layer not mounted: %s", _e)
+
 # Helper function to check if a file has an allowed extension
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
