@@ -1,0 +1,264 @@
+{% extends "layout.html" %}
+
+{% block title %}SHACL Workbench – {{ display_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    #shapesEditor, #dataEditor { font-family: var(--bs-font-monospace); font-size: .82rem; }
+    #shapesEditor { min-height: 420px; }
+    #dataEditor { min-height: 180px; }
+    .shacl-results td { font-size: .85rem; vertical-align: top; }
+    .shacl-results code { font-size: .78rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex flex-wrap align-items-baseline justify-content-between mb-3">
+        <h2 class="h4 mb-1"><i class="fas fa-shapes me-2"></i>SHACL Workbench
+            <small class="text-muted">{{ display_name }}</small></h2>
+        <a class="btn btn-sm btn-outline-secondary" href="javascript:history.back()">
+            <i class="fas fa-arrow-left me-1"></i>Back</a>
+    </div>
+    <p class="small text-muted">Build shapes for this ontology (start from a scaffold derived from its OWL
+        restrictions, domains/ranges and functional properties), then test them against the ontology's own
+        individuals or pasted instance data. The ontology supplies the class hierarchy, so <code>sh:class</code>
+        accepts instances of subclasses. Generated shapes read OWL <em>some</em>/cardinality axioms as
+        closed-world data requirements.</p>
+
+    <div class="row g-3">
+        <!-- Build -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+                    <strong class="me-auto">Shapes (Turtle)</strong>
+                    <div class="form-check form-check-inline small mb-0">
+                        <input class="form-check-input" type="checkbox" id="includeDomainRange" checked>
+                        <label class="form-check-label" for="includeDomainRange">domain/range</label>
+                    </div>
+                    <button class="btn btn-sm btn-primary" id="generateBtn">
+                        <i class="fas fa-magic me-1"></i>Generate from ontology</button>
+                    <button class="btn btn-sm btn-outline-info" id="lintBtn">
+                        <i class="fas fa-check-double me-1"></i>Check shapes</button>
+                    <label class="btn btn-sm btn-outline-secondary mb-0">
+                        <i class="fas fa-upload me-1"></i>Load file
+                        <input type="file" id="shapesFile" accept=".ttl,.shacl,.rdf,.owl,.nt,.jsonld" hidden>
+                    </label>
+                    <button class="btn btn-sm btn-outline-secondary" id="downloadBtn">
+                        <i class="fas fa-download me-1"></i>Download</button>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control" id="shapesEditor" spellcheck="false"
+                              placeholder="Paste SHACL shapes in Turtle, or click Generate from ontology."></textarea>
+                    <div id="buildStatus" class="mt-2"></div>
+                </div>
+                <div class="card-footer">
+                    <div class="input-group input-group-sm">
+                        <select class="form-select" id="savedSets" style="max-width: 50%;">
+                            <option value="">Saved shape sets…</option>
+                        </select>
+                        <button class="btn btn-outline-secondary" id="loadSetBtn">Load</button>
+                        <button class="btn btn-outline-danger" id="deleteSetBtn">Delete</button>
+                        <input type="text" class="form-control" id="setName" placeholder="Name" maxlength="255">
+                        <button class="btn btn-success" id="saveSetBtn"><i class="fas fa-save me-1"></i>Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header"><strong>Test data</strong></div>
+                <div class="card-body">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="includeAbox" checked>
+                        <label class="form-check-label small" for="includeAbox">
+                            Validate the ontology's own individuals</label>
+                    </div>
+                    <textarea class="form-control" id="dataEditor" spellcheck="false"
+                              placeholder="Optional: instance data to validate (Turtle, RDF/XML, JSON-LD, N-Triples)."></textarea>
+                    <div class="row g-2 mt-2 align-items-center">
+                        <div class="col-auto">
+                            <label class="small text-muted" for="dataFormat">Format</label>
+                            <select class="form-select form-select-sm" id="dataFormat">
+                                <option value="">auto</option>
+                                <option value="turtle">Turtle</option>
+                                <option value="xml">RDF/XML</option>
+                                <option value="json-ld">JSON-LD</option>
+                                <option value="nt">N-Triples</option>
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="small text-muted" for="inference">Inference</label>
+                            <select class="form-select form-select-sm" id="inference">
+                                {% for m in inference_modes %}
+                                <option value="{{ m }}" {% if m == 'rdfs' %}selected{% endif %}>{{ m }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <label class="btn btn-sm btn-outline-secondary mb-0 mt-3">
+                                <i class="fas fa-upload me-1"></i>Load data
+                                <input type="file" id="dataFile" hidden>
+                            </label>
+                        </div>
+                        <div class="col text-end">
+                            <button class="btn btn-warning mt-3" id="validateBtn">
+                                <i class="fas fa-play me-1"></i>Validate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header"><strong>Validation report</strong></div>
+        <div class="card-body" id="reportBody">
+            <p class="text-muted small mb-0">Run a validation to see results.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const base = {{ ('/api/shacl/' ~ filename) | tojson }};
+    const $ = id => document.getElementById(id);
+    const shapes = $('shapesEditor');
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const status = (el, kind, html) => { $(el).innerHTML = `<div class="alert alert-${kind} py-2 small mb-0">${html}</div>`; };
+    const busy = (el, msg) => status(el, 'info', `<span class="spinner-border spinner-border-sm me-2"></span>${esc(msg)}`);
+
+    async function api(path, method, body) {
+        const res = await fetch(base + path, {
+            method: method || 'GET',
+            headers: body ? {'Content-Type': 'application/json'} : {},
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        let data = {};
+        try { data = await res.json(); } catch (e) { data = {error: `HTTP ${res.status}`}; }
+        if (!res.ok) throw new Error(data.error || data.description || `HTTP ${res.status}`);
+        return data;
+    }
+
+    function readFileInto(input, target) {
+        input.addEventListener('change', () => {
+            const f = input.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = () => { target.value = r.result; };
+            r.readAsText(f);
+            input.value = '';
+        });
+    }
+    readFileInto($('shapesFile'), shapes);
+    readFileInto($('dataFile'), $('dataEditor'));
+
+    $('generateBtn').addEventListener('click', async () => {
+        if (shapes.value.trim() && !confirm('Replace the current shapes with a generated scaffold?')) return;
+        busy('buildStatus', 'Generating shapes from the ontology…');
+        try {
+            const d = await api('/generate', 'POST', {include_domain_range: $('includeDomainRange').checked});
+            shapes.value = d.turtle;
+            let html = `Generated ${d.node_shapes} node shape(s), ${d.property_shapes} property shape(s).`;
+            if (d.skipped.length) html += ` ${d.skipped.length} axiom(s) had no SHACL mapping (listed as comments at the top).`;
+            status('buildStatus', d.node_shapes ? 'success' : 'warning',
+                   d.node_shapes ? html : 'The ontology has no restrictions, domains/ranges or functional properties to derive shapes from.');
+        } catch (e) { status('buildStatus', 'danger', esc(e.message)); }
+    });
+
+    $('lintBtn').addEventListener('click', async () => {
+        busy('buildStatus', 'Checking shapes…');
+        try {
+            const d = await api('/lint', 'POST', {shapes: shapes.value});
+            if (!d.issues.length) { status('buildStatus', 'success', 'Shapes are valid SHACL and every referenced class/property is declared in the ontology.'); return; }
+            const bad = d.issues.some(i => i.level === 'error');
+            status('buildStatus', bad ? 'danger' : 'warning',
+                   '<ul class="mb-0 ps-3">' + d.issues.map(i => `<li><strong>${esc(i.level)}</strong>: ${esc(i.message)}</li>`).join('') + '</ul>');
+        } catch (e) { status('buildStatus', 'danger', esc(e.message)); }
+    });
+
+    $('downloadBtn').addEventListener('click', () => {
+        const blob = new Blob([shapes.value], {type: 'text/turtle'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = ($('setName').value.trim() || 'shapes').replace(/[^\w.-]+/g, '_') + '.ttl';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    });
+
+    // -- saved sets
+    async function refreshSets(selectId) {
+        try {
+            const d = await api('/shapes');
+            $('savedSets').innerHTML = '<option value="">Saved shape sets…</option>' +
+                d.shape_sets.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+            if (selectId) $('savedSets').value = selectId;
+        } catch (e) { /* no DB: saving unavailable, editor still works */ }
+    }
+    $('saveSetBtn').addEventListener('click', async () => {
+        try {
+            const d = await api('/shapes', 'POST', {name: $('setName').value, shapes: shapes.value});
+            status('buildStatus', 'success', `Saved “${esc(d.name)}”.`);
+            refreshSets(d.id);
+        } catch (e) { status('buildStatus', 'danger', esc(e.message)); }
+    });
+    $('loadSetBtn').addEventListener('click', async () => {
+        const id = $('savedSets').value;
+        if (!id) return;
+        try {
+            const d = await api('/shapes/' + id);
+            shapes.value = d.shapes;
+            $('setName').value = d.name;
+            status('buildStatus', 'info', `Loaded “${esc(d.name)}”.`);
+        } catch (e) { status('buildStatus', 'danger', esc(e.message)); }
+    });
+    $('deleteSetBtn').addEventListener('click', async () => {
+        const id = $('savedSets').value;
+        if (!id || !confirm('Delete this saved shape set?')) return;
+        try { await api('/shapes/' + id, 'DELETE'); refreshSets(); }
+        catch (e) { status('buildStatus', 'danger', esc(e.message)); }
+    });
+    refreshSets();
+
+    // -- validate
+    $('validateBtn').addEventListener('click', async () => {
+        busy('reportBody', 'Validating…');
+        try {
+            const d = await api('/validate', 'POST', {
+                shapes: shapes.value,
+                data: $('dataEditor').value,
+                data_format: $('dataFormat').value,
+                include_ontology_individuals: $('includeAbox').checked,
+                inference: $('inference').value,
+            });
+            renderReport(d);
+        } catch (e) { status('reportBody', 'danger', esc(e.message)); }
+    });
+
+    function renderReport(d) {
+        const counts = Object.entries(d.counts).map(([k, v]) => `${v} ${esc(k)}${v === 1 ? '' : 's'}`).join(', ');
+        let html = d.conforms
+            ? `<div class="alert alert-success py-2 small">Data conforms to the shapes (${d.data_triples} data triples checked).</div>`
+            : `<div class="alert alert-danger py-2 small">Data does not conform: ${counts}.</div>`;
+        if (d.results.length) {
+            const sev = {Violation: 'danger', Warning: 'warning', Info: 'info'};
+            html += `<div class="table-responsive"><table class="table table-sm table-striped shacl-results">
+                <thead><tr><th>Severity</th><th>Focus node</th><th>Path</th><th>Value</th><th>Constraint</th><th>Message</th><th>Shape</th></tr></thead><tbody>` +
+                d.results.map(r => `<tr>
+                    <td><span class="badge bg-${sev[r.severity] || 'secondary'}">${esc(r.severity)}</span></td>
+                    <td title="${esc(r.focus_node)}">${esc(r.focus_label)}</td>
+                    <td title="${esc(r.path || '')}">${esc(r.path_label || '')}</td>
+                    <td>${esc(r.value || '')}</td>
+                    <td><code>${esc(r.constraint || '')}</code></td>
+                    <td>${esc(r.message)}</td>
+                    <td>${esc(r.source_shape || '')}</td></tr>`).join('') +
+                '</tbody></table></div>';
+        }
+        html += `<details class="mt-2"><summary class="small text-muted">Raw pySHACL report</summary><pre class="small mt-2">${esc(d.report_text)}</pre></details>`;
+        $('reportBody').innerHTML = html;
+    }
+})();
+</script>
+{% endblock %}

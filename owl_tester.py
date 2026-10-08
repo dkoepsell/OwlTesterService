@@ -836,8 +836,8 @@ class OwlTester:
         from rdflib.namespace import RDF, RDFS, OWL
 
         t = time.perf_counter()
-        g = rdflib.Graph()
-        g.parse(file_path)
+        from owl_format_detector import parse_rdf_file
+        g = parse_rdf_file(file_path)
         logger.info(f"[STAGE] rdflib.parse: {time.perf_counter()-t:.2f}s ({len(g)} triples)")
 
         # Ontology IRI/name from owl:Ontology subject (if declared)
@@ -876,11 +876,17 @@ class OwlTester:
         axioms_list = []
 
         def add_named_axiom(s, o, kind, sep):
-            if isinstance(s, rdflib.URIRef) and isinstance(o, rdflib.URIRef):
-                sn = self._local_name(s)
-                on = self._local_name(o)
-                if sn and on and sn not in ('Thing', 'Nothing'):
-                    axioms_list.append({'type': kind, 'description': f"{sn} {sep} {on}"})
+            # Subject must be a named entity; the object may be an anonymous
+            # class expression (restriction, intersection, union, ...).
+            if not isinstance(s, rdflib.URIRef):
+                return
+            sn = self._local_name(s)
+            on = self._render_class_expression(g, o)
+            if sn and on and sn not in ('Thing', 'Nothing'):
+                axiom = {'type': kind, 'description': f"{sn} {sep} {on}"}
+                if not isinstance(o, rdflib.URIRef):
+                    axiom['anonymous'] = True
+                axioms_list.append(axiom)
 
         for s, _, o in g.triples((None, RDFS.subClassOf, None)):
             add_named_axiom(s, o, 'SubClassOf', '⊑')
@@ -898,6 +904,11 @@ class OwlTester:
 
         imports = [str(o) for o in g.objects(None, OWL.imports)]
 
+        # Human-readable labels keyed by local name. Ontologies with opaque IRIs
+        # (OBO-style IDs, UUIDs) are unreadable by local name alone, so axiom
+        # descriptions are re-rendered through this map in _analyze_with_rdflib.
+        entity_labels = self._collect_labels(g)
+
         return {
             'graph': g,
             'ontology_name': ontology_name or 'Unknown Ontology',
@@ -910,7 +921,131 @@ class OwlTester:
             'axioms': axioms_list,
             'axiom_count': axiom_count,
             'imports': imports,
+            'entity_labels': entity_labels,
         }
+
+    def _render_class_expression(self, g, node, depth=0):
+        """Render an OWL class expression (named or anonymous) in Manchester-
+        style text using IRI local names, e.g. 'hasPart some (Wheel and Round)'.
+        Returns None for nodes that cannot be rendered."""
+        import rdflib
+        from rdflib.collection import Collection
+        from rdflib.namespace import OWL, RDF
+
+        if isinstance(node, rdflib.URIRef):
+            return self._local_name(node)
+        if isinstance(node, rdflib.Literal):
+            return f'"{node}"'
+        if depth > 8:
+            return '…'
+
+        def sub(n):
+            text = self._render_class_expression(g, n, depth + 1)
+            if text is None:
+                return '?'
+            # Parenthesise compound sub-expressions for unambiguous reading.
+            return f"({text})" if ' ' in text and not isinstance(n, rdflib.URIRef) else text
+
+        def members(lst):
+            try:
+                return list(Collection(g, lst))
+            except Exception:
+                return []
+
+        for op, word in ((OWL.intersectionOf, ' and '), (OWL.unionOf, ' or ')):
+            lst = g.value(node, op)
+            if lst is not None:
+                return word.join(sub(m) for m in members(lst)) or None
+        comp = g.value(node, OWL.complementOf)
+        if comp is not None:
+            return f"not {sub(comp)}"
+        one = g.value(node, OWL.oneOf)
+        if one is not None:
+            return '{' + ', '.join(sub(m) for m in members(one)) + '}'
+
+        prop = g.value(node, OWL.onProperty)
+        if prop is None:
+            return None
+        inv = g.value(prop, OWL.inverseOf) if isinstance(prop, rdflib.BNode) else None
+        p = f"inverse {self._local_name(inv)}" if inv is not None else self._render_class_expression(g, prop, depth + 1)
+        filler_cls = g.value(node, OWL.onClass) or g.value(node, OWL.onDataRange)
+
+        for pred, word in ((OWL.someValuesFrom, 'some'), (OWL.allValuesFrom, 'only')):
+            f = g.value(node, pred)
+            if f is not None:
+                return f"{p} {word} {sub(f)}"
+        v = g.value(node, OWL.hasValue)
+        if v is not None:
+            return f"{p} value {sub(v)}"
+        if (node, OWL.hasSelf, None) in g:
+            return f"{p} Self"
+        for preds, word in (((OWL.minQualifiedCardinality, OWL.minCardinality), 'min'),
+                            ((OWL.maxQualifiedCardinality, OWL.maxCardinality), 'max'),
+                            ((OWL.qualifiedCardinality, OWL.cardinality), 'exactly')):
+            for pred in preds:
+                n = g.value(node, pred)
+                if n is not None:
+                    tail = f" {sub(filler_cls)}" if filler_cls is not None else ''
+                    return f"{p} {word} {n}{tail}"
+        return None
+
+    def _collect_labels(self, g):
+        """Map local name -> preferred label (rdfs:label, then skos:prefLabel),
+        preferring English/untagged literals, with the BFO catalog as fallback
+        for referenced-but-unlabelled BFO terms. Only names whose label differs
+        from the local name are included."""
+        import rdflib
+        from rdflib.namespace import RDFS, SKOS
+
+        def rank(lit):
+            lang = (getattr(lit, 'language', None) or '').lower()
+            return 0 if lang in ('', 'en') or lang.startswith('en-') else 1
+
+        best = {}  # iri -> (priority, label)
+        for prio, pred in enumerate((RDFS.label, SKOS.prefLabel)):
+            for s, o in g.subject_objects(pred):
+                if not isinstance(s, rdflib.URIRef) or not isinstance(o, rdflib.Literal):
+                    continue
+                text = str(o).strip()
+                if not text:
+                    continue
+                key = (prio, rank(o))
+                if s not in best or key < best[s][0]:
+                    best[s] = (key, text)
+
+        labels = {}
+        catalog = getattr(self, 'bfo_catalog', None)
+        if catalog is not None:
+            for iri, label in getattr(catalog, 'labels', {}).items():
+                local = self._local_name(iri)
+                if label and label != local:
+                    labels[local] = label
+        for iri, (_, text) in best.items():
+            local = self._local_name(iri)
+            if local and text != local:
+                labels[local] = text  # the ontology's own label beats the catalog's
+        return labels
+
+    @staticmethod
+    def _relabel(description, labels):
+        """Replace IRI local names in an axiom description with their labels."""
+        if not labels or not isinstance(description, str):
+            return description
+        return re.sub(r'[\w.\-]+', lambda m: labels.get(m.group(0), m.group(0)), description)
+
+    def _apply_labels(self, items, labels):
+        """Re-render 'description' fields with labels, keeping the IRI-based
+        original under 'description_ids' for traceability."""
+        if not labels:
+            return
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            desc = item.get('description')
+            new = self._relabel(desc, labels)
+            if new != desc:
+                item['description_ids'] = desc
+                item['description'] = new
 
     def _determine_expressivity_rdflib(self, g):
         """Heuristic DL expressivity from an RDFlib graph (no owlready2 access)."""
@@ -1262,9 +1397,18 @@ class OwlTester:
                 'Unsatisfiable: equivalent to owl:Nothing under the asserted axioms.'
             )
 
+        labels = rdf.get('entity_labels', {})
+        self._apply_labels(rdf['axioms'], labels)
+        self._apply_labels(inferred_axioms, labels)
+        self._apply_labels(derivation_steps, labels)
+        for ax in inferred_axioms or []:
+            if isinstance(ax, dict) and isinstance(ax.get('derivation'), dict):
+                self._apply_labels([ax['derivation']], labels)
+
         result = {
             'ontology_name': rdf['ontology_name'],
             'ontology_iri': rdf['ontology_iri'],
+            'entity_labels': labels,
             'classes': len(rdf['class_names']),
             'object_properties': len(rdf['object_property_names']),
             'data_properties': len(rdf['data_property_names']),

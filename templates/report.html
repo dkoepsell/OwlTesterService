@@ -440,7 +440,7 @@
     <h3>{{ title }} ({{ items | length }})</h3>
     {% if items %}
     <div class="cols">
-        {% for item in items[:max_list] %}<div>{{ item }}</div>{% endfor %}
+        {% set lbl = analysis.entity_labels or {} %}{% for item in items[:max_list] %}<div>{% if lbl.get(item) %}{{ lbl[item] }} <span class="muted small">{{ item }}</span>{% else %}{{ item }}{% endif %}</div>{% endfor %}
     </div>
     {% if items | length > max_list %}
     <p class="small muted">… and {{ items | length - max_list }} more (truncated for print).</p>

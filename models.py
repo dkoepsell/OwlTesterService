@@ -101,6 +101,10 @@ class OntologyAnalysis(db.Model):
     lint_findings = db.Column(db.JSON, nullable=True)
     coherence_status = db.Column(db.String(20), nullable=True)
 
+    # Local name -> human-readable label (rdfs:label / skos:prefLabel), so
+    # ontologies with opaque IRIs (OBO-style IDs) display readable names.
+    entity_labels = db.Column(db.JSON, nullable=True)
+
     # Provable FOL export (SPEC Task 5): the ontology's axioms rendered in
     # Prover9 (LADR) and CLIF syntax, plus the prover-vs-reasoner cross-check.
     fol_prover9 = db.Column(db.Text, nullable=True)
@@ -244,3 +248,28 @@ class OntologyIndividual(db.Model):
     
     def __repr__(self):
         return f"<OntologyIndividual {self.id}: {self.name}>"
+
+class ShaclShapeSet(db.Model):
+    """A saved SHACL shapes graph (Turtle) attached to an uploaded ontology,
+    keyed by the upload's stored filename like the recognition layer."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False, index=True)
+    name = db.Column(db.String(255), nullable=False)
+    shapes_ttl = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow,
+                           onupdate=datetime.datetime.utcnow)
+
+    def to_dict(self, with_body=False):
+        out = {
+            "id": self.id,
+            "name": self.name,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+        if with_body:
+            out["shapes"] = self.shapes_ttl
+        return out
+
+    def __repr__(self):
+        return f"<ShaclShapeSet {self.id}: {self.name}>"

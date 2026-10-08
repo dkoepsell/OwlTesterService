@@ -109,6 +109,15 @@ try:
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("recognition layer not mounted: %s", _e)
 
+# Mount the SHACL workbench (GET /shacl/<filename> plus its JSON API): generate
+# shapes from an ontology, edit and save them, and validate data against them.
+try:
+    from shacl_layer import shacl_bp as _shacl_bp
+    app.register_blueprint(_shacl_bp)
+    logging.getLogger(__name__).info("SHACL workbench mounted at /shacl")
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("SHACL workbench not mounted: %s", _e)
+
 # Helper function to check if a file has an allowed extension
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -883,6 +892,7 @@ def analyze_owl(filename):
             return render_template('analysis.html', 
                                  file=file_record, 
                                  analysis=analysis,
+                                 labels=analysis.entity_labels or {},
                                  classes=class_list,
                                  relations=object_properties,
                                  data_properties=data_properties,
@@ -1060,7 +1070,8 @@ def api_analyze_owl(filename):
             derivation_steps=derivation_steps,
             lint_findings=lint_findings,
             unsatisfiable_classes=unsatisfiable_classes,
-            coherence_status=coherence_status
+            coherence_status=coherence_status,
+            entity_labels=analysis_result.get('entity_labels') or {}
         )
         
         # Build FOL premises from the structural lists produced by analyze_ontology

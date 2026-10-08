@@ -214,3 +214,30 @@ def auto_convert_ontology(file_path: str, target_format: str = 'xml') -> str:
     finally:
         # Don't cleanup here - let the calling code manage cleanup
         pass
+
+def parse_rdf_file(file_path: str) -> rdflib.Graph:
+    """Parse an RDF file into a graph, sniffing the syntax from its content.
+
+    Uploads are normalized to RDF/XML in place but keep their original
+    extension, so a stored ``.ttl`` usually holds RDF/XML and rdflib's
+    extension-based guess fails. Try the guess first, then content-sniffed
+    syntaxes; re-raise the first error if nothing parses.
+    """
+    g = rdflib.Graph()
+    try:
+        g.parse(file_path)
+        return g
+    except Exception as first_err:  # noqa: BLE001 - fall through to sniffing
+        with open(file_path, 'rb') as fh:
+            head = fh.read(512).lstrip()
+        candidates = ['xml', 'turtle', 'nt', 'json-ld'] if head.startswith(b'<') \
+            else ['turtle', 'json-ld', 'nt', 'xml']
+        for fmt in candidates:
+            g = rdflib.Graph()
+            try:
+                g.parse(file_path, format=fmt)
+                logger.info(f"Parsed {file_path} as {fmt} (extension guess failed)")
+                return g
+            except Exception:  # noqa: BLE001 - try the next syntax
+                continue
+        raise first_err
