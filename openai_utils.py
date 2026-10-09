@@ -413,22 +413,32 @@ Focus on what this class would represent in a domain ontology.
     except Exception as e:
         logger.error(f"Error generating class description: {str(e)}")
         return {"error": str(e)}
+_IMPLICATIONS_SYSTEM_PROMPT = """You are an expert in formal ontology, description logic and first-order logic, working for the authors of one specific ontology.
+Your job is to show them what THEIR axioms commit them to in the real world: consequences they may not have noticed, including surprising, restrictive or counter-intuitive ones.
 
-def generate_real_world_implications(ontology_name, domain_classes, fol_premises, num_implications=5):
+Rules:
+- Every implication must follow from specific items in the material you are given. Cite those items by ID (A# asserted axiom, I# inferred axiom, D# definition) in "premises_used". Never cite anything else.
+- Prefer consequences that combine two or more axioms: subclass chains, domain/range constraints forcing an individual's type, disjointness ruling out a classification, restrictions (some/only/min/max) requiring or forbidding a relation, equivalences that make classification automatic, inferred subsumptions.
+- Use the ontology's own class, property and individual names, and its own definitions. Build each scenario around concrete named instances of those classes.
+- In "explanation", walk through the derivation step by step, citing the IDs as you go, and say what the ontology would force or forbid in that scenario.
+- Do NOT restate a single axiom as a scenario ("an X is a Y"), do NOT make claims that would hold for any ontology in this field, and do NOT draw on domain knowledge that the axioms do not support. If the axioms say less than common sense would, that gap is itself a worthwhile implication: point it out.
+- If an axiom combination produces a consequence a domain expert would likely reject, say so plainly: that is the most valuable kind of implication."""
+
+
+def generate_real_world_implications(context, num_implications=5):
     """
-    Generate real-world implications from FOL premises using OpenAI.
-    
+    Generate real-world implications grounded in one ontology's own axioms.
+
     Args:
-        ontology_name (str): The name of the ontology being analyzed
-        domain_classes (list): List of main domain classes in the ontology
-        fol_premises (list): List of FOL premises with type, fol, and description
+        context (dict): From implication_context.build_context -- the
+            ontology's terms, label-rendered asserted/inferred axioms and
+            definitions, each with a citable ID.
         num_implications (int): Number of implications to generate (default: 5)
-        
+
     Returns:
-        list: A list of dictionaries containing generated implications
+        list: A list of implication dicts, or [{"error": ..., "title": ...}]
     """
-    import logging
-    logger = logging.getLogger(__name__)
+    from implication_context import render_context, resolve_citations
 
     try:
         # Resolve the AI provider (OpenAI or Anthropic) from the BYO key / env.
@@ -440,216 +450,71 @@ def generate_real_world_implications(ontology_name, domain_classes, fol_premises
                 "the AI settings, or set OPENAI_API_KEY or ANTHROPIC_API_KEY on the "
                 "server."
             )
-        client = get_openai_client(api_key) if provider == "openai" else None
+        if not (context.get('axioms') or context.get('inferred') or context.get('definitions')):
+            raise ValueError(
+                "This ontology has no axioms or definitions about its own terms to "
+                "draw implications from (only declarations, or only BFO axioms).")
 
-        # If no FOL premises provided or empty list, generate simple defaults based on classes
-        if not fol_premises or len(fol_premises) == 0:
-            logger.warning("No FOL premises provided, generating defaults from classes")
-            fol_premises = []
-            
-            # Get class names from domain_classes
-            class_names = []
-            if domain_classes:
-                for cls in domain_classes:
-                    if isinstance(cls, dict) and 'name' in cls:
-                        class_names.append(cls['name'])
-                    elif isinstance(cls, str):
-                        class_names.append(cls)
-            
-            # If no class names found, use some defaults from analysis
-            if not class_names:
-                # Try to use classes from the ontology analysis
-                try:
-                    from app import app
-                    # Look for recent analysis in the database
-                    with app.app_context():
-                        from models import OntologyAnalysis
-                        recent_analysis = OntologyAnalysis.query.order_by(OntologyAnalysis.id.desc()).first()
-                        if recent_analysis and recent_analysis.class_list:
-                            class_names = recent_analysis.class_list[:10]  # Use up to 10 classes
-                except Exception as e:
-                    logger.error(f"Error fetching classes from database: {str(e)}")
-                    
-                # If still no classes, use default placeholder
-                if not class_names:
-                    class_names = ["LegalFact", "LegalDomain", "LegalEntity", "Regulation"]
-            
-            # Generate basic premises for each class
-            for cls in class_names[:10]:  # Limit to 10 classes
-                fol_premises.append({
-                    'type': 'class',
-                    'fol': f"instance_of(x, {cls}, t)",
-                    'description': f"Entities that are instances of {cls}"
-                })
-                
-                # Add some relationship premises if we have multiple classes
-                if len(class_names) > 1 and class_names.index(cls) < len(class_names) - 1:
-                    next_cls = class_names[class_names.index(cls) + 1]
-                    fol_premises.append({
-                        'type': 'property',
-                        'fol': f"related_to(x, y, t) & instance_of(x, {cls}, t) & instance_of(y, {next_cls}, t)",
-                        'description': f"Relation between {cls} and {next_cls}"
-                    })
-        
-        # Extract class names and descriptions for context
-        class_info = []
-        for cls in domain_classes:
-            if isinstance(cls, dict) and 'name' in cls and 'description' in cls:
-                class_info.append(f"{cls['name']}: {cls['description']}")
-            elif isinstance(cls, str):
-                class_info.append(cls)
-        
-        # If no class info, use class names from FOL premises
-        if not class_info and fol_premises:
-            for premise in fol_premises:
-                if premise.get('type') == 'class' and 'instance_of' in premise.get('fol', ''):
-                    fol_expr = premise.get('fol', '')
-                    try:
-                        class_name = fol_expr.split(',')[1].strip()
-                        if class_name and class_name not in class_info:
-                            class_info.append(class_name)
-                    except:
-                        pass
-        
-        # Extract FOL formulas and descriptions
-        fol_info = []
-        for premise in fol_premises:
-            if isinstance(premise, dict) and 'fol' in premise:
-                if 'description' in premise:
-                    fol_info.append(f"Formula: {premise['fol']}\nExplanation: {premise['description']}")
-                else:
-                    # If no description, use the type if available
-                    description = premise.get('type', 'premise').title()
-                    fol_info.append(f"Formula: {premise['fol']}\nExplanation: {description} premise")
-            elif isinstance(premise, str):
-                # For simple string premises, just use the formula
-                fol_info.append(f"Formula: {premise}\nExplanation: Auto-generated premise")
-        
-        # If no domain name provided, use a placeholder
-        if not ontology_name or ontology_name == "Unknown":
-            ontology_name = "LegalFacts Ontology"
-        
-        # Ensure we have some class info
-        if not class_info:
-            class_info = ["UnknownClass"]
-            
-        # Ensure we have FOL info
-        if not fol_info or (isinstance(fol_info, list) and len(fol_info) == 0):
-            logger.warning("No FOL info for implications generation, using defaults")
-            # These should have been generated in the earlier code
-            fol_info = [
-                "Formula: instance_of(x, LegalFact, t)\nExplanation: Entities that are instances of LegalFact",
-                "Formula: instance_of(x, LegalEntity, t)\nExplanation: Entities that are instances of LegalEntity",
-                "Formula: related_to(x, y, t)\nExplanation: Relation between entities"
-            ]
-        
-        # Prepare the prompt
-        system_prompt = """You are an expert in ontology analysis and first-order logic. 
-Your task is to generate real-world implications and examples based on the given ontology and its First-Order Logic (FOL) premises.
-Focus on practical, concrete scenarios that demonstrate how the logical rules in the ontology would manifest in the real world.
-Provide specific examples that domain experts would find valuable in understanding the ontology's practical applications.
-Each example should clearly connect to one or more FOL premises and explain which rules it demonstrates.
-Format your response as a JSON array of objects with 'title', 'scenario', 'premises_used', and 'explanation' fields.
+        user_prompt = f"""{render_context(context)}
 
-Important: If you received auto-generated FOL premises (which will be indicated by simple instance_of formulas), 
-create implications that would be meaningful for the domain area mentioned in the ontology name.
-"""
+Generate {num_implications} implications of this ontology's axioms, as a JSON object {{"implications": [...]}} where each item has:
+- "title": a short, specific title naming the ontology terms involved
+- "scenario": a concrete situation with named instances, showing what the axioms force or forbid (1-2 paragraphs)
+- "premises_used": the IDs (A#, I#, D#) of the items the implication rests on
+- "explanation": the step-by-step derivation from those items (1 paragraph)
 
-        user_prompt = f"""Ontology Name: {ontology_name}
-
-Domain Classes:
-{json.dumps(class_info, indent=2)}
-
-FOL Premises:
-{json.dumps(fol_info, indent=2)}
-
-Please generate {num_implications} real-world implications or examples from these FOL premises. 
-Each example should show how these logical structures would manifest in concrete situations.
-Provide your response as a JSON array with objects containing:
-- "title": A short descriptive title for the implication
-- "scenario": A concrete real-world example demonstrating the logical rule in action (1-2 paragraphs)
-- "premises_used": List of the specific premises being demonstrated (can be indices of the FOL premises list or the actual formulas)
-- "explanation": Clear explanation of how the scenario demonstrates the logical rules (1 paragraph)
-
-Ensure your examples are domain-appropriate, concrete, and clearly connected to the ontology's logical structure.
-If the premises seem auto-generated (simple instance_of formulas), create meaningful implications that would be relevant
-for a {ontology_name.replace("Ontology", "").strip()} domain.
-"""
+Each implication must depend on this ontology specifically: if swapping in a different ontology of the same field would leave it true, replace it."""
 
         # Make the API call (provider-specific), then parse the JSON uniformly.
         if provider == "anthropic":
-            result_text = _generate_implications_anthropic(system_prompt, user_prompt, api_key)
+            result_text = _generate_implications_anthropic(
+                _IMPLICATIONS_SYSTEM_PROMPT, user_prompt, api_key)
         else:
-            response = client.chat.completions.create(
+            response = get_openai_client(api_key).chat.completions.create(
                 model=OPENAI_MODEL,
                 messages=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": _IMPLICATIONS_SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.7
+                temperature=0.4
             )
-            if response is None or response.choices is None or len(response.choices) == 0:
+            if response is None or not response.choices:
                 logger.error("OpenAI API returned an empty response when generating implications")
                 return [{"error": "The OpenAI API returned an empty response. Please try again later.", "title": "Error"}]
             result_text = response.choices[0].message.content
 
-        if result_text is None or result_text.strip() == "":
+        if not result_text or not result_text.strip():
             logger.error("%s returned empty content when generating implications", provider)
             return [{"error": "The AI provider returned empty content. Please try again later.", "title": "Error"}]
 
-        logger.info(f"Raw {provider} response: {result_text}")
-        
-        # Handle different JSON formats that might be returned
-        implications = []
-        
+        logger.info(f"Raw {provider} implications response: {result_text[:500]}")
         try:
-            logger.info(f"Attempting to parse implications JSON: {result_text[:min(200, len(result_text))]}...")
             result = json.loads(result_text)
-            logger.info(f"Successfully loaded implications JSON. Response structure: {type(result).__name__}")
-            if isinstance(result, dict):
-                logger.info(f"JSON keys for implications: {list(result.keys())}")
-            
-            # Case 1: Response is a list of implications
-            if isinstance(result, list):
-                implications = result
-            # Case 2: Response has an 'implications' key
-            elif result.get("implications") and isinstance(result.get("implications"), list):
-                implications = result.get("implications")
-            # Case 3: Response has an 'examples' key (like in our current response)
-            elif result.get("examples") and isinstance(result.get("examples"), list):
-                implications = result.get("examples")
-            # Case 4: Response is a flat object with the expected fields
-            elif "title" in result and "scenario" in result:
-                implications = [result]  # Wrap single item in a list
-            # Case 5: Response has numbered keys as strings (e.g., "1", "2", etc.)
-            else:
-                for key, value in result.items():
-                    if isinstance(value, dict) and "title" in value:
-                        implications.append(value)
-                        
-            logger.info(f"Parsed implications from response: {implications}")
-        except Exception as e:
-            logger.error(f"Error parsing OpenAI response: {str(e)}")
-            implications = []
-        
-        if implications and isinstance(implications, list):
-            logger.info(f"Successfully generated {len(implications)} real-world implications")
+        except ValueError as e:
+            logger.error(f"Error parsing implications response: {e}")
+            return [{"error": "The AI provider returned malformed JSON. Please try again.", "title": "Error"}]
+
+        if isinstance(result, list):
+            implications = result
+        elif isinstance(result.get("implications"), list):
+            implications = result["implications"]
+        elif isinstance(result.get("examples"), list):
+            implications = result["examples"]
+        elif "title" in result and "scenario" in result:
+            implications = [result]
         else:
-            logger.warning("No implications generated or implications not in list format")
-        
-        # If we still have no implications, create a default one for debugging
+            implications = [v for v in result.values() if isinstance(v, dict) and "title" in v]
+
+        implications = [i for i in implications if isinstance(i, dict) and i.get("title")]
         if not implications:
-            implications = [{
-                "title": "Example Implication",
-                "scenario": "This is an example implication generated as a fallback.",
-                "premises_used": ["Example premise"],
-                "explanation": "The OpenAI response didn't contain properly formatted implications."
-            }]
-            logger.warning("Using fallback implications because none were parsed from the response")
-            
+            logger.warning("No implications parsed from the %s response", provider)
+            return [{"error": "The AI provider's response contained no implications. Please try again.", "title": "Error"}]
+
+        implications = resolve_citations(implications, context)
+        logger.info(f"Generated {len(implications)} grounded implications")
         return implications
-        
+
     except Exception as e:
         logger.error(f"Error generating real-world implications: {str(e)}")
         return [{"error": str(e), "title": "Error generating implications"}]

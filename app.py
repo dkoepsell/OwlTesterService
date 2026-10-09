@@ -1290,41 +1290,19 @@ def generate_implications(analysis_id):
                 })
         
         elif request.method == 'POST':
-            # Generate new implications
-            fol_premises = analysis.fol_premises
-            
-            if not fol_premises or len(fol_premises) == 0:
-                return jsonify({
-                    'success': False,
-                    'message': 'No FOL premises found for this analysis'
-                }), 400
-            
-            # Generate implications using OpenAI
+            # Generate implications from the ontology's own axioms, labels and
+            # definitions (not the placeholder fol_premises, which carry no
+            # logical content and produced generic, domain-name-only results).
             try:
-                # Extract domain classes from analysis class_list if available
-                domain_classes = []
-                if analysis.class_list:
-                    # Check if class_list contains dictionaries with 'name' field
-                    if isinstance(analysis.class_list, list) and len(analysis.class_list) > 0:
-                        if isinstance(analysis.class_list[0], dict) and 'name' in analysis.class_list[0]:
-                            domain_classes = [cls['name'] for cls in analysis.class_list if 'name' in cls]
-                        else:
-                            domain_classes = analysis.class_list  # Assume it's already a list of class names
-                
-                # Get the ontology name
-                ontology_name = analysis.ontology_name if analysis.ontology_name else "Unknown Ontology"
-                
-                # Log what we're passing to the implications generator
-                app.logger.info(f"Generating implications for ontology '{ontology_name}'")
-                app.logger.info(f"Domain classes: {domain_classes}")
-                app.logger.info(f"FOL premises count: {len(fol_premises) if fol_premises else 0}")
-                
-                # Call the function with the correct parameters
-                implications = generate_real_world_implications(
-                    ontology_name=ontology_name,
-                    domain_classes=domain_classes,
-                    fol_premises=fol_premises
-                )
+                from implication_context import build_context
+                file_record = OntologyFile.query.get(analysis.ontology_file_id)
+                context = build_context(analysis, file_record.file_path if file_record else None)
+                app.logger.info(
+                    f"Generating implications for '{context['ontology_name']}': "
+                    f"{len(context['axioms'])} axioms, {len(context['inferred'])} inferred, "
+                    f"{len(context['definitions'])} definitions")
+
+                implications = generate_real_world_implications(context)
 
                 # The generator reports failure as [{"error": ..., "title": ...}]
                 # instead of raising. Surface that as an error response — don't
