@@ -491,6 +491,73 @@ def check_enhanced_consistency(analysis_id):
         return jsonify({'error': str(e)}), 500
 
 # File Upload and Analysis
+def _upload_bundle(files):
+    """Store a multi-file (or zipped) modular ontology as one merged file.
+
+    owl:imports between the uploaded modules are resolved locally (see
+    ontology_bundle); the merged import closure of the top-level module is
+    what gets analysed, and the manifest keeps per-module provenance.
+    """
+    from ontology_bundle import BundleError, create_bundle
+    filename = f"{uuid.uuid4().hex}.owl"
+    try:
+        file_path, manifest = create_bundle(
+            files, app.config['UPLOADED_OWLS_DEST'], filename,
+            app.config['ALLOWED_EXTENSIONS'],
+            root_name=request.form.get('root_module') or None)
+    except BundleError as e:
+        flash(f"Could not assemble the ontology bundle: {e}", 'error')
+        return redirect(url_for('upload_owl'))
+
+    if len(manifest['roots']) > 1:
+        flash(f"Several top-level modules ({', '.join(manifest['roots'])}); analysing "
+              f"them together. Pick one under 'Top-level ontology' to analyse a single stack.",
+              'warning')
+    if manifest['unresolved']:
+        missing = ', '.join(sorted({u['iri'] for u in manifest['unresolved']}))
+        flash(f"Some imports were not in the upload and were skipped: {missing}", 'warning')
+
+    imported = len(manifest['order']) - len(manifest['roots'])
+    display = ' + '.join(manifest['roots'])
+    if imported:
+        display += f" (+{imported} imported module{'s' if imported != 1 else ''})"
+    file_record = OntologyFile(
+        filename=filename,
+        original_filename=display[:255],
+        file_path=file_path,
+        file_size=os.path.getsize(file_path),
+        mime_type='application/rdf+xml',
+        user_id=current_user.id if current_user.is_authenticated else None
+    )
+    db.session.add(file_record)
+    db.session.commit()
+    return redirect(url_for('analyze_owl', filename=filename))
+
+
+@app.route('/api/bundle/<filename>/layers', methods=['GET', 'POST'])
+def bundle_layers(filename):
+    """Layer-by-layer check of a multi-file upload.
+
+    POST starts the check in the background and returns 'running'; GET polls
+    the stored report. Each module is reasoned over with its import closure,
+    bottom-up, to find the first layer that makes the stack inconsistent or
+    introduces unsatisfiable classes.
+    """
+    from bundle_layers import mark_running, read_layers, run_and_store
+    from ontology_bundle import load_manifest
+    file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+    if not load_manifest(file_record.file_path):
+        return jsonify({'status': 'done', 'error': 'not a multi-file upload'}), 404
+    if request.method == 'GET':
+        return jsonify(read_layers(file_record.file_path))
+    marker = mark_running(file_record.file_path)
+    if marker is None:
+        return jsonify(read_layers(file_record.file_path)), 202
+    threading.Thread(target=run_and_store, args=(file_record.file_path,),
+                     daemon=True, name=f"bundle-layers-{filename}").start()
+    return jsonify(marker), 202
+
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_owl():
     """Handle OWL file upload and redirection to analysis page."""
@@ -498,12 +565,17 @@ def upload_owl():
         return render_template('upload.html')
     try:
         # Check if a file was uploaded
-        if 'file' not in request.files:
+        files = [f for f in request.files.getlist('file') if f and f.filename]
+        if not files:
             flash('No file selected', 'error')
             return redirect(url_for('index'))
-            
-        file = request.files['file']
-        
+
+        # Several files, or a zip: a modular ontology whose imports resolve locally.
+        if len(files) > 1 or files[0].filename.lower().endswith('.zip'):
+            return _upload_bundle(files)
+
+        file = files[0]
+
         # Check if the file has a name
         if file.filename == '' or file.filename is None:
             flash('No file selected', 'error')
@@ -889,9 +961,11 @@ def analyze_owl(filename):
             if analysis.individual_count is None:
                 analysis.individual_count = 0
                 
-            return render_template('analysis.html', 
-                                 file=file_record, 
+            from ontology_bundle import load_manifest
+            return render_template('analysis.html',
+                                 file=file_record,
                                  analysis=analysis,
+                                 bundle=load_manifest(file_record.file_path),
                                  labels=analysis.entity_labels or {},
                                  classes=class_list,
                                  relations=object_properties,

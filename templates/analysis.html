@@ -109,6 +109,8 @@
             </div>
         </div>
         
+        {% if bundle %}{% include 'bundle_modules_card.html' %}{% endif %}
+
         <div class="card mb-4">
             <div class="card-header bg-secondary text-white">
                 <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Ontology Statistics</h5>
@@ -230,6 +232,9 @@
                     {% for cls in analysis.unsatisfiable_classes %}
                     <li class="list-group-item">
                         <strong>{{ cls.label or cls.name }}</strong>
+                        {% if bundle and bundle.entity_module.get(cls.iri) %}
+                        <span class="badge bg-info text-dark ms-2" title="Module that declares this class">{{ bundle.entity_module.get(cls.iri) }}</span>
+                        {% endif %}
                         {% if cls.justification %}
                         <div class="small mt-1">{{ cls.justification }}</div>
                         {% endif %}

@@ -1,0 +1,105 @@
+{# Modules of a multi-file upload: import stack, resolution, and the layer-by-layer check.
+   Expects `bundle` (the ontology_bundle manifest) and `file`. #}
+<div class="card mb-4" id="bundle-modules">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Modules</h5>
+        <span class="badge bg-light text-dark">{{ bundle.order | length }} module{{ '' if bundle.order|length == 1 else 's' }} merged</span>
+    </div>
+    <div class="card-body">
+        <p class="mb-3">This analysis covers the top-level module
+            <strong>{{ bundle.roots | join(', ') }}</strong> and everything it imports. Imports were
+            resolved against the uploaded files only{% if bundle.catalog %} (using <code>{{ bundle.catalog }}</code>){% endif %}.
+            {% if bundle.bfo_vendored %}BFO imports use the built-in BFO 2020.{% endif %}</p>
+
+        <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr><th>Layer</th><th>Module</th><th>Imports</th><th class="text-end">Classes</th><th class="text-end">Properties</th><th class="text-end">Triples</th></tr>
+            </thead>
+            <tbody>
+            {% for m in bundle.modules | reverse if m.name in bundle.order %}
+                <tr>
+                    <td>{{ m.layer }}</td>
+                    <td>
+                        <strong>{{ m.title or m.name }}</strong>
+                        {% if m.name in bundle.roots %}<span class="badge bg-primary ms-1">top</span>{% endif %}
+                        <div class="small text-muted">{{ m.name }}{% if m.ontology_iri %} · <code>{{ m.ontology_iri }}</code>{% endif %}</div>
+                    </td>
+                    <td class="small">
+                        {% for imp in m.imports %}
+                            {% if imp.status == 'local' %}<span class="badge bg-success">{{ imp.module }}</span>
+                            {% elif imp.status == 'bfo' %}<span class="badge bg-info text-dark" title="{{ imp.iri }}">BFO 2020 (built-in)</span>
+                            {% else %}<span class="badge bg-warning text-dark" title="Not in the upload; skipped">missing: {{ imp.iri }}</span>{% endif %}
+                        {% else %}<span class="text-muted">none</span>{% endfor %}
+                    </td>
+                    <td class="text-end">{{ m.counts.classes }}</td>
+                    <td class="text-end">{{ m.counts.object_properties + m.counts.data_properties }}</td>
+                    <td class="text-end">{{ m.triples }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        {% if bundle.unused %}
+        <div class="alert alert-secondary small">
+            Uploaded but not imported by the top-level module, so not analysed:
+            {{ bundle.unused | join(', ') }}.
+        </div>
+        {% endif %}
+
+        <h6 class="mt-3"><i class="fas fa-list-ol me-2"></i>Layer-by-layer check</h6>
+        <p class="small mb-2">Reasons over each module together with what it imports, bottom-up,
+            and reports the first layer that makes the stack inconsistent or makes classes unsatisfiable.</p>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="bundle-layers-run">
+            <i class="fas fa-play me-1"></i>Run layer check
+        </button>
+        <div id="bundle-layers-result" class="mt-3"></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const url = "{{ url_for('bundle_layers', filename=file.filename) }}";
+    const btn = document.getElementById('bundle-layers-run');
+    const out = document.getElementById('bundle-layers-result');
+    const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const badge = {ok: ['success', 'consistent, coherent'], incoherent: ['warning', 'unsatisfiable classes'],
+                   inconsistent: ['danger', 'inconsistent'], unknown: ['secondary', 'could not decide']};
+
+    function render(data) {
+        if (data.status === 'running') {
+            btn.disabled = true;
+            out.innerHTML = '<div class="text-muted small"><span class="spinner-border spinner-border-sm me-2"></span>Reasoning layer by layer…</div>';
+            setTimeout(poll, 3000);
+            return;
+        }
+        btn.disabled = false;
+        if (data.status === 'none') { out.innerHTML = ''; return; }
+        if (data.status === 'stale') { out.innerHTML = '<div class="alert alert-warning small">The previous run did not finish. Run it again.</div>'; return; }
+        if (data.error) { out.innerHTML = `<div class="alert alert-danger small">${esc(data.error)}</div>`; return; }
+        const head = data.first_break
+            ? `<div class="alert alert-warning small mb-2">The stack first breaks at <strong>${esc(data.first_break)}</strong>; the layers below it are fine on their own.</div>`
+            : '<div class="alert alert-success small mb-2">No layer introduces an inconsistency or unsatisfiable classes.</div>';
+        const rows = data.layers.map(l => {
+            const [cls, text] = badge[l.status] || badge.unknown;
+            const intro = (l.introduced_unsatisfiable || []).map(c =>
+                `<li>${esc(c.label || c.name)}${c.module ? ` <span class="badge bg-info text-dark">${esc(c.module)}</span>` : ''}</li>`).join('');
+            return `<tr class="${l.breaks_here ? 'table-warning' : ''}">
+                <td>${esc(l.layer)}</td>
+                <td><strong>${esc(l.title || l.module)}</strong><div class="small text-muted">${esc(l.closure.join(' + '))}</div></td>
+                <td><span class="badge bg-${cls}">${text}</span>${l.note ? `<div class="small text-muted">${esc(l.note)}</div>` : ''}</td>
+                <td class="small">${intro ? `<ul class="mb-0 ps-3">${intro}</ul>` : '<span class="text-muted">none new</span>'}</td></tr>`;
+        }).join('');
+        out.innerHTML = head + `<div class="table-responsive"><table class="table table-sm align-middle">
+            <thead><tr><th>Layer</th><th>Module + imports</th><th>Result</th><th>Newly unsatisfiable</th></tr></thead>
+            <tbody>${rows}</tbody></table></div>`;
+    }
+    function poll() { fetch(url).then(r => r.json()).then(render).catch(() => { btn.disabled = false; }); }
+    btn.addEventListener('click', () => {
+        fetch(url, {method: 'POST'}).then(r => r.json()).then(render)
+            .catch(e => { out.innerHTML = `<div class="alert alert-danger small">${esc(e)}</div>`; });
+    });
+    poll();
+})();
+</script>
