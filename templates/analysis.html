@@ -107,6 +107,13 @@
                                 <i class="fas fa-print me-1"></i>Print Full Report
                             </a>
                         </div>
+
+                        <h6 class="mt-3"><i class="fas fa-file-download me-2"></i>Ontology File: </h6>
+                        <div class="ms-4">
+                            <a href="{{ url_for('download_owl', filename=file.filename) }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-download me-1"></i>Download OWL{% if bundle %} (merged){% endif %}
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

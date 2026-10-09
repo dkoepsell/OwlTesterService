@@ -697,6 +697,28 @@ def _match_straddle_finding(analysis, class_iri, drop_iri):
     return None
 
 
+@app.route('/download/<filename>')
+def download_owl(filename):
+    """Download the stored ontology file as analysed: the merged import closure
+    for a multi-file upload, the corrected file for an auto-fixed one."""
+    from ontology_bundle import load_manifest
+    file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+    if not file_record.file_path or not os.path.exists(file_record.file_path):
+        flash("The stored file is no longer available.", "error")
+        return redirect(url_for('index'))
+
+    ext = os.path.splitext(file_record.filename)[1] or '.owl'
+    manifest = load_manifest(file_record.file_path)
+    if manifest:
+        base = os.path.splitext(manifest['roots'][0])[0] + '.merged'
+    else:
+        base = os.path.splitext(file_record.original_filename or 'ontology')[0]
+    download_name = (secure_filename(base) or 'ontology') + ext
+    return send_from_directory(
+        os.path.dirname(file_record.file_path), os.path.basename(file_record.file_path),
+        as_attachment=True, download_name=download_name)
+
+
 @app.route('/api/analysis/<int:analysis_id>/fix-straddle')
 def fix_straddle_download(analysis_id):
     """Drop one clashing subClassOf edge and return the corrected ontology file."""
