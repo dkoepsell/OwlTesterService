@@ -2529,6 +2529,35 @@ def api_generate_diagram(filename):
     # Redirect to the new interactive diagram
     return redirect(url_for('generate_diagram', filename=filename))
 
+@app.route('/analyze/<filename>/uml')
+def uml_view(filename):
+    """UML class diagram of a stored ontology (vendored owl2uml).
+
+    The page fetches ?format=json for the SVG; ?format=svg downloads it.
+    Graphviz lays it out when `dot` is installed, else the built-in layout.
+    """
+    from owl2uml import layout, parse_ontology, render_svg
+    from owl2uml.dot import dot_available, render_dot_svg
+    file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+    fmt = request.args.get('format')
+    if fmt not in ('json', 'svg'):
+        return render_template('uml_view.html', file=file_record)
+    if not os.path.exists(file_record.file_path):
+        return jsonify(error=f"Ontology file not found: {filename}"), 404
+    try:
+        model = parse_ontology(file_record.file_path)
+        if dot_available():
+            svg, engine = render_dot_svg(model), 'graphviz'
+        else:
+            svg, engine = render_svg(model, *layout(model)), 'builtin'
+    except Exception as e:
+        logger.warning(f"UML render failed for {filename}: {e}")
+        return jsonify(error=f"Could not render UML: {e}"), 500
+    if fmt == 'svg':
+        return Response(svg, mimetype='image/svg+xml')
+    return jsonify(svg=svg, engine=engine, classes=len(model.classes), edges=len(model.edges))
+
+
 @app.route('/analyze/<filename>/bvss')
 def bvss_visualize(filename):
     """Generate a BVSS visualization for an ontology file."""

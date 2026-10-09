@@ -90,8 +90,11 @@
                             <a href="{{ url_for('generate_diagram', filename=file.filename) }}" class="btn btn-outline-primary btn-sm me-2">
                                 <i class="fas fa-sitemap me-1"></i>Interactive Diagram
                             </a>
-                            <a href="{{ url_for('bvss_visualize', filename=file.filename) }}" class="btn btn-outline-info btn-sm">
+                            <a href="{{ url_for('bvss_visualize', filename=file.filename) }}" class="btn btn-outline-info btn-sm me-2">
                                 <i class="fas fa-project-diagram me-1"></i>BVSS View
+                            </a>
+                            <a href="{{ url_for('uml_view', filename=file.filename) }}" class="btn btn-outline-success btn-sm">
+                                <i class="fas fa-th-list me-1"></i>UML View
                             </a>
                         </div>
 

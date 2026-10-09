@@ -23,8 +23,10 @@ FROM python:3.11-slim
 #   default-jre-headless — Java runtime for OWL reasoners (Pellet/HermiT) and ROBOT
 #   libpq-dev + gcc    — needed to build psycopg2-binary
 #   wget               — to fetch ROBOT during image build
+#   graphviz           — `dot` layout for the UML view (owl2uml)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
+    graphviz \
     libpq-dev \
     gcc \
     wget \
