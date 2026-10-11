@@ -1,0 +1,235 @@
+{% extends "layout.html" %}
+
+{% block title %}Getting Started: Statute Ontologies{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-lg-10">
+            <h1 class="display-5">Getting Started: Build a Statute Ontology</h1>
+            <p class="lead">Not sure where to begin? This guide walks you through building a BFO-grounded ontology of a statute in twelve steps, and shows where each step happens in the sandbox. The worked example throughout is the Texas out-of-hospital DNR ontology (TX-DNR), Health &amp; Safety Code chapter 166.</p>
+            <p class="text-muted">The sandbox and the checks speed up drafting. They do not replace the three human safeguards that keep an ontology faithful to the law: the <strong>section table</strong> (step 2), the <strong>scenarios</strong> (step 7), and an <strong>independent statutory review</strong> (step 10).</p>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('sandbox_new') }}" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Start a new ontology</a>
+                <a href="{{ url_for('sandbox_list') }}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Back to sandbox</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- At a glance -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white"><h5 class="mb-0">At a glance: 4 phases, 12 steps, 1 review loop</h5></div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3"><a href="#phase1" class="text-decoration-none"><strong>1. Read the law</strong></a><br><small class="text-muted">Steps 1&ndash;3: scope, section table, sort the nouns</small></div>
+                <div class="col-md-3"><a href="#phase2" class="text-decoration-none"><strong>2. Build</strong></a><br><small class="text-muted">Steps 4&ndash;6: set up, write terms, run checks</small></div>
+                <div class="col-md-3"><a href="#phase3" class="text-decoration-none"><strong>3. Test against cases</strong></a><br><small class="text-muted">Steps 7&ndash;9: scenarios, deciding rules, read as a lawyer</small></div>
+                <div class="col-md-3"><a href="#phase4" class="text-decoration-none"><strong>4. Check and publish</strong></a><br><small class="text-muted">Steps 10&ndash;12: review, document, release</small></div>
+            </div>
+            <p class="mt-3 mb-0 small">Phases 1 to 3 build an ontology that passes every automated check. Step 10 tests whether it is faithful to the statute, and its findings send you back to the build.</p>
+        </div>
+    </div>
+
+    <!-- Phase 1 -->
+    <h2 id="phase1" class="mt-5 mb-3">Phase 1: Read the law</h2>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 1. Fix the scope and the as-of date</h4>
+            <ul>
+                <li><strong>Name the chapters and subchapters.</strong> TX-DNR covers chapter 166, subchapter C (out-of-hospital orders) and subchapter E (facility orders), and nothing else.</li>
+                <li><strong>Read the history note at the foot of each section.</strong> Section 166.203 was amended in 2023, adding a third route to a valid facility order; an older copy of the law has only two.</li>
+                <li><strong>Never work from a bill's enrolled text alone.</strong> It shows the law as passed, not as later amended. Use it for history; use the current code for content.</li>
+            </ul>
+            <div class="alert alert-info mb-0"><i class="fas fa-mouse-pointer me-2"></i><strong>In the sandbox:</strong> when you <a href="{{ url_for('sandbox_new') }}">create the ontology</a>, put the jurisdiction in <em>Domain</em> (e.g. Law), the code and chapter in <em>Subject</em>, and the scope and as-of date in <em>Description</em>. You can change them later on the editor's <em>Settings</em> tab.</div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 2. Read every section and build a section table</h4>
+            <p>Read the definitions section first, then every operative section, and record each rule in a working table, one row per rule. Keep it open beside the editor the whole time: every class you add should trace to a row.</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead><tr><th>Section</th><th>Who</th><th>Must / may / may not</th><th>Do what</th><th>Conditions</th><th>Exceptions</th></tr></thead>
+                    <tbody>
+                        <tr><td>166.089(a)</td><td>responding EMS personnel</td><td>must</td><td>honor an out-of-hospital order</td><td>form found on arrival; identity confirmed; form appears valid</td><td>166.089(h) request at scene; 166.098 known pregnancy</td></tr>
+                        <tr><td>166.092(a)</td><td>declarant, guardian, qualified relative, agent</td><td>may</td><td>revoke the order</td><td>at any time; declarant regardless of competence</td><td>oral revocation effective only once communicated at the scene</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="mb-0 small text-muted">The sandbox has no section-table tool; keep it in a spreadsheet or document.</p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 3. Sort every noun into a pattern</h4>
+            <p>Go down the section table and ask of each thing the law mentions what kind of thing it is. The answer picks its parent class. The Legal Ontologies Foundry patterns (LOF-ODP-001 to 004) give the legal parents; the last column shows what to pick in the sandbox's <em>BFO Category</em> menu.</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead><tr><th>If it is&hellip;</th><th>It is a&hellip;</th><th>Foundry parent</th><th>TX-DNR examples</th><th>Sandbox BFO Category</th></tr></thead>
+                    <tbody>
+                        <tr><td>What the law or an order says, surviving any copy</td><td>legal content</td><td>ODP-001 legal content</td><td>out-of-hospital DNR order, advance directive</td><td>GenericallyDependentContinuant</td></tr>
+                        <tr><td>A paper, file, or object carrying that content</td><td>legal document</td><td>ODP-001 legal document</td><td>order form; identification device</td><td>Object</td></tr>
+                        <tr><td>Something people do that makes, changes, or ends legal content</td><td>legal act</td><td>ODP-001 legal act</td><td>execution, issuance, revocation</td><td>Process</td></tr>
+                        <tr><td>Something a person is, because of law or appointment</td><td>legal role</td><td>ODP-002 legal role</td><td>declarant, attending physician, qualified relative</td><td>Role</td></tr>
+                        <tr><td>A must, may, can, or cannot of a person</td><td>legal position</td><td>ODP-003 duty, claim, power, immunity&hellip;</td><td>duty to honor, power to revoke</td><td>Continuant</td></tr>
+                        <tr><td>A happening that is not itself a legal act</td><td>process</td><td>BFO process</td><td>EMS response, CPR, pregnancy</td><td>Process</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p><strong>When something fits two rows, it is usually two things.</strong> &ldquo;The order&rdquo; is the content (what it directs), the form (the paper), and the execution (the signing). Model all three and relate them.</p>
+            <div class="alert alert-info mb-0"><i class="fas fa-mouse-pointer me-2"></i><strong>In the sandbox:</strong> the menu has BFO categories only, not the Foundry patterns. Add one class per pattern first (<em>legal content</em>, <em>legal document</em>, <em>legal act</em>, <em>legal role</em>, <em>legal position</em>), then set each statute term's <em>Parent Class</em> to the matching one, so the pattern survives in the hierarchy.</div>
+        </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <h2 id="phase2" class="mt-5 mb-3">Phase 2: Build</h2>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 4. Set up</h4>
+            <p>Choose a short identifier and prefix (TX-DNR used <code>txdnr</code> / <code>TXDNR</code>) and a title that names the jurisdiction and statute. If you will publish to the Foundry, reserve an ID range and plan to import BFO 2020 and the LOF-ODP-001 to 004 base files; that setup happens outside the sandbox, in a repository edited with Protégé and ROBOT.</p>
+            <div class="alert alert-info mb-0"><i class="fas fa-mouse-pointer me-2"></i><strong>In the sandbox:</strong> <a href="{{ url_for('sandbox_new') }}">New Ontology</a> gives you the editor with four tabs: <em>Classes</em>, <em>Properties</em>, <em>Individuals</em>, and <em>Settings</em>.</div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 5. Write the terms</h4>
+            <p>Work through the step 3 table one class at a time. On the <em>Classes</em> tab, click <em>Add Class</em> and fill in:</p>
+            <ul>
+                <li><strong>Class Name</strong> &mdash; the label: lower case, singular, unique. Add a qualifier when it would collide with an imported term (&ldquo;Texas DNR order&rdquo;, not &ldquo;DNR order&rdquo;).</li>
+                <li><strong>Parent Class</strong> and <strong>BFO Category</strong> &mdash; what step 3 chose.</li>
+                <li><strong>Description</strong> &mdash; a genus-and-difference definition in one sentence, in the statute's own words where you can, followed by the section it comes from and any exceptions. Quote rather than paraphrase.</li>
+                <li><strong>Axioms: only what the statute fixes.</strong> An order form is a material entity that carries some out-of-hospital order; the three facility-order routes are disjoint.</li>
+            </ul>
+            <p>Relations get the same treatment on the <em>Properties</em> tab: name, definition, source section, <em>Domain</em>, and <em>Range</em>.</p>
+            <p><strong>If you used AI suggestions, revise them rather than accept them.</strong> Re-parent each suggested class to the matching pattern class from step 3; merge duplicates and split conflations (look for one class doing the work of order, form, and execution); and <strong>delete anything with no row in the section table</strong> &mdash; an extracted term the statute does not support is a claim the ontology cannot back. Avoid privation classes (&ldquo;non-revoked order&rdquo;), boolean expressions as class names, and propositions reified as classes.</p>
+            <p><strong>Kinds as individuals.</strong> When legal content names a kind of thing rather than a particular one (an order directs withholding of CPR as a kind, not one episode of CPR), declare the kind as both a class and an individual. OWL 2 allows this (punning); use the <em>Individuals</em> tab.</p>
+            <div class="alert alert-info mb-0">
+                <i class="fas fa-flask me-2"></i><strong>Try a hard axiom first.</strong> Before committing an axiom you are unsure of, write it as first-order logic and paste it into the <a href="{{ url_for('index') }}">FOL expression tester</a>. It reports the BFO classes and relations it recognized and lists any non-BFO terms, so a misspelled relation shows up before it reaches the ontology. For example, every out-of-hospital order form carries an order:
+                <pre class="mt-2 mb-2 p-2 bg-dark text-light rounded"><code>forall x t (instance_of(x, OutOfHospitalDNROrderForm, t) -&gt;
+  exists y (instance_of(y, OutOfHospitalDNROrder, t) &amp; is_carrier_of(x, y, t)))</code></pre>
+                The <a href="/fol-syntax-guide">FOL Syntax Guide</a> and <a href="/fol-formats">Prover9 &amp; CLIF guide</a> give the accepted forms.
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 6. Run the checks, and fix until clean</h4>
+            <p>Check after every working session, not just at the end.</p>
+            <div class="alert alert-info"><i class="fas fa-mouse-pointer me-2"></i><strong>In the sandbox:</strong> click <em>Export to History</em> (or <em>Download OWL</em> and then <a href="/upload">Upload</a>) to run the full analysis. The report gives, in one place, the consistency and coherence verdicts, any class placed under two BFO categories that BFO declares disjoint, an entity inventory, and a Prover9/Mace4 cross-check of the first-order translation. <a href="/history">History</a> keeps every run so you can compare versions.</div>
+            <p>Read the report knowing what it does and does not test:</p>
+            <ul>
+                <li>The BFO check is a category-disjointness lint. It catches a class placed under both process and continuant, not a class placed under the wrong one.</li>
+                <li>The first-order cross-check covers subsumption and disjointness. Unless BFO background axioms are loaded, agreement confirms the class hierarchy, not existential restrictions.</li>
+            </ul>
+            <p class="mb-0 small text-muted">For a Foundry release, also run ROBOT (<code>reason --reasoner HermiT</code>, the QC SPARQL checks, and <code>report --fail-on ERROR</code>) on the repository build. Use ROBOT as the gate that must pass and this tool as the independent check that should agree; investigate any disagreement before release.</p>
+        </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <h2 id="phase3" class="mt-5 mb-3">Phase 3: Test against cases</h2>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 7. Write scenarios, one rule each</h4>
+            <p>A scenario is a small set of hypothetical people and events that tests one rule.</p>
+            <ul>
+                <li><strong>Start from the section table.</strong> For each rule with a condition or exception, write one scenario where it applies, then change one fact to make another where it fails. TX-DNR's S1 (valid order, honored) and S2 (same, but a relative asks for CPR) differ in a single line.</li>
+                <li><strong>Write the law itself once</strong>: the legislature, its power, the enactment, and the chapter as legal content, so every duty can trace back to it.</li>
+                <li><strong>Build one full chain</strong> for at least one duty: grounded in the chapter, triggered by an occurrence, generated by an act realizing a role, owed to someone, with a remedy.</li>
+                <li><strong>Use hypothetical names</strong>, and say so.</li>
+            </ul>
+            <div class="alert alert-info mb-0"><i class="fas fa-mouse-pointer me-2"></i><strong>In the sandbox:</strong> add scenario people, documents, and events on the <em>Individuals</em> tab, each with its <em>Class</em>. Then re-run the analysis and check that the inferences you expect appear.</div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 8. Write the rules that decide</h4>
+            <p>OWL alone cannot say whether responders must honor an order, because OWL assumes the world is open: it never concludes that a missing fact is false, so it can never find that no one asked for CPR. Decisions therefore go in rules that check what is recorded.</p>
+            <ul class="mb-0">
+                <li>Write one rule per statutory condition (e.g. a SPARQL ASK query), paired with its section and a sentence saying what is the case when it fails.</li>
+                <li>Keep three kinds of rule apart: <strong>honoring</strong> rules decide what responders must do; <strong>validity</strong> rules decide whether an order was properly made; <strong>duty</strong> rules record obligations whose breach does not void the order. Mixing the last two was the most consequential mistake in the first TX-DNR draft.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 9. Read the results as a lawyer would</h4>
+            <ul class="mb-0">
+                <li>Is each verdict what the statute requires, for the reason the statute gives?</li>
+                <li>Does each failure message say what is the case, without double negatives? &ldquo;The responders know the person to be pregnant&rdquo; reads; &ldquo;Not met: the responders do not know the person to be pregnant&rdquo; does not.</li>
+                <li>Where two rules interact, is the interaction right? In TX-DNR's S5 the form appears valid, so responders must honor it, even though the order was improperly made for a minor. The result should say both, and why.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <h2 id="phase4" class="mt-5 mb-3">Phase 4: Check and publish</h2>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 10. Get an independent statutory review</h4>
+            <p>The builder is the worst person to find the builder's mistakes. Give a second reader who has not seen the work the ontology (<em>Download OWL</em>), your rules, and one instruction: check every legal claim against the current statute, section by section.</p>
+            <ul class="mb-0">
+                <li>If an AI drafted the ontology, the reviewer must be a person or a separate session with fresh instructions, never the one that did the drafting.</li>
+                <li>Ask, separately, for important rules the ontology omits entirely.</li>
+                <li>The reviewer must read the sections themselves, not your summary of them.</li>
+                <li>Spot-check before you fix: re-read the statute for any finding that would change a verdict.</li>
+                <li>What the review finds and you do not fix goes on a <em>not yet modeled</em> list, with sections.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 11. Document</h4>
+            <p>The documentation is where a reader decides whether to trust the ontology. It should carry: scope, as-of date, and jurisdiction; a statute map (your section table with a &ldquo;how it is modeled&rdquo; column); the scenarios and their verdicts; what is not yet modeled; linked sources; a plain statement that it is a model, not legal advice; and a license (e.g. CC BY 4.0).</p>
+            <p class="mb-0 small text-muted">In the sandbox, the <em>Settings</em> tab's description is a good place for scope, as-of date, and the not-legal-advice note.</p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h4>Step 12. Release</h4>
+            <p class="mb-0">Download the OWL file and put it in a repository with checks that run on every change. Tag the first release as a pre-release (v0.1.0), submit a registry entry at draft status if you are contributing to the Legal Ontologies Foundry, and open an issue for each open question and each not-yet-modeled item.</p>
+        </div>
+    </div>
+
+    <!-- Mistakes -->
+    <h2 class="mt-5 mb-3">Mistakes the review caught</h2>
+    <p>The first TX-DNR draft passed every automated check and still got the law wrong in five places. The reasoner checks that the ontology is coherent, not that it is faithful to the statute; only a reader with the statute open can check that.</p>
+    <div class="table-responsive">
+        <table class="table table-sm table-bordered">
+            <thead><tr><th>What the first draft did</th><th>What the statute says</th><th>Lesson</th></tr></thead>
+            <tbody>
+                <tr><td>Required responders to find the order form</td><td>A worn DNR identification device must be honored as the form would be (&sect; 166.090(b))</td><td>Read the sections a rule cross-references, not only the rule itself</td></tr>
+                <tr><td>Treated a missing notice as making a hospital order invalid</td><td>Failure to give notice &ldquo;does not affect the validity&rdquo; of the order (&sect; 166.204(b))</td><td>Separate validity rules from duty rules (step 8)</td></tr>
+                <tr><td>Gave only the declarant the power to revoke</td><td>A guardian, qualified relative, or agent may also revoke (&sect; 166.092(a))</td><td>Model who holds a power from the statute's list, not from the obvious case</td></tr>
+                <tr><td>Cited one immunity section for both kinds of order</td><td>Out-of-hospital orders: &sect; 166.094; facility orders: &sect; 166.207, with different terms</td><td>Check each citation at the subsection level</td></tr>
+                <tr><td>Treated an advance directive as a directive or a medical power of attorney only</td><td>An out-of-hospital DNR order is also an advance directive (&sect; 166.002(1)(B))</td><td>Reread the definitions section after modeling, not only before</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>Two habits prevent most of these: <strong>quote the statute's words</strong> in definitions and comments rather than paraphrasing, and <strong>keep the section table open</strong> beside the editor the whole time.</p>
+
+    <!-- Tools -->
+    <h2 class="mt-5 mb-3">Beyond the sandbox</h2>
+    <p>Everything is free. The sandbox covers drafting and checking; a full Foundry release also uses:</p>
+    <ul class="mb-5">
+        <li><strong><a href="https://bfo-agent.davidkoepsell.com/" target="_blank" rel="noopener">bfo-agent</a></strong> &mdash; drafts a first-pass ontology from a statute's text under BFO anti-pattern rules (optional; revise its output as in step 5).</li>
+        <li><strong><a href="https://protege.stanford.edu/" target="_blank" rel="noopener">Protégé 5</a></strong> &mdash; editing classes and running the reasoner interactively (needs Java 11+).</li>
+        <li><strong><a href="https://robot.obolibrary.org/" target="_blank" rel="noopener">ROBOT</a></strong> &mdash; command-line merging, reasoning, QC checks, and releases.</li>
+        <li><strong>Python 3 with rdflib</strong> &mdash; running the deciding rules and a plain-language report.</li>
+        <li><strong>BFO 2020</strong> and the <strong>LOF-ODP-001 to 004</strong> base files &mdash; the upper ontology and legal patterns every class descends from.</li>
+        <li><strong>The statute</strong>, current text and history notes, from the state's official code site.</li>
+        <li><strong>A second reader</strong> &mdash; a colleague, a student, or a separate agent session that has not seen your work.</li>
+    </ul>
+</div>
+{% endblock %}

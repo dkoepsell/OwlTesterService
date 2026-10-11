@@ -2817,6 +2817,11 @@ def sandbox_list():
         flash(f"Error listing sandbox ontologies: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+@app.route('/sandbox/guide')
+def sandbox_guide():
+    """Step-by-step guide to building a statute ontology in the sandbox."""
+    return render_template('sandbox_guide.html')
+
 @app.route('/sandbox/new', methods=['GET', 'POST'])
 def sandbox_new():
     """Create a new sandbox ontology."""
@@ -3127,6 +3132,30 @@ def api_sandbox_class(ontology_id, class_id):
         logger.error(f"Error in API sandbox class: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+# Sandbox BFO category names -> BFO 2020 numeric IDs, so exports point at real BFO IRIs
+SANDBOX_BFO_IDS = {
+    'Entity': '0000001',
+    'Continuant': '0000002',
+    'Occurrent': '0000003',
+    'IndependentContinuant': '0000004',
+    'MaterialEntity': '0000040',
+    'Object': '0000030',
+    'FiatObjectPart': '0000024',
+    'ObjectAggregate': '0000027',
+    'ImmaterialEntity': '0000141',
+    'Site': '0000029',
+    'SpecificallyDependentContinuant': '0000020',
+    'GenericallyDependentContinuant': '0000031',
+    'InformationEntity': '0000031',
+    'RealizableEntity': '0000017',
+    'Role': '0000023',
+    'Disposition': '0000016',
+    'Function': '0000034',
+    'Quality': '0000019',
+    'Process': '0000015',
+    'SpatiotemporalRegion': '0000011',
+}
+
 def generate_owl_xml(ontology, classes, properties, individuals):
     """Generate OWL/RDF XML for a sandbox ontology."""
     # Basic structure for the OWL/RDF XML
@@ -3155,7 +3184,8 @@ def generate_owl_xml(ontology, classes, properties, individuals):
         
         # Add BFO category if defined
         if cls.bfo_category:
-            xml += f"""        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_{cls.bfo_category}"/>
+            bfo_id = SANDBOX_BFO_IDS.get(cls.bfo_category, cls.bfo_category)
+            xml += f"""        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_{bfo_id}"/>
 """
         
         # Add parent class if defined
