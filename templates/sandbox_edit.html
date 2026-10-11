@@ -56,6 +56,9 @@
                 <a href="{{ url_for('sandbox_download', ontology_id=ontology.id) }}" class="btn btn-outline-secondary">
                     <i class="fas fa-download me-2"></i>Download OWL
                 </a>
+                <a href="{{ url_for('sandbox_download_clif', ontology_id=ontology.id) }}" class="btn btn-outline-secondary ms-2" title="First-order export (subclass and disjointness axioms) in Common Logic">
+                    <i class="fas fa-square-root-variable me-2"></i>Export CLIF
+                </a>
             </div>
         </div>
     </div>

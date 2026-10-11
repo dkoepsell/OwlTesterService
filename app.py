@@ -2994,6 +2994,34 @@ def sandbox_download(ontology_id):
         flash(f"Error downloading sandbox ontology: {str(e)}", 'error')
         return redirect(url_for('sandbox_view', ontology_id=ontology_id))
 
+@app.route('/sandbox/<int:ontology_id>/download.clif')
+def sandbox_download_clif(ontology_id):
+    """Download a sandbox ontology's subsumptions and disjointness as CLIF."""
+    try:
+        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
+        properties = OntologyProperty.query.filter_by(ontology_id=ontology_id).all()
+        individuals = OntologyIndividual.query.filter_by(ontology_id=ontology_id).all()
+
+        from rdflib import Graph
+        from fol_export import generate_exports
+        from bfo.catalog import DEFAULT_OWL_PATH
+        graph = Graph()
+        graph.parse(data=generate_owl_xml(ontology, classes, properties, individuals),
+                    format='xml')
+        exports = generate_exports(graph=graph, bfo_path=DEFAULT_OWL_PATH)
+        if exports.get('error') or not exports.get('clif'):
+            raise ValueError(exports.get('error') or 'no axioms to export')
+
+        response = make_response(exports['clif'])
+        response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename={ontology.title.replace(" ", "_")}.clif'
+        return response
+    except Exception as e:
+        logger.error(f"Error exporting sandbox ontology as CLIF: {str(e)}")
+        flash(f"Error exporting CLIF: {str(e)}", 'error')
+        return redirect(url_for('sandbox_view', ontology_id=ontology_id))
+
 @app.route('/api/sandbox/<int:ontology_id>/classes', methods=['GET', 'POST'])
 def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology classes."""
