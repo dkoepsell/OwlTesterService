@@ -42,7 +42,7 @@
                 <span class="badge bg-secondary">{{ ontology.ontology_individuals|length or 0 }} Individuals</span>
             </div>
             <div>
-                <a href="{{ url_for('sandbox_guide') }}#phase2" target="_blank" rel="noopener" class="btn btn-outline-info me-2" title="Step-by-step guide to building a statute ontology">
+                <a href="{{ url_for('sandbox_guide') }}#phase2" target="_blank" rel="noopener" class="btn btn-outline-info me-2" title="Step-by-step guide to building an ontology (any domain)">
                     <i class="fas fa-compass me-2"></i>Guide
                 </a>
                 <a href="{{ url_for('sandbox_view', ontology_id=ontology.id) }}" class="btn btn-outline-secondary me-2">

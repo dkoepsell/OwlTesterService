@@ -1,18 +1,40 @@
 {% extends "layout.html" %}
 
-{% block title %}Getting Started: Statute Ontologies{% endblock %}
+{% block title %}Getting Started: Ontology Building Guide{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="row mb-4">
         <div class="col-lg-10">
-            <h1 class="display-5">Getting Started: Build a Statute Ontology</h1>
-            <p class="lead">Not sure where to begin? This guide walks you through building a BFO-grounded ontology of a statute in twelve steps, and shows where each step happens in the sandbox. The worked example throughout is the Texas out-of-hospital DNR ontology (TX-DNR), Health &amp; Safety Code chapter 166.</p>
-            <p class="text-muted">The sandbox and the checks speed up drafting. They do not replace the three human safeguards that keep an ontology faithful to the law: the <strong>section table</strong> (step 2), the <strong>scenarios</strong> (step 7), and an <strong>independent statutory review</strong> (step 10).</p>
+            <h1 class="display-5">Getting Started: Build an Ontology Step by Step</h1>
+            <p class="lead">Not sure where to begin? This guide walks you through building a BFO-grounded ontology in twelve steps, and shows where each step happens in the sandbox. <strong>The procedure works for any domain</strong> &mdash; biology, engineering, manufacturing, medicine, finance, law. Its worked example happens to be a legal one: the Texas out-of-hospital DNR ontology (TX-DNR), built from Health &amp; Safety Code chapter 166.</p>
+            <p class="text-muted">The sandbox and the checks speed up drafting. They do not replace the three human safeguards that keep an ontology faithful to its source: the <strong>source table</strong> (step 2), the <strong>scenarios</strong> (step 7), and an <strong>independent expert review</strong> (step 10).</p>
             <div class="d-flex flex-wrap gap-2">
                 <a href="{{ url_for('sandbox_new') }}" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Start a new ontology</a>
                 <a href="{{ url_for('sandbox_list') }}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-2"></i>Back to sandbox</a>
             </div>
+        </div>
+    </div>
+
+    <!-- Any domain -->
+    <div class="card mb-4 border-info">
+        <div class="card-header bg-info text-dark"><h5 class="mb-0"><i class="fas fa-globe me-2"></i>Not building a legal ontology? Read it this way</h5></div>
+        <div class="card-body">
+            <p>Every step is general; only the example is legal. As you read, translate the legal terms into your own domain:</p>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-2">
+                    <thead><tr><th>In the guide (legal example)</th><th>In your domain</th><th>For instance</th></tr></thead>
+                    <tbody>
+                        <tr><td>the statute, its sections</td><td>your authoritative source text</td><td>a standard, a clinical guideline, a textbook chapter, a specification, a data dictionary</td></tr>
+                        <tr><td>scope and as-of date</td><td>scope and source version</td><td>ISO 9001:2015 clauses 7&ndash;8; guideline v3.2</td></tr>
+                        <tr><td>section table (who must / may do what)</td><td>source table: one row per statement the source makes</td><td>&ldquo;each batch record must name its operator&rdquo;</td></tr>
+                        <tr><td>Foundry legal patterns (legal content, document, act, role)</td><td>the reference ontologies for your domain, or plain BFO categories</td><td>OBI, IAO, CL, the Industrial Ontologies Foundry core</td></tr>
+                        <tr><td>scenarios</td><td>test cases: small sets of example instances</td><td>one batch that passes inspection, one that fails</td></tr>
+                        <tr><td>independent statutory review</td><td>independent review by a domain expert</td><td>a clinician, an engineer, a lab scientist</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="mb-0 small text-muted">The core habits carry over unchanged: fix your scope before writing classes, trace every class to a statement in your source, sort every noun by what kind of thing it is, keep content separate from its carriers and the acts that create it, test with cases, and have someone who did not build it check it against the source.</p>
         </div>
     </div>
 
@@ -21,17 +43,17 @@
         <div class="card-header bg-secondary text-white"><h5 class="mb-0">At a glance: 4 phases, 12 steps, 1 review loop</h5></div>
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-3"><a href="#phase1" class="text-decoration-none"><strong>1. Read the law</strong></a><br><small class="text-muted">Steps 1&ndash;3: scope, section table, sort the nouns</small></div>
+                <div class="col-md-3"><a href="#phase1" class="text-decoration-none"><strong>1. Read the source</strong></a><br><small class="text-muted">Steps 1&ndash;3: scope, source table, sort the nouns</small></div>
                 <div class="col-md-3"><a href="#phase2" class="text-decoration-none"><strong>2. Build</strong></a><br><small class="text-muted">Steps 4&ndash;6: set up, write terms, run checks</small></div>
                 <div class="col-md-3"><a href="#phase3" class="text-decoration-none"><strong>3. Test against cases</strong></a><br><small class="text-muted">Steps 7&ndash;9: scenarios, deciding rules, read as a lawyer</small></div>
                 <div class="col-md-3"><a href="#phase4" class="text-decoration-none"><strong>4. Check and publish</strong></a><br><small class="text-muted">Steps 10&ndash;12: review, document, release</small></div>
             </div>
-            <p class="mt-3 mb-0 small">Phases 1 to 3 build an ontology that passes every automated check. Step 10 tests whether it is faithful to the statute, and its findings send you back to the build.</p>
+            <p class="mt-3 mb-0 small">Phases 1 to 3 build an ontology that passes every automated check. Step 10 tests whether it is faithful to its source, and its findings send you back to the build.</p>
         </div>
     </div>
 
     <!-- Phase 1 -->
-    <h2 id="phase1" class="mt-5 mb-3">Phase 1: Read the law</h2>
+    <h2 id="phase1" class="mt-5 mb-3">Phase 1: Read the source <small class="text-muted fs-6">(in the example, the law)</small></h2>
 
     <div class="card mb-3">
         <div class="card-body">
