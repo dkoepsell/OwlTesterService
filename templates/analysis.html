@@ -47,13 +47,35 @@
     .derivation-description {
         font-style: italic;
     }
+    /* Collapsible report sections (see initCollapsibleSections) */
+    .section-card > .card-header { cursor: pointer; user-select: none; }
+    .section-card > .card-header:hover { filter: brightness(1.15); }
+    .section-card.section-collapsed > :not(.card-header) { display: none; }
+    .section-card.section-collapsed > .card-header { border-bottom: 0; }
+    .section-toggle { white-space: nowrap; }
+    .section-toggle .fa-chevron-down { transition: transform 0.2s ease; }
+    .section-card.section-collapsed .section-toggle .fa-chevron-down { transform: rotate(-90deg); }
+    .section-nav .btn { margin: 0 0.25rem 0.25rem 0; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <h1 class="mb-4">Ontology Analysis Report</h1>
+        <h1 class="mb-3">Ontology Analysis Report</h1>
+
+        <div class="card mb-4 border-secondary" id="sectionNavCard">
+            <div class="card-body py-2">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                    <small class="text-muted"><i class="fas fa-compress-alt me-1"></i>Every section below can be collapsed: click its header. Long sections start collapsed.</small>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-light" id="collapseAllSections"><i class="fas fa-compress-alt me-1"></i>Collapse all</button>
+                        <button type="button" class="btn btn-sm btn-outline-light" id="expandAllSections"><i class="fas fa-expand-alt me-1"></i>Expand all</button>
+                    </div>
+                </div>
+                <div class="section-nav" id="sectionNav"></div>
+            </div>
+        </div>
         
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -1242,5 +1264,79 @@
             }
         }
     });
+
+    // Collapsible report sections. Each top-level card with a header gets a
+    // Hide/Show toggle and a jump link; sections taller than LONG_SECTION_PX
+    // start collapsed unless the viewer chose otherwise (remembered per title).
+    (function initCollapsibleSections() {
+        const LONG_SECTION_PX = 700;
+        const STORE_KEY = 'analysisSectionState';
+        const nav = document.getElementById('sectionNav');
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {}; } catch (e) { saved = {}; }
+        const save = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(saved)); } catch (e) {} };
+
+        const cards = Array.from(document.querySelectorAll('.card')).filter(card => {
+            const header = card.querySelector(':scope > .card-header');
+            return header && header.querySelector('h5') && !card.parentElement.closest('.card');
+        });
+
+        function setCollapsed(card, collapsed) {
+            card.classList.toggle('section-collapsed', collapsed);
+            const btn = card.querySelector(':scope > .card-header .section-toggle');
+            if (btn) {
+                btn.setAttribute('aria-expanded', String(!collapsed));
+                btn.querySelector('.section-toggle-label').textContent = collapsed ? 'Show' : 'Hide';
+            }
+        }
+
+        cards.forEach((card, i) => {
+            const header = card.querySelector(':scope > .card-header');
+            const title = header.querySelector('h5').textContent.trim();
+            if (!card.id) card.id = 'section-' + i;
+            card.classList.add('section-card');
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-light section-toggle ms-2';
+            btn.title = 'Collapse or expand this section';
+            btn.innerHTML = '<i class="fas fa-chevron-down me-1"></i><span class="section-toggle-label">Hide</span>';
+            if (header.classList.contains('d-flex')) {
+                header.appendChild(btn);
+            } else {
+                header.classList.add('d-flex', 'justify-content-between', 'align-items-center');
+                header.appendChild(btn);
+            }
+
+            header.addEventListener('click', e => {
+                // Leave the header's own links, buttons and inputs alone.
+                const ctl = e.target.closest('a, button, input, select, label');
+                if (ctl && ctl !== btn) return;
+                const collapsed = !card.classList.contains('section-collapsed');
+                setCollapsed(card, collapsed);
+                saved[title] = collapsed;
+                save();
+            });
+
+            const isLong = card.scrollHeight > LONG_SECTION_PX;
+            setCollapsed(card, title in saved ? saved[title] : isLong);
+
+            if (nav) {
+                const link = document.createElement('a');
+                link.href = '#' + card.id;
+                link.className = 'btn btn-sm btn-outline-info';
+                link.textContent = title;
+                link.addEventListener('click', () => setCollapsed(card, false));
+                nav.appendChild(link);
+            }
+        });
+
+        const setAll = collapsed => cards.forEach(card => {
+            setCollapsed(card, collapsed);
+            saved[card.querySelector(':scope > .card-header h5').textContent.trim()] = collapsed;
+        });
+        document.getElementById('collapseAllSections').addEventListener('click', () => { setAll(true); save(); });
+        document.getElementById('expandAllSections').addEventListener('click', () => { setAll(false); save(); });
+    })();
 </script>
 {% endblock %}
