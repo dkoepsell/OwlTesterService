@@ -14,16 +14,31 @@ services:
       timeout: 5s
       retries: 5
 
+  # Shared rate-limit counters for all gunicorn workers (Flask-Limiter).
+  # Ephemeral by design: no persistence, small memory cap.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-owltester}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-owl_tester}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       SESSION_SECRET: ${SESSION_SECRET}
+      RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
     volumes:
       - uploads:/app/uploads
     expose:

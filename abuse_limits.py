@@ -143,6 +143,10 @@ def init_abuse_controls(app):
     app.config.setdefault("RATELIMIT_STORAGE_URI",
                           os.environ.get("RATELIMIT_STORAGE_URI", "memory://"))
     app.config.setdefault("RATELIMIT_HEADERS_ENABLED", True)
+    # If the shared store (redis) is unreachable, fail open to per-process
+    # memory counters rather than erroring every limited request.
+    app.config.setdefault("RATELIMIT_SWALLOW_ERRORS", True)
+    app.config.setdefault("RATELIMIT_IN_MEMORY_FALLBACK_ENABLED", True)
     # Initialise the limiter enabled, then apply the env switch through the
     # per-request filter above, so tests can re-enable it at runtime.
     app.config["RATELIMIT_ENABLED"] = True
