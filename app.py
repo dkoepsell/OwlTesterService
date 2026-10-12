@@ -2922,6 +2922,36 @@ def sandbox_edit(ontology_id):
         flash(f"Error editing sandbox ontology: {str(e)}", 'error')
         return redirect(url_for('sandbox_list'))
 
+@app.route('/sandbox/<int:ontology_id>/delete', methods=['POST'])
+def sandbox_delete(ontology_id):
+    """Delete a sandbox ontology and everything in it.
+
+    Files previously exported to history are kept; they just lose the link
+    back to this sandbox.
+    """
+    ontology = owned_sandbox_or_404(ontology_id)
+    title = ontology.title
+    try:
+        OntologyFile.query.filter_by(sandbox_ontology_id=ontology_id).update(
+            {OntologyFile.sandbox_ontology_id: None}, synchronize_session=False)
+        OntologyIndividual.query.filter_by(ontology_id=ontology_id).delete(
+            synchronize_session=False)
+        OntologyProperty.query.filter_by(ontology_id=ontology_id).delete(
+            synchronize_session=False)
+        OntologyClass.query.filter_by(ontology_id=ontology_id).update(
+            {OntologyClass.parent_id: None}, synchronize_session=False)
+        OntologyClass.query.filter_by(ontology_id=ontology_id).delete(
+            synchronize_session=False)
+        db.session.expire_all()
+        db.session.delete(db.session.get(SandboxOntology, ontology_id))
+        db.session.commit()
+        flash(f'Deleted sandbox ontology "{title}"', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting sandbox ontology {ontology_id}: {str(e)}")
+        flash(f"Error deleting sandbox ontology: {str(e)}", 'error')
+    return redirect(url_for('sandbox_list'))
+
 @app.route('/sandbox/<int:ontology_id>/export_to_history', methods=['POST'])
 def export_to_history(ontology_id):
     """Export a sandbox ontology to history for analysis."""
@@ -3179,20 +3209,51 @@ def api_sandbox_class(ontology_id, class_id):
             if not current_user.is_authenticated or ontology.user_id != current_user.id:
                 return jsonify({'error': 'You do not have permission to edit this ontology'}), 403
                 
-            # Delete the class
-            db.session.delete(cls)
-            
+            # Delete the class together with its subclasses (and their
+            # individuals); properties that used them as domain/range survive
+            # with that slot cleared.
+            deleted_ids = _delete_sandbox_class_subtree(ontology_id, cls.id)
+
             # Update the ontology's last_modified timestamp
             ontology.last_modified = datetime.datetime.utcnow()
             db.session.commit()
-            
-            return jsonify({'success': True})
-            
+
+            return jsonify({'success': True, 'deleted_class_ids': deleted_ids})
+
     except HTTPException:
         raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Error in API sandbox class: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+def _delete_sandbox_class_subtree(ontology_id, class_id):
+    """Delete a sandbox class, all its descendant subclasses and their individuals.
+
+    Properties whose domain or range was one of the deleted classes are kept,
+    with that domain/range cleared. Returns the deleted class ids. Does not commit.
+    """
+    ids, frontier = {class_id}, [class_id]
+    while frontier:
+        children = [c.id for c in OntologyClass.query.filter(
+            OntologyClass.ontology_id == ontology_id,
+            OntologyClass.parent_id.in_(frontier)).all() if c.id not in ids]
+        ids.update(children)
+        frontier = children
+    id_list = sorted(ids)
+    OntologyIndividual.query.filter(OntologyIndividual.class_id.in_(id_list)).delete(
+        synchronize_session=False)
+    OntologyProperty.query.filter(OntologyProperty.domain_class_id.in_(id_list)).update(
+        {OntologyProperty.domain_class_id: None}, synchronize_session=False)
+    OntologyProperty.query.filter(OntologyProperty.range_class_id.in_(id_list)).update(
+        {OntologyProperty.range_class_id: None}, synchronize_session=False)
+    # Break parent links inside the subtree first so row order cannot violate the FK.
+    OntologyClass.query.filter(OntologyClass.id.in_(id_list)).update(
+        {OntologyClass.parent_id: None}, synchronize_session=False)
+    OntologyClass.query.filter(OntologyClass.id.in_(id_list)).delete(synchronize_session=False)
+    db.session.expire_all()
+    return id_list
 
 # Sandbox BFO category names -> BFO 2020 numeric IDs, so exports point at real BFO IRIs
 SANDBOX_BFO_IDS = {
@@ -3562,7 +3623,11 @@ def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, 
             if not current_user.is_authenticated or ontology.user_id != current_user.id:
                 return jsonify({'error': 'You do not have permission to edit this ontology'}), 403
                 
-            # Delete the property
+            # Delete the property, and drop its values from any individuals
+            for ind in OntologyIndividual.query.filter_by(ontology_id=ontology_id).all():
+                values = ind.property_values or {}
+                if str(prop.id) in values:
+                    ind.property_values = {k: v for k, v in values.items() if k != str(prop.id)}
             db.session.delete(prop)
             
             # Update the ontology's last_modified timestamp

@@ -85,6 +85,12 @@
                                 <a href="{{ url_for('sandbox_edit', ontology_id=ontology.id) }}" class="btn btn-outline-secondary">
                                     <i class="fas fa-edit me-2"></i>Edit
                                 </a>
+                                <form method="post" action="{{ url_for('sandbox_delete', ontology_id=ontology.id) }}" class="d-grid"
+                                      onsubmit="return confirm('Delete this sandbox ontology and all its classes, properties and individuals? Files already exported to History are kept. This cannot be undone.');">
+                                    <button type="submit" class="btn btn-outline-danger">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </button>
+                                </form>
                             </div>
                         </div>
                     </div>
