@@ -18,6 +18,8 @@ plantuml>=0.3.0
 six>=1.17.0
 flask-login>=0.6.3
 flask-wtf>=1.2.2
+# Rate limiting; storage via RATELIMIT_STORAGE_URI (default memory://).
+Flask-Limiter>=3.8,<4
 rdflib>=7.1.4
 pyshacl>=0.26
 werkzeug>=3.1.3

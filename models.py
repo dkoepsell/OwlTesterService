@@ -175,7 +175,13 @@ class SandboxOntology(db.Model):
         
 class OntologyClass(db.Model):
     """Model for storing class definitions in sandbox ontologies."""
-    
+    # Explicit index names match migrate_db_sandbox_indexes.py (and prod), so
+    # create_all on a fresh DB builds the same indexes the migration does.
+    __table_args__ = (
+        db.Index('ix_ontology_class_ontology_id', 'ontology_id'),
+        db.Index('ix_ontology_class_parent_id', 'parent_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=False)
     name = db.Column(db.String(255), nullable=False)
@@ -199,7 +205,11 @@ class OntologyClass(db.Model):
         
 class OntologyProperty(db.Model):
     """Model for storing property/relationship definitions in sandbox ontologies."""
-    
+    __table_args__ = (
+        db.Index('ix_ontology_property_domain', 'domain_class_id'),
+        db.Index('ix_ontology_property_range', 'range_class_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=False)
     name = db.Column(db.String(255), nullable=False)
@@ -227,7 +237,10 @@ class OntologyProperty(db.Model):
 
 class OntologyIndividual(db.Model):
     """Model for storing individual instances in sandbox ontologies."""
-    
+    __table_args__ = (
+        db.Index('ix_ontology_individual_class_id', 'class_id'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     ontology_id = db.Column(db.Integer, db.ForeignKey('sandbox_ontology.id'), nullable=False)
     name = db.Column(db.String(255), nullable=False)

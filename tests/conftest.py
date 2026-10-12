@@ -14,6 +14,9 @@ import pytest
 # files silently miss.
 os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(
     tempfile.mkdtemp(prefix="owltester-tests-"), "suite.db")
+# Rate limiting off for the suite; tests/test_abuse_limits.py re-enables it
+# per test through app.config["RATELIMIT_ENABLED"].
+os.environ["RATELIMIT_ENABLED"] = "0"
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 

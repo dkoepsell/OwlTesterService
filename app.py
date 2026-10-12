@@ -73,6 +73,20 @@ login_manager.login_message_category = 'info'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Abuse controls: ProxyFix (real client IP behind the host nginx), rate limits
+# and hard sandbox caps. See abuse_limits.py.
+from abuse_limits import (limiter, init_abuse_controls, limit_endpoint, SandboxCapError,
+                          check_sandbox_count_cap, check_sandbox_size_cap,
+                          SANDBOX_CREATE_LIMIT, SANDBOX_WRITE_LIMIT, UPLOAD_LIMIT,
+                          ANALYSIS_LIMIT, AI_LIMIT, FOL_TEST_LIMIT, LOGIN_LIMIT, REGISTER_LIMIT)
+init_abuse_controls(app)
+
+_post_only = dict(methods=['POST'])
+_sandbox_create_limit = limiter.shared_limit(SANDBOX_CREATE_LIMIT, scope='sandbox-create', **_post_only)
+_sandbox_write_limit = limiter.shared_limit(SANDBOX_WRITE_LIMIT, scope='sandbox-write', **_post_only)
+_ai_limit = limiter.shared_limit(AI_LIMIT, scope='ai')
+_analysis_limit = limiter.shared_limit(ANALYSIS_LIMIT, scope='analysis', **_post_only)
+
 # Configure file uploads
 app.config['UPLOADED_OWLS_DEST'] = os.path.join(app.root_path, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 64MB max upload size
@@ -120,6 +134,10 @@ try:
     logging.getLogger(__name__).info("SHACL workbench mounted at /shacl")
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("SHACL workbench not mounted: %s", _e)
+
+# The gate accepts uploaded artifacts and runs the reasoner on them.
+limit_endpoint(app, 'owltester.http_check', UPLOAD_LIMIT)
+limit_endpoint(app, 'owltester.http_repair', UPLOAD_LIMIT)
 
 # Helper function to check if a file has an allowed extension
 def allowed_file(filename):
@@ -210,6 +228,7 @@ def about():
 
 # API Endpoints
 @app.route('/api/test-expression', methods=['POST'])
+@limiter.limit(FOL_TEST_LIMIT)
 def test_expression():
     """API endpoint to test a FOL expression."""
     try:
@@ -540,6 +559,7 @@ def _upload_bundle(files):
 
 
 @app.route('/api/bundle/<filename>/layers', methods=['GET', 'POST'])
+@_analysis_limit
 def bundle_layers(filename):
     """Layer-by-layer check of a multi-file upload.
 
@@ -564,6 +584,7 @@ def bundle_layers(filename):
 
 
 @app.route('/upload', methods=['GET', 'POST'])
+@limiter.limit(UPLOAD_LIMIT, methods=['POST'])
 def upload_owl():
     """Handle OWL file upload and redirection to analysis page."""
     if request.method == 'GET':
@@ -793,6 +814,7 @@ def _autofix_trivialization_block(original_path, corrected_bytes, removed_count=
 
 
 @app.route('/analysis/<int:analysis_id>/fix-and-reanalyze', methods=['POST'])
+@_analysis_limit
 def fix_and_reanalyze(analysis_id):
     """Drop one clashing subClassOf edge, save the corrected ontology as a new
     file, and run full coherence analysis on it."""
@@ -867,6 +889,7 @@ def auto_fix_straddles_download(analysis_id):
 
 
 @app.route('/analysis/<int:analysis_id>/auto-fix-and-reanalyze', methods=['POST'])
+@_analysis_limit
 def auto_fix_and_reanalyze(analysis_id):
     """Resolve every partition straddle at once, save the corrected ontology as a
     new file, and run full coherence analysis on it."""
@@ -916,6 +939,7 @@ def auto_fix_and_reanalyze(analysis_id):
 
 
 @app.route('/analyze/<filename>/reanalyze', methods=['POST'])
+@_analysis_limit
 def reanalyze_owl(filename):
     """Discard the stored analysis for a file and run a fresh one.
 
@@ -1268,6 +1292,7 @@ def api_analyze_owl(filename):
         return redirect(url_for('index'))
 
 @app.route('/api/analysis/<analysis_id>/implications', methods=['GET', 'POST'])
+@limiter.shared_limit(AI_LIMIT, scope='ai', methods=['POST'])
 def generate_implications(analysis_id):
     """
     Generate or retrieve real-world implications for an ontology analysis.
@@ -1500,6 +1525,7 @@ def start_prover_check(analysis, bfo_background=False):
 
 
 @app.route('/api/analysis/<analysis_id>/prover-check', methods=['GET', 'POST'])
+@_analysis_limit
 def prover_check(analysis_id):
     """Prover9/Mace4 cross-check against the OWL reasoner.
 
@@ -1534,6 +1560,7 @@ def prover_check(analysis_id):
 
 
 @app.route('/api/analysis/<analysis_id>/probe', methods=['POST'])
+@_analysis_limit
 def analysis_probe(analysis_id):
     """Satisfiability probe: can the named class have any instance at all?
 
@@ -1712,7 +1739,19 @@ def view_history():
         flash(f"Error viewing history: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+def _check_imported_sandbox_size(ontology):
+    """Flush pending rows and enforce the per-sandbox class/property caps."""
+    db.session.flush()
+    classes = OntologyClass.query.filter_by(ontology_id=ontology.id).count()
+    props = OntologyProperty.query.filter_by(ontology_id=ontology.id).count()
+    if classes > app.config['MAX_CLASSES_PER_SANDBOX'] or props > app.config['MAX_PROPERTIES_PER_SANDBOX']:
+        raise SandboxCapError(
+            f"This ontology is too large for the sandbox ({classes} classes, {props} properties; "
+            f"limits {app.config['MAX_CLASSES_PER_SANDBOX']} and {app.config['MAX_PROPERTIES_PER_SANDBOX']}).")
+
+
 @app.route('/import_to_sandbox/<int:file_id>', methods=['POST'])
+@_sandbox_create_limit
 def import_to_sandbox(file_id):
     """Import an ontology file from history to the sandbox."""
     success = False
@@ -1721,24 +1760,15 @@ def import_to_sandbox(file_id):
     try:
         # Get the file or return 404
         file = owned_file_or_404(file_id=file_id)
-        
+
+        # Hard caps: sandboxes per visitor, and classes per sandbox (cheap
+        # pre-check from the stored analysis; re-checked before each commit).
+        check_sandbox_count_cap()
+        if file.analyses and isinstance(file.analyses[0].class_list, list):
+            check_sandbox_size_cap(None, add_classes=len(file.analyses[0].class_list))
+
         # Add debug logging
         logger.debug(f"Importing file ID {file_id} - Original filename: {file.original_filename}")
-        
-        # Create a base ontology first, before doing anything that might fail
-        ontology = SandboxOntology()
-        ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
-        ontology.domain = "Imported Ontology"
-        ontology.subject = "Imported from History"
-        ontology.description = f"Imported from file '{file.original_filename}'."
-        ontology.user_id = current_user.id if not current_user.is_anonymous else None
-        
-        # Save and COMMIT to get a permanent ID before creating related records
-        db.session.add(ontology)
-        db.session.commit()
-        
-        # Log the newly created ontology ID for debugging
-        logger.debug(f"Created new sandbox ontology with ID: {ontology.id}")
         
         # Get the file path
         file_path = file.file_path
@@ -1746,6 +1776,21 @@ def import_to_sandbox(file_id):
         # Handle missing files by creating a basic ontology structure from database records
         # This allows us to work with ontologies even if the original file is missing
         if not os.path.exists(file_path):
+            # Create the base ontology here: the other branches build their own,
+            # so creating it unconditionally left an empty orphan per import.
+            ontology = SandboxOntology()
+            ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
+            ontology.domain = "Imported Ontology"
+            ontology.subject = "Imported from History"
+            ontology.description = f"Imported from file '{file.original_filename}'."
+            ontology.user_id = current_user.id if not current_user.is_anonymous else None
+
+            # Flush to get an ID before creating related records (committed
+            # with them at the end, so a failed import leaves nothing behind)
+            db.session.add(ontology)
+            db.session.flush()
+            logger.debug(f"Created new sandbox ontology with ID: {ontology.id}")
+
             logger.warning(f"File not found at {file_path}. Using database records instead.")
             
             # Update the existing ontology description to note the missing file
@@ -2001,6 +2046,7 @@ def import_to_sandbox(file_id):
                     logger.error(f"Error processing object_property_list: {str(e)}")
             
             # Final commit for any remaining changes
+            _check_imported_sandbox_size(ontology)
             db.session.commit()
             
             # Success message
@@ -2101,6 +2147,7 @@ def import_to_sandbox(file_id):
                     db.session.add(prop)
             
             # Final commit for all changes
+            _check_imported_sandbox_size(ontology)
             db.session.commit()
             
             logger.debug(f"Successfully imported ontology to sandbox with ID: {ontology.id}")
@@ -2168,12 +2215,16 @@ def import_to_sandbox(file_id):
                 db.session.add(ontology_prop)
             
             # Final commit for all changes
+            _check_imported_sandbox_size(ontology)
             db.session.commit()
             
             logger.debug(f"Successfully imported ontology to sandbox with ID: {ontology.id}")
             flash(f"Ontology '{file.original_filename}' successfully imported to Sandbox.", 'success')
             return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
+        except SandboxCapError:
+            raise
         except Exception as e:
+            db.session.rollback()  # drop any half-built sandbox before the fallback
             logger.warning(f"Could not parse ontology with Owlready2: {str(e)}")
             
             # Create a basic sandbox ontology
@@ -2192,6 +2243,10 @@ def import_to_sandbox(file_id):
             
     except HTTPException:
         raise  # e.g. 404 for a file the visitor does not own
+    except SandboxCapError as e:
+        db.session.rollback()
+        flash(str(e), 'warning')
+        return redirect(url_for('sandbox_list'))
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error importing file to sandbox: {str(e)}")
@@ -2713,6 +2768,7 @@ def server_error(e):
 
 # User Authentication
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit(LOGIN_LIMIT, methods=['POST'])
 def login():
     """User login page"""
     if current_user.is_authenticated:
@@ -2747,6 +2803,7 @@ def login():
     return render_template('login.html', form=form)
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit(REGISTER_LIMIT, methods=['POST'])
 def register():
     """User registration page"""
     if current_user.is_authenticated:
@@ -2843,12 +2900,19 @@ def sandbox_guide():
     return render_template('sandbox_guide.html')
 
 @app.route('/sandbox/new', methods=['GET', 'POST'])
+@_sandbox_create_limit
 def sandbox_new():
     """Create a new sandbox ontology."""
     try:
         form = DomainForm()
         
         if form.validate_on_submit():
+            try:
+                check_sandbox_count_cap()
+            except SandboxCapError as cap_error:
+                flash(str(cap_error), 'warning')
+                return redirect(url_for('sandbox_list'))
+
             # Create a new ontology
             ontology = SandboxOntology(
                 title=form.title.data,
@@ -2953,6 +3017,7 @@ def sandbox_delete(ontology_id):
     return redirect(url_for('sandbox_list'))
 
 @app.route('/sandbox/<int:ontology_id>/export_to_history', methods=['POST'])
+@limiter.limit(UPLOAD_LIMIT)
 def export_to_history(ontology_id):
     """Export a sandbox ontology to history for analysis."""
     try:
@@ -3083,6 +3148,7 @@ def sandbox_download_clif(ontology_id):
         return redirect(url_for('sandbox_view', ontology_id=ontology_id))
 
 @app.route('/api/sandbox/<int:ontology_id>/classes', methods=['GET', 'POST'])
+@_sandbox_write_limit
 def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology classes."""
     try:
@@ -3115,7 +3181,12 @@ def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int
             
             if not data or 'name' not in data:
                 return jsonify({'error': 'Name is required'}), 400
-                
+
+            try:
+                check_sandbox_size_cap(ontology_id, add_classes=1)
+            except SandboxCapError as cap_error:
+                return jsonify({'error': str(cap_error)}), 409
+
             name = data.get('name')
             description = data.get('description', '')
             bfo_category = data.get('bfo_category')
@@ -3430,6 +3501,7 @@ def generate_owl_xml(ontology, classes, properties, individuals):
     return xml
 
 @app.route('/api/sandbox/ai/suggestions', methods=['GET', 'POST'])
+@_ai_limit
 def api_sandbox_ai_suggestions():
     """API endpoint to get AI-generated class and property suggestions for an ontology domain."""
     logger.info(f"AI suggestions endpoint called with method: {request.method}")
@@ -3469,6 +3541,7 @@ def api_sandbox_ai_suggestions():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sandbox/ai/bfo-category', methods=['POST'])
+@_ai_limit
 def api_sandbox_ai_bfo_category():
     """API endpoint to suggest a BFO category for a class."""
     try:
@@ -3490,6 +3563,7 @@ def api_sandbox_ai_bfo_category():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sandbox/<int:ontology_id>/properties', methods=['GET', 'POST'])
+@_sandbox_write_limit
 def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology properties."""
     try:
@@ -3523,7 +3597,12 @@ def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, 
             
             if not data or 'name' not in data or 'property_type' not in data:
                 return jsonify({'error': 'Name and property_type are required'}), 400
-                
+
+            try:
+                check_sandbox_size_cap(ontology_id, add_properties=1)
+            except SandboxCapError as cap_error:
+                return jsonify({'error': str(cap_error)}), 409
+
             name = data.get('name')
             description = data.get('description', '')
             property_type = data.get('property_type')
@@ -3643,6 +3722,7 @@ def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, 
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sandbox/ai/description', methods=['POST'])
+@_ai_limit
 def api_sandbox_ai_description():
     """API endpoint to generate a description for a class."""
     try:
