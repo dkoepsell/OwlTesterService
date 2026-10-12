@@ -28,6 +28,10 @@ def _artifact_path(filename):
     """Resolve an upload filename, refusing anything that escapes the folder."""
     if not filename or os.path.basename(filename) != filename:
         return None
+    # Only the visitor's own uploads: another user's file reads as absent (404).
+    from ownership import owns_filename
+    if not owns_filename(filename):
+        return None
     path = os.path.join(current_app.config.get("UPLOADED_OWLS_DEST", "uploads"), filename)
     return path if os.path.isfile(path) else None
 
@@ -170,6 +174,8 @@ def shacl_shapes(filename):
 
 @shacl_bp.route("/api/shacl/<path:filename>/shapes/<int:set_id>", methods=["GET", "DELETE"])
 def shacl_shape_set(filename, set_id):
+    if _artifact_path(filename) is None:
+        abort(404)
     ShaclShapeSet, db = _shape_sets()
     row = ShaclShapeSet.query.filter_by(filename=filename, id=set_id).first()
     if row is None:

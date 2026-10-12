@@ -39,6 +39,10 @@ def _artifact_path(filename):
     """Resolve an upload filename, refusing anything that escapes the folder."""
     if not filename or os.path.basename(filename) != filename:
         return None
+    # Only the visitor's own uploads: another user's file reads as absent (404).
+    from ownership import owns_filename
+    if not owns_filename(filename):
+        return None
     path = os.path.join(_upload_dir(), filename)
     return path if os.path.isfile(path) else None
 

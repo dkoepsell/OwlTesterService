@@ -12,7 +12,7 @@ import pytest
 
 from fol_export import build_theory
 from prover9_runner import _parse_interpretation, _witness_from_model, probe_class
-from tests.conftest import fixture_path
+from tests.conftest import fixture_path, grant_anon_files
 
 requires_provers = pytest.mark.skipif(
     shutil.which("prover9") is None or shutil.which("mace4") is None,
@@ -107,7 +107,7 @@ def client():
         app_module.db.session.remove()
 
 
-def _make_analysis(owl_name):
+def _make_analysis(owl_name, client):
     from models import db, OntologyFile, OntologyAnalysis
 
     src = fixture_path(owl_name)
@@ -116,6 +116,7 @@ def _make_analysis(owl_name):
         file_size=os.path.getsize(src), mime_type="application/rdf+xml")
     db.session.add(file_record)
     db.session.commit()
+    grant_anon_files(client, file_record.id)
     analysis = OntologyAnalysis(ontology_file_id=file_record.id)
     db.session.add(analysis)
     db.session.commit()
@@ -124,7 +125,7 @@ def _make_analysis(owl_name):
 
 @requires_provers
 def test_probe_route_resolves_by_label(client):
-    aid = _make_analysis("quality_disposition_straddle.owl")
+    aid = _make_analysis("quality_disposition_straddle.owl", client)
     resp = client.post(f"/api/analysis/{aid}/probe", json={"class": "Force"})
     assert resp.status_code == 200
     r = resp.get_json()
@@ -133,7 +134,7 @@ def test_probe_route_resolves_by_label(client):
 
 
 def test_probe_route_rejects_missing_class(client):
-    aid = _make_analysis("quality_disposition_straddle.owl")
+    aid = _make_analysis("quality_disposition_straddle.owl", client)
     assert client.post(f"/api/analysis/{aid}/probe", json={}).status_code == 400
     resp = client.post(f"/api/analysis/{aid}/probe", json={"class": "NoSuch"})
     assert resp.status_code == 404

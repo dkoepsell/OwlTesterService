@@ -10,6 +10,8 @@ import tempfile
 
 import pytest
 
+from tests.conftest import own_upload
+
 import shacl_tools
 
 ONTOLOGY = """
@@ -152,7 +154,9 @@ def client(onto_path):
     target = os.path.join(upload_dir, ARTIFACT)
     shutil.copy(onto_path, target)
     app.config["TESTING"] = True
-    yield app.test_client()
+    test_client = app.test_client()
+    own_upload(app, test_client, ARTIFACT, target)
+    yield test_client
     if os.path.exists(target):
         os.remove(target)
 

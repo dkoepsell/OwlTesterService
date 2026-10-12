@@ -31,6 +31,25 @@ def _kernel():
     return _CONFIG["kernel_path"] or default_kernel_path()
 
 
+def _owned_upload_path(raw):
+    """Resolve a JSON ``path`` to one of the visitor's own uploads.
+
+    Over HTTP a bare server path would read any file on the box, including
+    another user's ontology, so only an upload the visitor owns is accepted
+    (by stored filename or a path inside the upload folder).
+    """
+    from flask import current_app
+    from ownership import owns_filename
+
+    upload_dir = os.path.realpath(current_app.config.get("UPLOADED_OWLS_DEST", "uploads"))
+    path = os.path.realpath(os.path.join(upload_dir, str(raw)))
+    name = os.path.basename(path)
+    if (os.path.dirname(path) != upload_dir or not os.path.isfile(path)
+            or not owns_filename(name)):
+        raise ValueError("path must name one of your uploaded ontologies")
+    return path
+
+
 def _materialize(req):
     """Get a temp file path for the artifact from a multipart upload or a JSON
     body ({content, filename} or {path}). Returns (path, cleanup_bool)."""
@@ -43,7 +62,7 @@ def _materialize(req):
         return path, True
     data = req.get_json(silent=True) or {}
     if data.get("path"):
-        return data["path"], False
+        return _owned_upload_path(data["path"]), False
     if data.get("content"):
         suffix = os.path.splitext(data.get("filename", "artifact.owl"))[1] or ".owl"
         fd, path = tempfile.mkstemp(suffix=suffix)

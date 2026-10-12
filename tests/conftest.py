@@ -49,3 +49,29 @@ def _java_available():
 requires_java = pytest.mark.skipif(
     not _java_available(), reason="Pellet requires a Java runtime"
 )
+
+
+def grant_anon_files(client, *file_ids):
+    """Make ``file_ids`` the anonymous test client's own uploads.
+
+    Ontology files are private to their owner (see ``ownership.py``); an
+    anonymous visitor owns the files whose ids are in their session.
+    """
+    with client.session_transaction() as sess:
+        ids = list(sess.get("anon_file_ids", []))
+        sess["anon_file_ids"] = ids + [i for i in file_ids if i not in ids]
+
+
+def own_upload(flask_app, client, filename, path):
+    """Register ``filename`` (already in the upload folder) as the client's file."""
+    from models import db, OntologyFile
+
+    with flask_app.app_context():
+        record = OntologyFile(filename=filename, original_filename=filename,
+                              file_path=path, file_size=os.path.getsize(path),
+                              mime_type="application/rdf+xml")
+        db.session.add(record)
+        db.session.commit()
+        file_id = record.id
+    grant_anon_files(client, file_id)
+    return file_id

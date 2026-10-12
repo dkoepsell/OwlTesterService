@@ -10,6 +10,8 @@ import shutil
 
 import pytest
 
+from tests.conftest import own_upload
+
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         "fixtures", "recognition")
 
@@ -27,7 +29,9 @@ def client():
     shutil.copy(os.path.join(FIXTURES, "structural.ttl"), target)
 
     app.config["TESTING"] = True
-    yield app.test_client()
+    test_client = app.test_client()
+    own_upload(app, test_client, ARTIFACT, target)
+    yield test_client
 
     if os.path.exists(target):
         os.remove(target)
