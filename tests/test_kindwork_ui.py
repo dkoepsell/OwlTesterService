@@ -194,8 +194,11 @@ def test_b7_no_key_offers_answer_yourself(page, server, monkeypatch):
     open_page(page, base)
     paste_and_propose(page, claims())
     page.wait_for_function(
-        "() => document.body.innerText.includes('answer the questions yourself')")
-    assert page.is_visible('[data-act="addterms"]')  # "I'll answer myself"
+        "() => { const bar = document.getElementById('kw-keybar');"
+        " const text = document.body.innerText.replace(bar ? bar.innerText : '', '');"
+        " return text.includes('answer the questions yourself'); }")
+    page.wait_for_selector('[data-act="addterms"]')  # "I'll answer myself"
+    assert "add your own OpenAI or Anthropic" in page.inner_text("#kw-keybar")
 
 
 def test_b8_rate_limit_message(page, server):
@@ -213,3 +216,32 @@ def test_b8_rate_limit_message(page, server):
     finally:
         limiter.reset()
         app_module.app.config["RATELIMIT_ENABLED"] = False
+
+
+# --- the visitor's own key ---------------------------------------------------------------
+
+def test_key_bar_adds_and_removes_the_visitors_key(page, server):
+    _, base = server
+    open_page(page, base)
+    page.wait_for_selector("#kw-keybar")
+    assert "add your own OpenAI or Anthropic" in page.inner_text("#kw-keybar")
+    page.click("#kw-keybar button:has-text('Add your key')")
+    page.select_option("#kw-keybar select", "anthropic")
+    page.fill("#kw-keybar input[type=password]", "sk-ant-test-0000000000000000000000")
+    page.click("#kw-keybar button:has-text('Save')")
+    page.wait_for_selector("#kw-keybar :text('uses your own Anthropic (Claude) key')")
+    status = page.request.get(f"{base}/api/settings/openai-key").json()
+    assert status == {"has_key": True, "source": "session", "provider": "anthropic"}
+    page.click("#kw-keybar button:has-text('Remove key')")
+    page.wait_for_selector("#kw-keybar :text('Key removed.')")
+    assert page.request.get(f"{base}/api/settings/openai-key").json()["source"] != "session"
+
+
+def test_key_bar_rejects_a_bad_key(page, server):
+    _, base = server
+    open_page(page, base)
+    page.click("#kw-keybar button:has-text('Add your key')")
+    page.select_option("#kw-keybar select", "anthropic")
+    page.fill("#kw-keybar input[type=password]", "not-a-key")
+    page.click("#kw-keybar button:has-text('Save')")
+    page.wait_for_selector("#kw-keybar :text('does not look like an Anthropic API key')")

@@ -9,6 +9,10 @@ KINDWORK_MODE picks the phase: `triage` (P1, the default) is anonymous and
 rate-limited; `full` (P2) requires OwlTester's sign-in, or a bearer token equal
 to KINDWORK_TOKEN when one is set. Every reply carries X-Kindwork-Core. Nothing a
 person sends is stored after the reply, except the counts in kindwork.metrics.
+
+/propose runs on the visitor's own AI key, the same one "generate implications"
+uses (api_key_utils, held in the session only). API and MCP clients without a
+session send it as `X-AI-Key` (and `X-AI-Provider`). Server keys are never used.
 """
 
 from __future__ import annotations
@@ -147,12 +151,42 @@ def host_config():
     return cfg
 
 
-# Measurement hook for section 9. It sits inside the one injected script, so the
-# vendored page stays untouched; it reports an event name and nothing else.
+# Everything below runs inside the one injected script, so the vendored page
+# stays untouched. The beacon reports an event name for section 9 and nothing
+# else. The key bar lets a visitor add their own OpenAI or Anthropic key, the
+# same session-only key "generate implications" uses, so Propose can run.
 _BEACON = """(function(){var m={savecsv:'save-csv',saveowl:'save-ttl',savekit:'save-other',saveseed:'save-other',savetester:'save-other',savetracker:'save-other'};
 document.addEventListener('click',function(e){var t=e.target&&e.target.closest&&e.target.closest('[data-act],.cta a');if(!t)return;
 var ev=t.matches('.cta a')?'triage':m[t.getAttribute('data-act')];if(!ev||!navigator.sendBeacon)return;
 try{navigator.sendBeacon(window.KINDWORK_HOST.api+'/event',new Blob([JSON.stringify({event:ev})],{type:'application/json'}));}catch(x){}},true);})();"""
+
+_KEY_BAR = """(function(){var URL_='/api/settings/openai-key';
+function el(tag,attrs,text){var e=document.createElement(tag);for(var k in attrs)e.setAttribute(k,attrs[k]);if(text)e.textContent=text;return e;}
+function bar(){var b=document.getElementById('kw-keybar');if(b)return b;
+b=el('div',{id:'kw-keybar',role:'region','aria-label':'Your AI key'});
+b.style.cssText='font:14px/1.4 system-ui,sans-serif;padding:8px 16px;border-bottom:1px solid GrayText;background:Canvas;color:CanvasText;display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+document.body.insertBefore(b,document.body.firstChild);return b;}
+function btn(label){var x=el('button',{type:'button'},label);x.style.cssText='font:inherit;padding:3px 10px;cursor:pointer';return x;}
+function show(st,msg){var b=bar();b.textContent='';
+var p=st.provider==='anthropic'?'Anthropic (Claude)':'OpenAI';
+if(st.source==='session'){b.appendChild(el('span',{},'Propose answers uses your own '+p+' key. It stays in your session and is never saved.'));
+var c=btn('Change key');c.onclick=function(){form(st);};b.appendChild(c);
+var r=btn('Remove key');r.onclick=function(){fetch(URL_,{method:'DELETE',credentials:'same-origin'}).then(function(x){return x.json();}).then(function(j){show({source:'none'},'Key removed.');});};b.appendChild(r);}
+else{b.appendChild(el('span',{},'To have AI propose answers, add your own OpenAI or Anthropic (Claude) key. It stays in your session and is never saved. Without one, you can still answer every question by hand.'));
+var a=btn('Add your key');a.onclick=function(){form(st);};b.appendChild(a);}
+if(msg)b.appendChild(el('span',{role:'status'},msg));}
+function form(st){var b=bar();b.textContent='';
+var sel=el('select',{'aria-label':'AI provider'});[['anthropic','Anthropic (Claude)'],['openai','OpenAI']].forEach(function(o){var op=el('option',{value:o[0]},o[1]);if((st.provider||'anthropic')===o[0])op.selected=true;sel.appendChild(op);});
+var inp=el('input',{type:'password',autocomplete:'off','aria-label':'API key',placeholder:'sk-ant-...'});inp.style.cssText='font:inherit;min-width:16em;padding:3px 6px';
+sel.onchange=function(){inp.placeholder=sel.value==='anthropic'?'sk-ant-...':'sk-...';};
+var save=btn('Save'),cancel=btn('Cancel'),out=el('span',{role:'status'});
+save.onclick=function(){out.textContent='Saving...';fetch(URL_,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:inp.value.trim(),provider:sel.value})})
+.then(function(x){return x.json();}).then(function(j){if(j.success)show({source:'session',provider:j.provider},'Key saved.');else out.textContent=j.message||'That key was not accepted.';})
+.catch(function(){out.textContent='The key could not be saved. Try again.';});};
+cancel.onclick=function(){load();};
+[el('span',{},'Your key:'),sel,inp,save,cancel,out].forEach(function(x){b.appendChild(x);});inp.focus();}
+function load(){fetch(URL_,{credentials:'same-origin'}).then(function(x){return x.json();}).then(function(j){show({source:j.source,provider:j.provider});}).catch(function(){});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();})();"""
 
 
 def render_page():
@@ -160,7 +194,7 @@ def render_page():
     if html.count(VIEWPORT_META) != 1:
         raise SidecarError("The vendored Kindwork page has no viewport-fit meta line.")
     cfg = json.dumps(host_config(), ensure_ascii=False).replace("</", "<\\/")
-    script = f"<script>window.KINDWORK_HOST = {cfg};\n{_BEACON}</script>"
+    script = f"<script>window.KINDWORK_HOST = {cfg};\n{_BEACON}\n{_KEY_BAR}</script>"
     return html.replace(VIEWPORT_META, VIEWPORT_META + "\n" + script, 1)
 
 
@@ -198,9 +232,26 @@ def ingest():
                    context=reply.get("context", ""))
 
 
+def visitor_ai():
+    """(provider, key) from the visitor's own key, or None. Never a server key."""
+    from api_key_utils import ai_key_source, resolve_ai
+    if ai_key_source() == "session":
+        provider, key = resolve_ai()
+        if provider and key:
+            return provider, key
+    key = request.headers.get("X-AI-Key", "").strip()
+    if key:
+        asked = request.headers.get("X-AI-Provider", "").strip().lower()
+        if key.startswith("sk-ant-"):
+            return "anthropic", key
+        return (asked if asked in ("openai", "anthropic") else "openai"), key
+    return None
+
+
 def _propose(b):
     _enforce(PROPOSE_LIMITS, "propose")
-    return module.propose(b.get("kind"), b.get("terms"), b.get("context"), b.get("task"))
+    return module.propose(b.get("kind"), b.get("terms"), b.get("context"), b.get("task"),
+                          ai=visitor_ai())
 
 
 @module_bp.post("/kindwork/v1/propose")

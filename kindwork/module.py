@@ -10,6 +10,11 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
+import os
+import re
+import subprocess
+from pathlib import Path
 
 from kindwork import sidecar
 from kindwork.sidecar import PROPOSE_TIMEOUT
@@ -68,20 +73,106 @@ def ingest(name, b64):
     return sidecar.call("ingest", name=name[:200], base64=b64)
 
 
-def propose(kind, terms=None, context=None, task=None):
-    """Proposals only. The sidecar builds the prompt from the page's own builders."""
+PROMPT_BIN = Path(__file__).resolve().parent / "prompt.mjs"
+NO_KEY = ("Add your own OpenAI or Anthropic (Claude) key to have AI propose answers, "
+          "or answer the questions yourself.")
+
+
+def _payload(kind, terms, context, task):
     if kind == "task":
-        payload = {"kind": "task", "task": task if isinstance(task, str) else ""}
-    elif kind == "terms":
+        return {"kind": "task", "task": task if isinstance(task, str) else ""}
+    if kind == "terms":
         clean = [{"name": str(t.get("name"))[:80], "desc": str(t.get("desc") or "")[:300],
                   "hints": str(t.get("hints") or "")[:200]}
                  for t in (terms if isinstance(terms, list) else [])
                  if isinstance(t, dict) and t.get("name")]
-        payload = {"kind": "terms", "terms": clean,
-                   "context": context if isinstance(context, str) else ""}
-    else:
-        raise sidecar.SidecarInputError('kind must be "task" or "terms".')
-    reply = sidecar.call("propose", timeout=PROPOSE_TIMEOUT, **payload)
+        return {"kind": "terms", "terms": clean,
+                "context": context if isinstance(context, str) else ""}
+    raise sidecar.SidecarInputError('kind must be "task" or "terms".')
+
+
+def _page_prompt(payload):
+    """The prompt the page itself would send, from kindwork_core's builders."""
+    node = sidecar.node_bin()
+    if not node:
+        raise sidecar.SidecarError("Node.js is not installed on this server.")
+    try:
+        proc = subprocess.run([node, str(PROMPT_BIN)], input=json.dumps(payload),
+                              capture_output=True, text=True, timeout=sidecar.CALL_TIMEOUT,
+                              check=False)
+        reply = json.loads(proc.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
+        raise sidecar.SidecarError(f"prompt builder failed: {e}") from e
+    if proc.returncode == 2:
+        raise sidecar.SidecarInputError(reply.get("error") or "The input was refused.")
+    if proc.returncode != 0:
+        raise sidecar.SidecarError(reply.get("error") or "prompt builder failed")
+    return reply["prompt"]
+
+
+def _parse_reply(text):
+    """Same tolerance as kindwork_core llm.js: bare JSON, a fenced block, or the outer braces."""
+    t = (text or "").strip()
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", t)
+    for cand in (t, fence.group(1) if fence else None, t[t.find("{"):t.rfind("}") + 1]):
+        if not cand:
+            continue
+        try:
+            return json.loads(cand)
+        except ValueError:
+            continue
+    raise sidecar.SidecarUpstreamError(
+        "The model answered in the wrong shape. Try again, or send fewer terms.", "invalid_json")
+
+
+def _openai_propose(payload, key):
+    from openai import OpenAI, APIStatusError, APITimeoutError, AuthenticationError, RateLimitError
+    from openai_utils import OPENAI_MODEL
+    prompt = _page_prompt(payload)
+    try:
+        resp = OpenAI(api_key=key, timeout=120).chat.completions.create(
+            model=OPENAI_MODEL, max_tokens=8000, response_format={"type": "json_object"},
+            messages=[{"role": "user", "content": prompt + "\n\nReply with the JSON only."}])
+    except AuthenticationError as e:
+        raise sidecar.SidecarUpstreamError(
+            "Your OpenAI key was not accepted. Check it, or answer the questions yourself.",
+            "invalid_key", 502) from e
+    except RateLimitError as e:
+        raise sidecar.SidecarUpstreamError(
+            "Too many requests just now. Try again in a minute.", "rate_limited", 429) from e
+    except APITimeoutError as e:
+        raise sidecar.SidecarUpstreamError(
+            "The model took too long. Try again with fewer terms.") from e
+    except APIStatusError as e:
+        raise sidecar.SidecarUpstreamError("The model could not be reached. Try again.") from e
+    result = _parse_reply(resp.choices[0].message.content)
+    if not isinstance(result, dict) or not isinstance(result.get("terms"), list):
+        raise sidecar.SidecarUpstreamError(
+            "The model answered in the wrong shape. Try again, or send fewer terms.", "invalid_json")
+    if payload["kind"] == "terms":  # drop any term the model invented
+        asked = {t["name"].lower() for t in payload["terms"]}
+        result["terms"] = [t for t in result["terms"]
+                           if isinstance(t, dict) and str(t.get("name", "")).lower() in asked]
+    return {"result": result, "model": OPENAI_MODEL}
+
+
+def propose(kind, terms=None, context=None, task=None, ai=None):
+    """Proposals only, on the visitor's own key: ai = (provider, key) or None.
+
+    Anthropic keys go to the sidecar, which builds the prompt from the page and
+    calls Claude. OpenAI keys get the same page-built prompt, sent from here.
+    No key is a 503 sampling_disabled; server-side keys are never used.
+    """
+    payload = _payload(kind, terms, context, task)
+    provider, key = ai or (None, None)
+    if os.environ.get("KINDWORK_LLM_MOCK"):  # tests: the sidecar replays a fixed reply
+        provider, key = "anthropic", key or ""
+    if not provider:
+        raise sidecar.SidecarUpstreamError(NO_KEY, "sampling_disabled", 503)
+    if provider == "openai":
+        return _openai_propose(payload, key)
+    reply = sidecar.call("propose", timeout=PROPOSE_TIMEOUT,
+                         env={"KINDWORK_LLM_KEY": key} if key else None, **payload)
     return {"result": reply.get("result"), "model": reply.get("model")}
 
 

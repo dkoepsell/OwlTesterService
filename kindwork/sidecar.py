@@ -57,14 +57,25 @@ def node_bin():
     return os.environ.get("KINDWORK_NODE") or shutil.which("node")
 
 
-def call(op: str, timeout: float = CALL_TIMEOUT, **payload) -> dict:
+# Server-side model keys are never handed to the sidecar: propose runs on the
+# visitor's own key, passed per call through `env`.
+_SERVER_KEYS = ("KINDWORK_LLM_KEY", "ANTHROPIC_API_KEY", "SOOL_ANTHROPIC_KEY")
+
+
+def _child_env(extra):
+    env = {k: v for k, v in os.environ.items() if k not in _SERVER_KEYS}
+    env.update(extra or {})
+    return env
+
+
+def call(op: str, timeout: float = CALL_TIMEOUT, env: dict | None = None, **payload) -> dict:
     node = node_bin()
     if not node:
         raise SidecarError("Node.js is not installed on this server.")
     try:
         proc = subprocess.run([node, str(BIN)], input=json.dumps({"op": op, **payload}),
                               capture_output=True, text=True, timeout=timeout,
-                              cwd=str(CORE_DIR), check=False)
+                              cwd=str(CORE_DIR), env=_child_env(env), check=False)
     except subprocess.TimeoutExpired as e:
         raise SidecarError(f"kindwork-core did not answer within {timeout}s") from e
     except OSError as e:

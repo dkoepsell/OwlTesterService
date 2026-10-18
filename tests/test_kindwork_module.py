@@ -360,3 +360,97 @@ def test_measurement_rows_older_than_twelve_months_are_purged(app_module, client
         for row in KindworkSession.query.all():
             db.session.delete(row)
         db.session.commit()
+
+
+# --- Propose runs on the visitor's own key, never a server key ---------------------------
+
+ANTHROPIC_TEST_KEY = "sk-ant-test-0000000000000000000000"
+OPENAI_TEST_KEY = "sk-test-00000000000000000000000000"
+
+
+def save_key(client, key, provider):
+    resp = client.post("/api/settings/openai-key", json={"api_key": key, "provider": provider})
+    assert resp.get_json()["success"], resp.get_json()
+
+
+@needs_node
+def test_propose_ignores_server_keys(client, monkeypatch):
+    for k in ("KINDWORK_LLM_KEY", "ANTHROPIC_API_KEY", "SOOL_ANTHROPIC_KEY", "OPENAI_API_KEY"):
+        monkeypatch.setenv(k, "sk-ant-server-key-should-not-be-used")
+    resp = post(client, "propose", {"kind": "terms", "terms": claims_terms()})
+    assert resp.status_code == 503 and resp.get_json()["code"] == "sampling_disabled"
+
+
+def test_sidecar_child_env_drops_server_keys(monkeypatch):
+    from kindwork.sidecar import _child_env
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "server")
+    monkeypatch.setenv("KINDWORK_LLM_KEY", "server")
+    env = _child_env({"KINDWORK_LLM_KEY": "visitor"})
+    assert env["KINDWORK_LLM_KEY"] == "visitor" and "ANTHROPIC_API_KEY" not in env
+
+
+def test_propose_uses_session_anthropic_key(client, monkeypatch):
+    from kindwork import module, sidecar
+    seen = {}
+
+    def fake_call(op, timeout=sidecar.CALL_TIMEOUT, env=None, **payload):
+        seen.update(op=op, env=env, payload=payload)
+        return {"ok": True, "result": {"terms": []}, "model": "claude"}
+
+    monkeypatch.setattr(module.sidecar, "call", fake_call)
+    save_key(client, ANTHROPIC_TEST_KEY, "anthropic")
+    resp = post(client, "propose", {"kind": "terms", "terms": [{"name": "Claim"}]})
+    assert resp.status_code == 200
+    assert seen["op"] == "propose" and seen["env"] == {"KINDWORK_LLM_KEY": ANTHROPIC_TEST_KEY}
+
+
+@needs_node
+def test_propose_uses_session_openai_key_with_page_prompt(client, monkeypatch):
+    import openai
+    seen = {}
+
+    class FakeCompletions:
+        def create(self, **kw):
+            seen.update(kw)
+            content = json.dumps({"appName": "Claims", "relations": [], "terms": [
+                {"name": "Claim", "answers": {"r1": "y"}}, {"name": "Invented", "answers": {}}]})
+            msg = type("M", (), {"content": content})
+            return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None, timeout=None):
+            seen["api_key"] = api_key
+            self.chat = type("Chat", (), {"completions": FakeCompletions()})
+
+    monkeypatch.setattr(openai, "OpenAI", FakeOpenAI)
+    save_key(client, OPENAI_TEST_KEY, "openai")
+    resp = post(client, "propose", {"kind": "terms", "terms": [{"name": "Claim", "desc": "A request"}]})
+    assert resp.status_code == 200, resp.get_json()
+    assert seen["api_key"] == OPENAI_TEST_KEY
+    prompt = seen["messages"][0]["content"]
+    assert "Basic Formal Ontology" in prompt and "- Claim: A request" in prompt
+    assert [t["name"] for t in resp.get_json()["result"]["terms"]] == ["Claim"]
+
+
+def test_mcp_propose_takes_key_header(client, monkeypatch):
+    from kindwork import module, sidecar
+    seen = {}
+
+    def fake_call(op, timeout=sidecar.CALL_TIMEOUT, env=None, **payload):
+        seen["env"] = env
+        return {"ok": True, "result": {"terms": []}, "model": "claude"}
+
+    monkeypatch.setattr(module.sidecar, "call", fake_call)
+    res = client.post("/kindwork/mcp", headers={"X-AI-Key": ANTHROPIC_TEST_KEY}, json={
+        "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": "kindwork_propose", "arguments": {"terms": [{"name": "Claim"}]}}}).get_json()
+    assert res["result"]["isError"] is False
+    assert seen["env"] == {"KINDWORK_LLM_KEY": ANTHROPIC_TEST_KEY}
+
+
+def test_page_carries_key_bar_in_the_one_injected_script(client):
+    html = client.get("/kindwork").get_data(as_text=True)
+    start = html.index("<script>window.KINDWORK_HOST =")
+    script = html[start:html.index("</script>", start)]
+    assert "kw-keybar" in script and "/api/settings/openai-key" in script
+    assert html.count("kw-keybar") == script.count("kw-keybar")
