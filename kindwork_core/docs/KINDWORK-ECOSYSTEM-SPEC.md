@@ -1,6 +1,6 @@
 # Kindwork, BFO-Agent, OwlTester: Interchange Spec
 
-Draft 0.1.0, October 18, 2026. David R. Koepsell.
+Draft 0.1.1, October 18, 2026. David R. Koepsell.
 Vocabulary namespace: `https://ontology.davidkoepsell.com/kindwork/vocab#` (prefix `kwv:`)
 
 Three tools, one loop. Kindwork is the front door for people who are not ontologists. BFO-Agent populates a model from documents behind a reasoner gate. OwlTester verifies with a DL reasoner. This spec fixes the files they exchange, so each tool can be built and tested on its own and still compose.
@@ -64,6 +64,8 @@ Written by Kindwork as `<slug>.kindwork.json`. Read by BFO-Agent as a seed and b
       "id": "lic",
       "iri": "https://example.org/kindwork/job-site-tracker#ElectricalLicense",
       "name": "Electrical license",
+      "state": "confirmed",
+      "committed": true,
       "definition": "The state license that lets a worker do electrical work.",
       "keyword": "status",
       "bfo": "BFO:0000031",
@@ -86,6 +88,7 @@ Written by Kindwork as `<slug>.kindwork.json`. Read by BFO-Agent as a seed and b
 Field rules:
 
 - `keyword` is `null` when the interview is unfinished. Consumers must treat such a term as unplaced, never guess.
+- `state` is `proposed` (an LLM answered, no person has confirmed) or `confirmed`. `committed` is derived: confirmed, placed, and not blocked by a conflict that crosses or splits a BFO kind or by an open reasoner failure. Only committed terms are built. Consumers must never treat a proposed term as committed.
 - `answers` keys are the interview question ids (`r1 r2 a1 a2 b1 b2 b3 c1 c2 c3 c4 c5 c5b c6`), values `y` or `n`. Only the path actually walked is present.
 - `relations[].rel` is one of the link names in section 2, or `isA` for a domain subclass link. `property` is the full IRI that link compiles to.
 - `conflicts` are Kindwork's open cards at export time. Severity is `partition`, `within`, or `chain`.

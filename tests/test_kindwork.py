@@ -230,4 +230,4 @@ def test_vocab_served_as_turtle(client):
 
 
 def test_page_renders(client):
-    assert client.get("/kindwork").status_code == 200
+    assert client.get("/kindwork/workbench").status_code == 200

@@ -135,14 +135,15 @@ try:
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("SHACL workbench not mounted: %s", _e)
 
-# Mount the Kindwork adapter (GET /kindwork, POST /kindwork/check, GET
+# Mount the Kindwork adapter (GET /kindwork/workbench, POST /kindwork/check, GET
 # /kindwork/vocab): checks a Kindwork export and returns owltester-findings.
 try:
     from kindwork.routes import kindwork_bp as _kindwork_bp
     from kindwork.module_routes import module_bp as _kindwork_module_bp
     app.register_blueprint(_kindwork_bp)
-    # The Kindwork module: /kindwork/v1/{health,build,import,lint,check} and the
-    # /kindwork/mcp endpoint, backed by the kindwork_core/ Node sidecar.
+    # The Kindwork module: the guided page at GET /kindwork, /kindwork/v1/{health,
+    # ingest,propose,check,build,import,lint} and /kindwork/mcp, backed by the
+    # kindwork_core/ Node sidecar. /propose and /check carry their own P1 limits.
     app.register_blueprint(_kindwork_module_bp)
     logging.getLogger(__name__).info("Kindwork adapter mounted at /kindwork")
 except Exception as _e:  # noqa: BLE001
@@ -152,8 +153,7 @@ except Exception as _e:  # noqa: BLE001
 limit_endpoint(app, 'owltester.http_check', UPLOAD_LIMIT)
 limit_endpoint(app, 'owltester.http_repair', UPLOAD_LIMIT)
 limit_endpoint(app, 'kindwork.check', UPLOAD_LIMIT)
-limit_endpoint(app, 'kindwork_module.check', UPLOAD_LIMIT)
-for _kw_endpoint in ('build', 'import_model', 'lint', 'mcp'):
+for _kw_endpoint in ('build', 'import_model', 'lint', 'ingest', 'mcp'):
     limit_endpoint(app, f'kindwork_module.{_kw_endpoint}', ANALYSIS_LIMIT)
 
 # Helper function to check if a file has an allowed extension

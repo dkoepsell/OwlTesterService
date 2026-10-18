@@ -5,8 +5,12 @@
   "type": "module",
   "license": "UNLICENSED",
   "private": true,
-  "bin": { "kindwork-core": "bin/kindwork-core.mjs" },
-  "engines": { "node": ">=20" },
+  "bin": {
+    "kindwork-core": "bin/kindwork-core.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test test/acceptance.test.js"
@@ -14,6 +18,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
     "@xmldom/xmldom": "0.8.15",
+    "exceljs": "4.4.0",
     "express": "5.1.0",
     "jszip": "3.10.1",
     "n3": "1.17.4",

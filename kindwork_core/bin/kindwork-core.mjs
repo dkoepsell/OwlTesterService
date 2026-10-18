@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 // Sidecar entry point. OwlTester calls this with one JSON request on stdin and
-// reads one JSON response on stdout. Exit 0 on success, 2 on input errors, 1 otherwise.
+// reads one JSON response on stdout. Exit 0 on success, 2 on input errors, 3 on model (LLM) errors, 1 otherwise.
 //
 //   {"op":"build",    "source":"...", "name":"model.kw"}
 //   {"op":"import",   "source":"...", "name":"client.owl"}
 //   {"op":"lint",     "source":"...", "name":"model.kw"}
 //   {"op":"prepare",  "source":"...", "name":"model.kw"}
 //   {"op":"findings", "source":"...", "name":"model.kw", "reasoner": { status, consistent, unsatisfiable: [...] }}
+//   {"op":"ingest",   "name":"terms.xlsx", "base64":"..."}            -> { terms: [{name, desc, hints}], context }
+//   {"op":"propose",  "kind":"terms", "terms":[{name,desc,hints}], "context":"..."}  or  {"op":"propose","kind":"task","task":"..."}
 //   {"op":"health"}
 import { build, importModel, prepare, findings, load, health, InputError } from '../src/service.js';
+import { ingest } from '../src/ingest.js';
+import { propose, UpstreamError } from '../src/llm.js';
 
 let raw = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', d => { raw += d; });
-process.stdin.on('end', () => {
+process.stdin.on('end', async () => {
   let req;
   try { req = JSON.parse(raw); } catch (e) { return done(1, { ok: false, error: 'The request was not JSON.' }); }
   const opts = { name: req.name || 'model', format: req.format };
@@ -24,6 +28,8 @@ process.stdin.on('end', () => {
       case 'import': return done(0, importModel(req.source, opts));
       case 'prepare': return done(0, { ok: true, ...prepare(req.source, opts) });
       case 'lint': { const r = load(req.source, opts); return done(0, { ok: true, input: r.kind, errors: [], warnings: r.warnings }); }
+      case 'ingest': return done(0, await ingest(req.name || '', Buffer.from(String(req.base64 || ''), 'base64')));
+      case 'propose': return done(0, { ok: true, ...(await propose(req)) });
       case 'findings':
         if (!req.reasoner || typeof req.reasoner.status !== 'string') return done(2, { ok: false, error: 'findings needs a reasoner result with a status.' });
         return done(0, findings(req.source, opts, req.reasoner));
@@ -31,6 +37,7 @@ process.stdin.on('end', () => {
     }
   } catch (e) {
     if (e instanceof InputError) return done(2, { ok: false, error: e.message, errors: e.diagnostics });
+    if (e instanceof UpstreamError) return done(3, { ok: false, code: e.code, error: e.message, status: e.status });
     return done(1, { ok: false, error: 'Internal error in kindwork-core.', detail: String(e && e.message || e) });
   }
 });

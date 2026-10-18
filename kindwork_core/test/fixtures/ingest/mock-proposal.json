@@ -1,0 +1,8 @@
+{"appName":"Claims desk","terms":[
+ {"name":"Claim","desc":"A request for payment under a policy.","answers":{"r1":"y","a1":"n","a2":"y"},"signals":{"held":true}},
+ {"name":"Policyholder","desc":"The person who holds the policy.","answers":{"r1":"n","r2":"n","c1":"n","c2":"n","c3":"n","c4":"n","c5":"y","c5b":"n"},"signals":{}},
+ {"name":"Prior authorization","desc":"Approval needed before a service is covered.","answers":{"r1":"n","r2":"y","b1":"n","b2":"n","b3":"y"},"signals":{"held":true}},
+ {"name":"Denial","answers":{"r1":"y","a1":"n","a2":"n"},"signals":{}},
+ {"name":"Adjuster","answers":{"r1":"n","r2":"n","c1":"n","c2":"n","c3":"n","c4":"n","c5":"y","c5b":"n"}},
+ {"name":"Invented term","answers":{"r1":"n","r2":"n","c1":"y"}}
+],"relations":[{"from":"Prior authorization","rel":"heldBy","to":"Policyholder"},{"from":"Claim","rel":"participant","to":"Adjuster"}]}

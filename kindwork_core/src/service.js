@@ -1,7 +1,6 @@
 // The three operations, shared by the REST API, the MCP server and the CLI.
 import { createRequire } from 'node:module';
 import { createCore } from './core.js';
-import { parseKw } from './kw.js';
 import { reason, reasonerAvailable, REASONER } from './reasoner.js';
 
 const require = createRequire(import.meta.url);
@@ -11,6 +10,7 @@ export class InputError extends Error {
   constructor(message, diagnostics) { super(message); this.status = 422; this.diagnostics = diagnostics || []; }
 }
 
+const host = x => JSON.parse(JSON.stringify(x)); // values leave the sandbox as plain host objects
 const plain = html => String(html).replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 
 export function detect(source, hint = '') {
@@ -37,7 +37,7 @@ export function load(source, { name = 'model', format } = {}) {
     if (j.format !== 'kindwork-model') throw new InputError('JSON input must be a kindwork-model file.');
     try { core.applyManifest(j); } catch (e) { throw new InputError(e.message); }
   } else if (kind === 'kw') {
-    const r = parseKw(source, core.SLOTS);
+    const r = core.parseKw(source);
     if (r.errors.length) throw new InputError(`The keyword source has ${r.errors.length} error${r.errors.length > 1 ? 's' : ''}.`, r.errors);
     core.applyManifest(r.model);
     const lineByName = new Map(r.model.terms.map(t => [t.name.toLowerCase(), r.lineOf.get(t.id)]));
@@ -61,7 +61,9 @@ function summary(core, sch) {
   return {
     app: sch.app, slug: sch.slug, namespace: core.nsBase(),
     recordTypes: sch.collections.map(c => ({ name: c.name, keyword: c.kw, bfo: core.KW[c.kw].iri })),
-    unplaced: core.S.terms.filter(t => !core.kwOf(t)).map(t => t.name)
+    unplaced: core.S.terms.filter(t => !core.kwOf(t)).map(t => t.name),
+    proposed: core.S.terms.filter(t => t.state === 'proposed').map(t => t.name),
+    heldBack: [...core.blockers().keys()].map(id => core.termById(id)).filter(t => t && core.kwOf(t) && t.state !== 'proposed').map(t => t.name)
   };
 }
 
@@ -78,7 +80,7 @@ export function build(source, opts = {}) {
     [`${s}.kindwork.json`]: core.genManifest(sch),
     'README.md': core.genReadme(sch) + core.genReadmeTail(sch)
   };
-  return { ok: true, input: kind, ...summary(core, sch), warnings, files };
+  return host({ ok: true, input: kind, ...summary(core, sch), warnings, files });
 }
 
 export async function buildZip(result) {
@@ -90,14 +92,16 @@ export async function buildZip(result) {
 export function importModel(source, opts = {}) {
   const { core, warnings, kind, ontology } = load(source, opts);
   const sch = core.genSchema();
-  return { ok: true, input: kind, ...summary(core, sch), ontology: ontology ? { classes: ontology.classes, imported: ontology.imported } : null, warnings, model: JSON.parse(core.genManifest(sch)) };
+  return host({ ok: true, input: kind, ...summary(core, sch), ontology: ontology ? { classes: ontology.classes, imported: ontology.imported } : null, warnings, model: JSON.parse(core.genManifest(sch)) });
 }
 
 // Step 1 of a check: the ontology the reasoner should run on. An ontology input is
 // checked as given (all classes); a model or keyword source is compiled first.
 export function prepare(source, opts = {}) {
   const { core, kind, ontology } = load(source, opts);
-  return { input: kind, ontology: ontology ? { text: ontology.text, ext: ontology.ext } : { text: core.genOWL(core.genSchema()), ext: 'ttl' } };
+  // Check every confirmed term, including ones an earlier check held back, so they can be cleared.
+  core.S.findings = [];
+  return host({ input: kind, ontology: ontology ? { text: ontology.text, ext: ontology.ext } : { text: core.genOWL(core.genSchema(true)), ext: 'ttl' } });
 }
 
 // Reference check: prepare, reason with the bundled ROBOT runner, assemble findings.
@@ -111,6 +115,7 @@ export async function check(source, opts = {}) {
 // r = { status: 'ok'|'timeout'|'error'|'unavailable', consistent, unsatisfiable: [{iri,label,axioms,partition}], axioms?, detail }
 export function findings(source, opts, r) {
   const { core, kind } = load(source, opts);
+  core.S.findings = []; // a check replaces earlier findings
   const findings = [];
   const termByIri = new Map(core.S.terms.map(t => [core.iriOf(t), t]));
 
@@ -151,13 +156,13 @@ export function findings(source, opts, r) {
     });
   }
 
-  return {
+  return host({
     format: 'owltester-findings', version: '0.1', generator: 'kindwork-build', generated: new Date().toISOString(),
     ontology: core.nsBase(), input: kind,
     reasoner: r.status === 'unavailable' ? null : { name: REASONER.name, version: REASONER.via, profile: REASONER.profile },
     verdict: { consistent: r.status === 'ok' ? r.consistent : null, coherent: r.status === 'ok' && r.consistent ? r.unsatisfiable.length === 0 : null },
     findings
-  };
+  });
 }
 
 export function health() {

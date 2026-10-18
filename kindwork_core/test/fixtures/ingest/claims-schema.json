@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Claim",
+  "description": "Claims intake for a regional health plan.",
+  "type": "object",
+  "properties": {
+    "claim_status": { "type": "string", "enum": ["submitted", "pended", "paid", "denied"], "description": "Where the claim is in adjudication." },
+    "service_date": { "type": "string", "format": "date" },
+    "member": { "$ref": "#/$defs/Member" }
+  },
+  "$defs": {
+    "Member": { "title": "Member", "type": "object", "description": "A person covered by a policy.", "properties": { "member_id": { "type": "string", "description": "The plan's identifier for the member." } } }
+  }
+}
