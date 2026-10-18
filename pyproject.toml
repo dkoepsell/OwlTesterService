@@ -1,6 +1,6 @@
 [project]
 name = "owl-tester-service"
-version = "0.1.0"
+version = "1.0.0"
 description = "FOL-BFO-OWL Analysis System — ontology validation, reasoning, and visualization"
 requires-python = ">=3.11"
 

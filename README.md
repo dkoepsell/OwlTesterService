@@ -54,6 +54,17 @@ For more details about the reasoning enhancements, see the [Reasoning README](RE
 - **Domain-specific Support**: Tailored suggestions based on ontology domain and subject
 - **OWL/RDF Export**: Download created ontologies in standard formats
 
+### Kindwork: Ontologies for Non-Ontologists
+
+Kindwork, at `/kindwork`, guides people with no ontology training to a working BFO 2020 ontology by asking plain yes/no questions about their own terms.
+
+- **Bring Your Terms**: Paste a list, or upload a spreadsheet, data dictionary, JSON Schema, or SQL table definitions
+- **AI-proposed Answers**: With your own OpenAI or Anthropic (Claude) key, AI proposes an answer to each question; nothing counts until you confirm the term yourself
+- **Reasoner-checked Confirmation**: Every confirmation runs HermiT, cross-checked by Pellet, against BFO 2020; terms that cross or split a basic kind are held back with a card explaining why in plain words
+- **Downloads**: The classified list (CSV), the ontology (Turtle), SHACL shapes, keyword source, and a standalone tracker app
+- **Kindwork Workbench**: At `/kindwork/workbench`, lint keyword source, check a model or ontology, or check a Kindwork export with its shapes
+- **API and MCP**: JSON routes under `/kindwork/v1` and an MCP endpoint at `/kindwork/mcp` with six tools
+
 ## Technology Stack
 
 - **Backend**: Flask-based Python web application
@@ -61,7 +72,8 @@ For more details about the reasoning enhancements, see the [Reasoning README](RE
 - **Reasoning**: Owlready2 with Pellet reasoner integration
 - **Parsing**: Combined Owlready2 and RDFlib approach
 - **Visualization**: D3.js for interactive diagrams
-- **AI Integration**: OpenAI API for generating implications and descriptions
+- **AI Integration**: OpenAI API for generating implications and descriptions; your own OpenAI or Anthropic key for implications and Kindwork proposals
+- **Kindwork Core**: Node.js 20 sidecar running the vendored Kindwork generators (`kindwork_core/`)
 - **Authentication**: Flask-Login for user management
 - **Forms**: Flask-WTF for secure form handling
 
@@ -72,11 +84,12 @@ For more details about the reasoning enhancements, see the [Reasoning README](RE
 - Python 3.7+
 - PostgreSQL
 - Java (for the Pellet reasoner)
+- Node.js 20+ (for Kindwork)
 
 ### Installation
 
 1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
+2. Install dependencies: `pip install -r requirements.txt`, then `npm ci` in `kindwork_core/`
 3. Set up PostgreSQL database
 4. Configure environment variables
 5. Run the application: `python main.py`
@@ -97,6 +110,13 @@ Upload an OWL file through the web interface to receive:
 - Visualization of class hierarchy
 - Extracted FOL premises
 - Generated real-world implications
+
+### Building an Ontology with Kindwork
+
+1. Open `/kindwork` and paste your terms, or upload a spreadsheet
+2. Optionally add your own AI key in the bar at the top, and press Propose answers
+3. Check each term's answers and press Confirm; the reasoner runs before the term counts
+4. Resolve any held-back terms, then download the results
 
 ### Creating Ontologies
 

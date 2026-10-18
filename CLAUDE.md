@@ -56,6 +56,19 @@ Uploads go to `uploads/` directory. Allowed extensions: `owl`, `rdf`, `xml`, `tt
 
 **Multi-file (modular) uploads:** several files or a `.zip` (optionally with `catalog-v001.xml`) go through `ontology_bundle.py`, which resolves `owl:imports` locally (IRI / version IRI / catalog / file name; BFO → vendored), merges the top-level module's import closure into the single stored file, and writes `<file>.bundle.json` (manifest, per-entity module) plus a `<stem>_modules/` dir. `bundle_layers.py` + `/api/bundle/<filename>/layers` reason over each module's closure bottom-up to find the first breaking layer.
 
+## Kindwork
+
+Guided ontology building for laypeople, specified in `kindwork_core/docs/` (module spec 0.2.0 and the ecosystem spec).
+
+- **`kindwork_core/`** vendors the Kindwork reference implementation and runs it as a Node sidecar (`bin/kindwork-core.mjs`, one JSON request per process). Never edit `core/kindwork.html` in place: replace it from Kindwork, run `npm test` there plus `tests/test_kindwork*.py`, and put the new `X-Kindwork-Core` hash in the commit.
+- **`kindwork/module_routes.py`** serves `GET /kindwork` (the vendored page with one injected `KINDWORK_HOST` script, which also carries the measurement beacon and the AI key bar), `/kindwork/v1/{health,ingest,propose,check,build,import,lint,event}` and `/kindwork/mcp`.
+- **Check** runs `kindwork/module_reasoner.py`: HermiT with a Pellet cross-check over BFO 2020 plus the IAO bridge, offline.
+- **Propose** uses only the visitor's own key, the same session key as implications (`api_key_utils`), or `X-AI-Key` for API/MCP clients. Server keys are stripped from the sidecar on purpose.
+- **`kindwork/metrics.py`** keeps the P1 log: counts only, 12-month retention.
+- **`kindwork/routes.py`** holds the export check (`POST /kindwork/check`), `/kindwork/workbench` and the `kwv:` vocabulary.
+- **`KINDWORK_MODE`**: `triage` (public, rate-limited) or `full` (sign-in required).
+- Browser tests (`tests/test_kindwork_ui.py`) need `pip install playwright` and `playwright install chromium-headless-shell`.
+
 ## Frontend
 
 Templates use Jinja2 with Bootstrap 5 dark theme. D3.js v7 handles interactive ontology graphs. Key JS files: `static/js/script.js` (main page FOL tester), `static/js/sandbox.js` (ontology builder), `static/js/ontology-visualizer.js` (D3 visualization).
