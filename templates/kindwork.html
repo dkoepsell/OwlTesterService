@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+
+{% block title %}Kindwork check{% endblock %}
+
+{% block extra_head %}
+<style>
+    .kw-finding { border-left: 4px solid var(--bs-secondary); }
+    .kw-finding.fail { border-left-color: var(--bs-danger); }
+    .kw-finding.undetermined { border-left-color: var(--bs-warning); }
+    .kw-finding code { font-size: .78rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+    <h2 class="h4"><i class="fas fa-puzzle-piece me-2"></i>Check a Kindwork export</h2>
+    <p class="text-muted">
+        Upload what Kindwork exported: the ontology (<code>&lt;slug&gt;.ttl</code>), and if you have them,
+        the shapes (<code>&lt;slug&gt;-shapes.ttl</code>) and the manifest (<code>&lt;slug&gt;.kindwork.json</code>).
+        Several files or one zip both work. You get back <code>&lt;slug&gt;.findings.json</code> to load into Kindwork.
+    </p>
+    <form id="kwForm" class="mb-4">
+        <input class="form-control mb-2" type="file" name="files" multiple
+               accept=".ttl,.owl,.rdf,.xml,.json,.zip" required>
+        <button class="btn btn-primary" type="submit" id="kwSubmit">Run checks</button>
+        <span id="kwStatus" class="ms-2 text-muted"></span>
+    </form>
+    <div id="kwResult" class="d-none">
+        <div class="d-flex justify-content-between align-items-baseline mb-2">
+            <h3 class="h5 mb-0" id="kwVerdict"></h3>
+            <a class="btn btn-sm btn-outline-primary" id="kwDownload">Download findings</a>
+        </div>
+        <div id="kwFindings"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const form = document.getElementById('kwForm');
+    const status = document.getElementById('kwStatus');
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+    const word = v => v === true ? 'yes' : v === false ? 'no' : 'open';
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        status.textContent = 'Running the reasoner, this can take a minute...';
+        document.getElementById('kwSubmit').disabled = true;
+        try {
+            const resp = await fetch('{{ url_for("kindwork.check") }}', {method: 'POST', body: new FormData(form)});
+            const text = await resp.text();
+            const body = JSON.parse(text);
+            if (!resp.ok) { status.textContent = body.error || 'The check failed.'; return; }
+            const name = (resp.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+            const link = document.getElementById('kwDownload');
+            link.href = URL.createObjectURL(new Blob([text], {type: 'application/json'}));
+            link.download = name ? name[1] : 'findings.json';
+            document.getElementById('kwVerdict').textContent =
+                `Consistent: ${word(body.verdict.consistent)}. Coherent: ${word(body.verdict.coherent)}. ` +
+                `${body.findings.length} finding${body.findings.length === 1 ? '' : 's'}.`;
+            document.getElementById('kwFindings').innerHTML = body.findings.map(f => `
+                <div class="card kw-finding ${esc(f.verdict)} mb-2"><div class="card-body py-2">
+                    <div class="small text-muted">${esc(f.id)} · ${esc(f.check)} · ${esc(f.severity)} · ${esc(f.verdict)}</div>
+                    <div class="fw-semibold">${esc(f.title)}</div>
+                    <div>${esc(f.explanation)}</div>
+                    ${f.axioms.length ? `<div class="mt-1">${f.axioms.map(a => `<code class="d-block">${esc(a)}</code>`).join('')}</div>` : ''}
+                </div></div>`).join('') || '<p class="text-muted">No findings.</p>';
+            document.getElementById('kwResult').classList.remove('d-none');
+            status.textContent = '';
+        } catch (err) {
+            status.textContent = 'The check failed: ' + err;
+        } finally {
+            document.getElementById('kwSubmit').disabled = false;
+        }
+    });
+})();
+</script>
+{% endblock %}

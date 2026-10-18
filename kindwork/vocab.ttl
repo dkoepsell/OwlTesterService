@@ -1,0 +1,43 @@
+# Kindwork vocabulary, version 0.1.
+# Shared by Kindwork, BFO-Agent and OwlTester. See KINDWORK-ECOSYSTEM-SPEC.md.
+
+@prefix kwv: <https://ontology.davidkoepsell.com/kindwork/vocab#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+<https://ontology.davidkoepsell.com/kindwork/vocab> a owl:Ontology ;
+  rdfs:label "Kindwork vocabulary"@en ;
+  owl:versionInfo "0.1" ;
+  dcterms:creator "David Koepsell" .
+
+kwv:keyword a owl:AnnotationProperty ; rdfs:label "Kindwork keyword"@en ;
+  obo:IAO_0000115 "The interview keyword a class was given: thing, group, place, quality, tendency, function, role, authority, record, code, status, obligation, happening, moment, or period."@en .
+
+kwv:heldBy a owl:ObjectProperty ; rdfs:label "held by"@en ; obo:IAO_0000115 "Links a status to whoever holds it."@en .
+kwv:issuedBy a owl:ObjectProperty ; rdfs:label "issued by"@en ; obo:IAO_0000115 "Links a status to the authority that granted it."@en .
+kwv:canGrant a owl:ObjectProperty ; rdfs:label "can grant"@en ; obo:IAO_0000115 "Links an authority to a kind of status it can grant or revoke."@en .
+kwv:owedBy a owl:ObjectProperty ; rdfs:label "owed by"@en ; obo:IAO_0000115 "Links an obligation to whoever must act."@en .
+kwv:owedTo a owl:ObjectProperty ; rdfs:label "owed to"@en ; obo:IAO_0000115 "Links an obligation to whoever can claim it."@en .
+kwv:marks a owl:ObjectProperty ; rdfs:label "marks"@en ; obo:IAO_0000115 "Links a moment to the happening it starts or ends."@en .
+
+kwv:grantedOn a owl:DatatypeProperty ; rdfs:label "granted on"@en .
+kwv:expiresOn a owl:DatatypeProperty ; rdfs:label "expires on"@en .
+kwv:standing a owl:DatatypeProperty ; rdfs:label "standing"@en .
+kwv:dueOn a owl:DatatypeProperty ; rdfs:label "due on"@en .
+kwv:startsAt a owl:DatatypeProperty ; rdfs:label "starts at"@en .
+kwv:endsAt a owl:DatatypeProperty ; rdfs:label "ends at"@en .
+kwv:occursAt a owl:DatatypeProperty ; rdfs:label "occurs at"@en .
+kwv:startsOn a owl:DatatypeProperty ; rdfs:label "starts on"@en .
+kwv:endsOn a owl:DatatypeProperty ; rdfs:label "ends on"@en .
+kwv:hasValue a owl:DatatypeProperty ; rdfs:label "has value"@en .
+kwv:unit a owl:DatatypeProperty ; rdfs:label "unit"@en .
+kwv:measuredAt a owl:DatatypeProperty ; rdfs:label "measured at"@en .
+kwv:validFrom a owl:DatatypeProperty ; rdfs:label "valid from"@en .
+kwv:validUntil a owl:DatatypeProperty ; rdfs:label "valid until"@en .
+kwv:filedOn a owl:DatatypeProperty ; rdfs:label "filed on"@en .
+kwv:documentReference a owl:DatatypeProperty ; rdfs:label "document reference"@en .
+kwv:meaning a owl:DatatypeProperty ; rdfs:label "meaning"@en .
+kwv:jurisdiction a owl:DatatypeProperty ; rdfs:label "jurisdiction"@en .
+kwv:address a owl:DatatypeProperty ; rdfs:label "address"@en .
