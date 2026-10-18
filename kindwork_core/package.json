@@ -1,0 +1,22 @@
+{
+  "name": "kindwork-build",
+  "version": "0.1.0",
+  "description": "Kindwork build service: compiles keyword source and Kindwork models to BFO 2020 OWL, SHACL and a working tracker, and checks ontologies with HermiT. REST and MCP.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "bin": { "kindwork-core": "bin/kindwork-core.mjs" },
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/acceptance.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@xmldom/xmldom": "0.8.15",
+    "express": "5.1.0",
+    "jszip": "3.10.1",
+    "n3": "1.17.4",
+    "zod": "3.25.76"
+  }
+}

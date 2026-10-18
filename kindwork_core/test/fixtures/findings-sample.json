@@ -1,0 +1,31 @@
+{
+  "format": "owltester-findings",
+  "version": "0.1",
+  "generated": "2026-10-18T19:40:00Z",
+  "ontology": "http://ex.org/x",
+  "reasoner": { "name": "HermiT", "version": "1.4.5.519", "profile": "OWL 2 DL" },
+  "verdict": { "consistent": true, "coherent": false },
+  "findings": [
+    {
+      "id": "coh-001", "check": "coherence", "severity": "partition", "verdict": "fail",
+      "classes": ["http://ex.org/x#Episode"],
+      "title": "Manic episode is both something that happens and something someone has",
+      "explanation": "It sits under process through one parent and under disposition through another. BFO makes those disjoint, so the class can have no instances and every inference that touches it is unsound.",
+      "axioms": ["Episode SubClassOf Disorder", "Disorder SubClassOf obo:BFO_0000016 (disposition)", "Episode SubClassOf obo:BFO_0000015 (process)"]
+    },
+    {
+      "id": "coh-002", "check": "coherence", "severity": "within", "verdict": "fail",
+      "classes": ["http://ex.org/x#Score"],
+      "title": "Severity score is both a feature of a patient and a written record",
+      "explanation": "A quality belongs to one bearer and cannot be copied. A record can be copied into many files. BFO keeps them apart, so the score needs to be one or the other, or split into the measured severity and the record of it.",
+      "axioms": ["Score SubClassOf obo:BFO_0000019 (quality)", "Score SubClassOf obo:IAO_0000030 (information content entity)"]
+    },
+    {
+      "id": "ent-001", "check": "entailment", "severity": "info", "verdict": "undetermined",
+      "classes": ["http://ex.org/x#Note"],
+      "title": "Clinic note has no BFO category, so nothing can be concluded about it",
+      "explanation": "The class has no path to BFO. The reasoner accepts it but cannot say what kind of thing it is. Placing it would let the other checks reach it.",
+      "axioms": []
+    }
+  ]
+}

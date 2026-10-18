@@ -1,0 +1,372 @@
+{
+  "format": "kindwork-model",
+  "version": "0.1",
+  "generator": "Kindwork",
+  "generated": "2026-10-18T19:14:26.401Z",
+  "app": "Job site tracker",
+  "namespace": "https://example.org/kindwork/job-site-tracker",
+  "vocabulary": "https://ontology.davidkoepsell.com/kindwork/vocab#",
+  "task": "We manage electrical subcontractors on commercial job sites. For each worker we need to track their state electrical license: who issued it, when it expires, and whether it has been suspended. We schedule site inspections with the workers present and file an inspection report afterward. Each job has a permit number from the city. We log noise level readings at each site and record safety incidents. Before any excavation we have a duty to notify the city. Each job runs for a contract period, which the client sometimes extends.",
+  "terms": [
+    {
+      "id": "w",
+      "iri": "https://example.org/kindwork/job-site-tracker#Worker",
+      "name": "Worker",
+      "definition": "A person who works on a job site.",
+      "keyword": "thing",
+      "bfo": "BFO:0000040",
+      "answers": {
+        "r1": "n",
+        "r2": "n",
+        "c1": "n",
+        "c2": "n",
+        "c3": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "el",
+      "iri": "https://example.org/kindwork/job-site-tracker#Electrician",
+      "name": "Electrician",
+      "definition": "The job a worker does when doing electrical work.",
+      "keyword": "role",
+      "bfo": "BFO:0000023",
+      "answers": {
+        "r1": "n",
+        "r2": "n",
+        "c1": "n",
+        "c2": "n",
+        "c3": "n",
+        "c4": "n",
+        "c5": "y",
+        "c5b": "n"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "lic",
+      "iri": "https://example.org/kindwork/job-site-tracker#ElectricalLicense",
+      "name": "Electrical license",
+      "definition": "The state license that lets a worker do electrical work.",
+      "keyword": "status",
+      "bfo": "BFO:0000031",
+      "answers": {
+        "r1": "n",
+        "r2": "y",
+        "b1": "n",
+        "b2": "n",
+        "b3": "y"
+      },
+      "signals": {
+        "held": true
+      },
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "board",
+      "iri": "https://example.org/kindwork/job-site-tracker#StateLicensingBoard",
+      "name": "State licensing board",
+      "definition": "The state body that licenses electricians.",
+      "keyword": "group",
+      "bfo": "BFO:0000027",
+      "answers": {
+        "r1": "n",
+        "r2": "n",
+        "c1": "n",
+        "c2": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "auth",
+      "iri": "https://example.org/kindwork/job-site-tracker#LicensingAuthority",
+      "name": "Licensing authority",
+      "definition": "The board's power to grant, suspend, and revoke electrical licenses.",
+      "keyword": "authority",
+      "bfo": "BFO:0000023",
+      "answers": {
+        "r1": "n",
+        "r2": "n",
+        "c1": "n",
+        "c2": "n",
+        "c3": "n",
+        "c4": "n",
+        "c5": "y",
+        "c5b": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "site",
+      "iri": "https://example.org/kindwork/job-site-tracker#JobSite",
+      "name": "Job site",
+      "definition": "A commercial site where the work happens.",
+      "keyword": "place",
+      "bfo": "BFO:0000029",
+      "answers": {
+        "r1": "n",
+        "r2": "n",
+        "c1": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "insp",
+      "iri": "https://example.org/kindwork/job-site-tracker#SiteInspection",
+      "name": "Site inspection",
+      "definition": "A scheduled check of a site's work.",
+      "keyword": "happening",
+      "bfo": "BFO:0000015",
+      "answers": {
+        "r1": "y",
+        "a1": "n",
+        "a2": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "rep",
+      "iri": "https://example.org/kindwork/job-site-tracker#InspectionReport",
+      "name": "Inspection report",
+      "definition": "The report filed after an inspection.",
+      "keyword": "record",
+      "bfo": "IAO:0000030",
+      "answers": {
+        "r1": "n",
+        "r2": "y",
+        "b1": "n",
+        "b2": "n",
+        "b3": "n"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "pn",
+      "iri": "https://example.org/kindwork/job-site-tracker#PermitNumber",
+      "name": "Permit number",
+      "definition": "The city's number for a job's permit.",
+      "keyword": "code",
+      "bfo": "IAO:0000030",
+      "answers": {
+        "r1": "n",
+        "r2": "y",
+        "b1": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "noise",
+      "iri": "https://example.org/kindwork/job-site-tracker#NoiseLevel",
+      "name": "Noise level",
+      "definition": "A site's sound level, read by meter.",
+      "keyword": "quality",
+      "bfo": "BFO:0000019",
+      "answers": {
+        "r1": "n",
+        "r2": "n",
+        "c1": "n",
+        "c2": "n",
+        "c3": "n",
+        "c4": "y"
+      },
+      "signals": {
+        "measured": true
+      },
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "inc",
+      "iri": "https://example.org/kindwork/job-site-tracker#SafetyIncident",
+      "name": "Safety incident",
+      "definition": "Something that went wrong and could hurt someone.",
+      "keyword": "happening",
+      "bfo": "BFO:0000015",
+      "answers": {
+        "r1": "y",
+        "a1": "n",
+        "a2": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "exc",
+      "iri": "https://example.org/kindwork/job-site-tracker#Excavation",
+      "name": "Excavation",
+      "definition": "Digging on a job site.",
+      "keyword": "happening",
+      "bfo": "BFO:0000015",
+      "answers": {
+        "r1": "y",
+        "a1": "n",
+        "a2": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "duty",
+      "iri": "https://example.org/kindwork/job-site-tracker#DutyToNotifyTheCity",
+      "name": "Duty to notify the city",
+      "definition": "We must tell the city before any excavation.",
+      "keyword": "obligation",
+      "bfo": "BFO:0000031",
+      "answers": {
+        "r1": "n",
+        "r2": "y",
+        "b1": "n",
+        "b2": "y"
+      },
+      "signals": {},
+      "provenance": [],
+      "imported": null
+    },
+    {
+      "id": "per",
+      "iri": "https://example.org/kindwork/job-site-tracker#ContractPeriod",
+      "name": "Contract period",
+      "definition": "The time a job's contract covers.",
+      "keyword": "period",
+      "bfo": "BFO:0000038",
+      "answers": {
+        "r1": "y",
+        "a1": "y"
+      },
+      "signals": {
+        "extended": true
+      },
+      "provenance": [],
+      "imported": null
+    }
+  ],
+  "relations": [
+    {
+      "from": "el",
+      "rel": "bearer",
+      "to": "w",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000197"
+    },
+    {
+      "from": "lic",
+      "rel": "heldBy",
+      "to": "w",
+      "property": "https://ontology.davidkoepsell.com/kindwork/vocab#heldBy"
+    },
+    {
+      "from": "auth",
+      "rel": "bearer",
+      "to": "board",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000197"
+    },
+    {
+      "from": "auth",
+      "rel": "scope",
+      "to": "lic",
+      "property": "https://ontology.davidkoepsell.com/kindwork/vocab#canGrant"
+    },
+    {
+      "from": "w",
+      "rel": "at",
+      "to": "site",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000171"
+    },
+    {
+      "from": "insp",
+      "rel": "participant",
+      "to": "w",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000057"
+    },
+    {
+      "from": "insp",
+      "rel": "at",
+      "to": "site",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000066"
+    },
+    {
+      "from": "insp",
+      "rel": "during",
+      "to": "per",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000199"
+    },
+    {
+      "from": "rep",
+      "rel": "about",
+      "to": "insp",
+      "property": "http://purl.obolibrary.org/obo/IAO_0000136"
+    },
+    {
+      "from": "pn",
+      "rel": "designates",
+      "to": "site",
+      "property": "http://purl.obolibrary.org/obo/IAO_0000219"
+    },
+    {
+      "from": "noise",
+      "rel": "bearer",
+      "to": "site",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000197"
+    },
+    {
+      "from": "inc",
+      "rel": "at",
+      "to": "site",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000066"
+    },
+    {
+      "from": "exc",
+      "rel": "at",
+      "to": "site",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000066"
+    },
+    {
+      "from": "exc",
+      "rel": "during",
+      "to": "per",
+      "property": "http://purl.obolibrary.org/obo/BFO_0000199"
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "auth-lic",
+      "term": "lic",
+      "type": "auth",
+      "severity": "chain",
+      "title": "Who issues it?"
+    },
+    {
+      "id": "corr-duty",
+      "term": "duty",
+      "type": "corr",
+      "severity": "chain",
+      "title": "Owed to whom?"
+    },
+    {
+      "id": "period-per",
+      "term": "per",
+      "type": "period",
+      "severity": "partition",
+      "title": "A span of time, or something that can be extended?"
+    }
+  ],
+  "findings": []
+}

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, render_template, request
@@ -25,7 +26,7 @@ VOCAB_PATH = Path(__file__).resolve().parent / "vocab.ttl"
 
 @kindwork_bp.get("")
 def page():
-    return render_template("kindwork.html")
+    return render_template("kindwork.html", kindwork_url=os.environ.get("KINDWORK_URL", ""))
 
 
 @kindwork_bp.post("/check")
