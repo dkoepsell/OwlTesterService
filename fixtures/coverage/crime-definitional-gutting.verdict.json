@@ -1,0 +1,19 @@
+{
+  "fixture_id": "crime-definitional-gutting",
+  "coherent": false,
+  "headline": "No possible claim can satisfy these three clauses at once.",
+  "checked_positions": [
+    {
+      "position": "se_advertised",
+      "label": "Can the Fraudulent Instruction coverage the insuring clause names ever pay?",
+      "result": "empty",
+      "contradicting_clauses": [
+        "G1",
+        "D1",
+        "D2"
+      ]
+    }
+  ],
+  "plain_english_why": "The insuring clause advertises coverage for transfers made in reliance on a Fraudulent Instruction \u2014 the classic social-engineering loss, where a deceived Employee initiates the payment. But D2 requires every Fraudulent Instruction to constitute Computer Fraud, and D1 requires Computer Fraud to involve a transfer initiated without the knowledge or consent of any Employee. A transfer an Employee initiates in reliance on an instruction cannot also be a transfer no Employee initiated. The social-engineering coverage G1 names cannot pay any claim: the definitions gut the grant.",
+  "scenario": null
+}

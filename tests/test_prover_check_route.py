@@ -17,7 +17,7 @@ import time
 
 import pytest
 
-from tests.conftest import fixture_path
+from tests.conftest import fixture_path, grant_anon_files
 
 
 @pytest.fixture()
@@ -33,7 +33,7 @@ def client(tmp_path):
         app_module.db.session.remove()
 
 
-def _make_analysis():
+def _make_analysis(client):
     """Create a file + analysis row and return the analysis id, releasing the
     session so the background worker can write."""
     from models import db, OntologyFile, OntologyAnalysis
@@ -48,6 +48,7 @@ def _make_analysis():
     )
     db.session.add(file_record)
     db.session.commit()
+    grant_anon_files(client, file_record.id)
     analysis = OntologyAnalysis(ontology_file_id=file_record.id)
     db.session.add(analysis)
     db.session.commit()
@@ -76,14 +77,14 @@ def _wait_done(client, analysis_id, timeout=30):
 
 
 def test_get_without_result_reports_none(client):
-    analysis_id = _make_analysis()
+    analysis_id = _make_analysis(client)
     resp = client.get(f"/api/analysis/{analysis_id}/prover-check")
     assert resp.status_code == 200
     assert resp.get_json() == {"status": "none"}
 
 
 def test_post_starts_background_check_and_get_polls_verdict(client):
-    analysis_id = _make_analysis()
+    analysis_id = _make_analysis(client)
     resp = client.post(f"/api/analysis/{analysis_id}/prover-check")
     assert resp.status_code == 202
     marker = resp.get_json()
@@ -106,7 +107,7 @@ def test_start_is_idempotent_while_running(client):
     import app as app_module
     from models import db, OntologyAnalysis
 
-    analysis_id = _make_analysis()
+    analysis_id = _make_analysis(client)
     # A fresh 'running' marker must be returned as-is, not restarted.
     marker = {"ran": False, "status": "running", "bfo_background": False,
               "started_at": datetime.datetime.utcnow().isoformat()}
@@ -124,7 +125,7 @@ def test_start_is_idempotent_while_running(client):
 def test_stale_running_marker_is_reported_and_restartable(client):
     import app as app_module
 
-    analysis_id = _make_analysis()
+    analysis_id = _make_analysis(client)
     stale_start = (datetime.datetime.utcnow()
                    - datetime.timedelta(seconds=app_module._PROVER_STALE_SECONDS + 60))
     _set_cross_check(analysis_id, {"ran": False, "status": "running",

@@ -1,0 +1,7 @@
+@prefix : <http://ex.org/x#> . @prefix owl: <http://www.w3.org/2002/07/owl#> . @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> . @prefix obo: <http://purl.obolibrary.org/obo/> . @prefix dcterms: <http://purl.org/dc/terms/> .
+<http://ex.org/x> a owl:Ontology ; rdfs:label "Clinic" ; owl:imports <http://purl.obolibrary.org/obo/bfo.owl> .
+:Disorder a owl:Class ; rdfs:label "Mental disorder" ; rdfs:subClassOf obo:BFO_0000016 .
+:Episode a owl:Class ; rdfs:label "Manic episode" ; rdfs:subClassOf :Disorder , obo:BFO_0000015 ; dcterms:source "A manic episode is a distinct period..." .
+:Patient a owl:Class ; rdfs:label "Patient" ; rdfs:subClassOf obo:BFO_0000040 .
+:Score a owl:Class ; rdfs:label "Severity score" ; rdfs:subClassOf obo:BFO_0000019 , obo:IAO_0000030 .
+:Note a owl:Class ; rdfs:label "Clinic note" .

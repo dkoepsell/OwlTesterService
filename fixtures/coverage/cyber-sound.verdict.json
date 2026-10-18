@@ -1,0 +1,15 @@
+{
+  "fixture_id": "cyber-sound",
+  "coherent": true,
+  "headline": "A claim scenario exists in which this coverage pays.",
+  "checked_positions": [
+    {
+      "position": "restored_by_c1",
+      "label": "Does Endorsement 7 restore any coverage?",
+      "result": "inhabited",
+      "contradicting_clauses": []
+    }
+  ],
+  "plain_english_why": "Endorsement 7's condition \u2014 timely notice under Section 9 \u2014 is independent of what Exclusion 4(f) excludes. A claim can be excluded for a security-standards failure and still satisfy the notice condition, so there are real claim scenarios in which the carveback gives coverage back. The endorsement does the work it advertises.",
+  "scenario": "Example: a ransomware event first discovered in March, where a Schedule B control had lapsed \u2014 excluded under 4(f) \u2014 but the Insured gave timely notice under Section 9. Endorsement 7 restores coverage and the claim pays."
+}

@@ -1,0 +1,58 @@
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo:  <http://purl.obolibrary.org/obo/> .
+@prefix ex:   <http://example.org/rec#> .
+
+# A recognition-only institution carrying one instance of each defect the DL
+# instrument can reach. Every entity that should land on the chain carries a
+# label cue, so the binding is exercised alongside the detectors.
+
+<http://example.org/rec/stratum-abc> a owl:Ontology .
+
+ex:ReviewBoard a owl:Class ; rdfs:subClassOf obo:BFO_0000027 ;
+    rdfs:label "review board" .
+
+ex:EligibilityCriterion a owl:Class ; rdfs:subClassOf obo:IAO_0000033 ;
+    rdfs:label "eligibility criterion" .
+
+# --- K-C1: forced under two disjoint upper categories -------------------------
+# A continuant and an occurrent at once. bfo_lint sees this on named edges.
+ex:HearingCriterion a owl:Class ;
+    rdfs:subClassOf obo:BFO_0000002, obo:BFO_0000003 ;
+    rdfs:label "hearing criterion" .
+
+# --- K-C1 again, but inherited: the blanket case (§9.3) -----------------------
+# This class clashes only because its parent does. It is not an independent
+# discovery and must not be counted as one.
+ex:UrgentHearingCriterion a owl:Class ;
+    rdfs:subClassOf ex:HearingCriterion, obo:BFO_0000002, obo:BFO_0000003 ;
+    rdfs:label "urgent hearing criterion" .
+
+# --- K-B1: subsumption cycle --------------------------------------------------
+ex:ResidencyCondition a owl:Class ;
+    rdfs:subClassOf ex:SettlementCondition ;
+    rdfs:label "residency condition" .
+ex:SettlementCondition a owl:Class ;
+    rdfs:subClassOf ex:ResidencyCondition ;
+    rdfs:label "settlement condition" .
+
+# --- K-C3 (partial): a dependent continuant with no bearer --------------------
+ex:ApplicantStatus a owl:Class ; rdfs:subClassOf obo:BFO_0000020 ;
+    rdfs:label "applicant status" .
+
+# --- the §10.1 extraction defect: a reified realizable hung on its bearer -----
+# Correctly grounded as a disposition, and additionally minted as a material
+# entity bearing itself. That is the shape the paper reports as the largest
+# single source of artifactual incoherence in LLM ontology extraction: the
+# extractor reifies a realizable, hangs it on its bearer, and the class ends up
+# under two disjoint BFO categories at once.
+#
+# It therefore produces a genuine K-C1 clash -- which must come back attributed
+# to the artifact, not to the source classification.
+ex:FlightRiskDisposition a owl:Class ;
+    rdfs:subClassOf obo:BFO_0000016, obo:BFO_0000040 ;
+    rdfs:subClassOf [ a owl:Restriction ;
+                      owl:onProperty obo:RO_0000091 ;
+                      owl:someValuesFrom obo:BFO_0000016 ] ;
+    rdfs:label "flight risk disposition" .

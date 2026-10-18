@@ -1,0 +1,1731 @@
+<title>Kindwork</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a workbench. Wordmark and step tabs on top, then one working surface per step.
+   Interview is list + detail; Build is a live preview of the generated tool beside its files. */
+:root{
+  --paper:#F2F4F1; --surface:#FFFFFF; --sunk:#E9EDE9; --ink:#15201A; --ink-2:#4F5C55; --ink-3:#77837D; --line:#D3DAD4;
+  --accent:#15201A; --accent-ink:#F7F9F6; --focus:#2F62B8;
+  --time:#8A570A; --time-soft:#F6ECDA; --rec:#13675A; --rec-soft:#DCEFE9; --thg:#3B587A; --thg-soft:#E2E9F2;
+  --crit:#B42318; --crit-soft:#FBE8E6; --warn:#8F5E00; --warn-soft:#FAF0D9; --chain:#6740A6; --chain-soft:#EFE8F9; --good:#1F6C46; --good-soft:#E0F1E7;
+  --display:"Bricolage Grotesque","Atkinson Hyperlegible",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#0E1411; --surface:#151D19; --sunk:#1B2420; --ink:#E4EBE6; --ink-2:#A7B4AD; --ink-3:#7D8A83; --line:#2A3530;
+  --accent:#E4EBE6; --accent-ink:#0E1411; --focus:#7FA8F0;
+  --time:#E3B462; --time-soft:#2D2311; --rec:#62C7B1; --rec-soft:#11302A; --thg:#97B5DA; --thg-soft:#1A2533;
+  --crit:#F28A80; --crit-soft:#3A1714; --warn:#E6B65E; --warn-soft:#32260F; --chain:#B99DF2; --chain-soft:#261C3A; --good:#76D19F; --good-soft:#13301F;
+  color-scheme:dark } }
+:root[data-theme="dark"]{
+  --paper:#0E1411; --surface:#151D19; --sunk:#1B2420; --ink:#E4EBE6; --ink-2:#A7B4AD; --ink-3:#7D8A83; --line:#2A3530;
+  --accent:#E4EBE6; --accent-ink:#0E1411; --focus:#7FA8F0;
+  --time:#E3B462; --time-soft:#2D2311; --rec:#62C7B1; --rec-soft:#11302A; --thg:#97B5DA; --thg-soft:#1A2533;
+  --crit:#F28A80; --crit-soft:#3A1714; --warn:#E6B65E; --warn-soft:#32260F; --chain:#B99DF2; --chain-soft:#261C3A; --good:#76D19F; --good-soft:#13301F;
+  color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:16px/1.5 var(--body)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.shell{max-width:1200px;margin:0 auto;padding-block:22px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px 24px;flex-wrap:wrap;padding-bottom:16px;border-bottom:2px solid var(--ink)}
+.mark{font:700 clamp(30px,4.4vw,44px)/1 var(--display);letter-spacing:-.025em}
+.mark span{color:var(--rec)}
+.tag{margin:8px 0 0;color:var(--ink-2);max-width:60ch;text-wrap:pretty}
+.switch{display:inline-flex;align-items:center;gap:10px;font-size:14px;font-weight:700;cursor:pointer;user-select:none}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.track{width:38px;height:22px;border-radius:99px;background:var(--line);position:relative;transition:background .15s}
+.track::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--surface);transition:transform .15s}
+.switch input:checked + .track{background:var(--rec)}
+.switch input:checked + .track::after{transform:translateX(16px)}
+.switch input:focus-visible + .track{outline:2px solid var(--focus);outline-offset:2px}
+
+.steps{display:flex;gap:6px;margin:18px 0 22px;overflow-x:auto;padding-bottom:2px}
+.step{display:flex;align-items:center;gap:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-weight:700;font-size:14.5px;padding:9px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.step:hover{color:var(--ink)}
+.step[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.step .n{font:600 12px var(--mono);opacity:.65}
+.count{font:600 11.5px var(--mono);padding:1px 7px;border-radius:99px;background:var(--sunk);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.step[aria-selected="true"] .count{background:color-mix(in srgb,var(--paper) 18%,transparent);color:var(--paper)}
+.count.alert{background:var(--crit-soft);color:var(--crit)}
+
+h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h2{font-size:24px;font-weight:700;letter-spacing:-.01em}
+h3{font-size:16px;font-weight:700}
+.eyebrow{font:600 11.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.sub{color:var(--ink-2);font-size:14px;margin:4px 0 0}
+.lab{display:block;font-weight:700;font-size:14px;margin-bottom:6px}
+
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:14.5px;padding:9px 15px;border-radius:9px;cursor:pointer}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{opacity:.9}
+.btn.ghost{background:transparent}
+.btn.danger{background:var(--crit);border-color:var(--crit);color:#fff}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.link{background:none;border:0;padding:2px 2px;color:var(--ink);font-weight:700;font-size:14px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+input[type=text],input:not([type]),select,textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:15px}
+textarea{resize:vertical;line-height:1.5}
+input:focus,select:focus,textarea:focus{border-color:var(--ink-3)}
+
+.kw{display:inline-flex;align-items:center;font:600 12.5px/1 var(--mono);padding:5px 9px;border-radius:99px;border:1px solid transparent;white-space:nowrap}
+.kw.big{font-size:17px;padding:8px 14px}
+.kw.fam-time{color:var(--time);background:var(--time-soft);border-color:color-mix(in srgb,var(--time) 30%,transparent)}
+.kw.fam-records{color:var(--rec);background:var(--rec-soft);border-color:color-mix(in srgb,var(--rec) 30%,transparent)}
+.kw.fam-things{color:var(--thg);background:var(--thg-soft);border-color:color-mix(in srgb,var(--thg) 30%,transparent)}
+.kw.rec{box-shadow:0 0 0 2px var(--surface),0 0 0 3px currentColor}
+.pill{display:inline-flex;font:600 11.5px/1 var(--mono);padding:5px 8px;border-radius:99px;white-space:nowrap}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.ontline{font:12.5px/1.45 var(--mono);color:var(--ink-2);margin:8px 0 0}
+.ontline code{font:inherit;color:var(--ink)}
+
+/* Describe */
+.describe{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+.describe textarea{min-height:220px;font-size:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.status{font-size:14px;color:var(--ink-2)}
+.status.busy::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--rec);margin-right:8px;animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.addrow{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.inline{display:flex;gap:8px}
+.inline input{flex:1;min-width:0}
+.how ol{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:16px}
+.how li{display:grid;grid-template-columns:30px 1fr;gap:10px}
+.how .num{font:600 13px var(--mono);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--sunk);color:var(--ink-2)}
+.how p{margin:2px 0 0;color:var(--ink-2);font-size:14.5px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+
+/* Interview */
+.iv{display:grid;grid-template-columns:290px minmax(0,1fr);gap:22px;align-items:start}
+.tl{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+.tl-head{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 10px}
+.tlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;max-height:70vh;overflow:auto}
+.titem{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;border:0;background:transparent;padding:9px 10px;border-radius:9px;cursor:pointer}
+.titem:hover{background:var(--sunk)}
+.titem.on{background:var(--sunk);box-shadow:inset 0 0 0 1px var(--line)}
+.tname{font-weight:700;font-size:14.5px;min-width:0;overflow-wrap:anywhere}
+.tmeta{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.dot{font:600 11px/1 var(--mono);min-width:19px;height:19px;padding:0 5px;border-radius:99px;display:grid;place-items:center;background:var(--crit);color:#fff}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:20px;min-width:0}
+.tname-in{font:700 22px/1.2 var(--display)!important;padding:8px 11px}
+.fields{display:grid;gap:4px}
+.fields .lab:not(:first-child){margin-top:10px}
+.flag{background:var(--crit-soft);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:14.5px}
+.dgrid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
+.qs{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.q{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:12px;border:1px solid var(--line);border-radius:11px}
+.q.open{border-color:var(--ink-3);background:var(--sunk)}
+.qn{font:600 12px var(--mono);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper)}
+.qt{margin:0;font-weight:700;font-size:15px;line-height:1.4}
+.qh{margin:4px 0 10px;font-size:13.5px;color:var(--ink-2)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:7px 13px;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink-2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.seg button[data-v="?"][aria-pressed="true"]{background:var(--warn-soft);color:var(--warn)}
+.unsure{margin:10px 0 0;font-size:14px;background:var(--warn-soft);padding:8px 11px;border-radius:8px}
+.side{display:flex;flex-direction:column;gap:16px}
+.result{border-radius:12px;padding:16px;border:1px solid var(--line)}
+.result.fam-time{background:var(--time-soft)}
+.result.fam-records{background:var(--rec-soft)}
+.result.fam-things{background:var(--thg-soft)}
+.result.pending{background:var(--sunk);border-style:dashed}
+.result .kwrow{margin:10px 0 8px}
+.result p{margin:0;font-size:14.5px}
+.block h3{margin-bottom:2px}
+.slots{display:flex;flex-direction:column;gap:12px;margin-top:10px}
+.slab{display:block;font-weight:700;font-size:13.5px;margin-bottom:5px}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px}
+.check{display:inline-flex;gap:6px;align-items:center;font-size:14.5px}
+.sigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px 18px;margin-top:10px}
+.sig{display:flex;gap:8px;align-items:flex-start;font-size:14.5px}
+.sig input,.check input{margin-top:4px;accent-color:var(--rec)}
+.dfoot{display:flex;gap:10px;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--line)}
+
+/* Resolve */
+.rhead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.rhead p{margin:6px 0 0;color:var(--ink-2);max-width:62ch}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.sev{font:600 11.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.sev-partition .card-head{background:var(--crit-soft)} .sev-partition .sev{color:var(--crit)}
+.sev-within .card-head{background:var(--warn-soft)} .sev-within .sev{color:var(--warn)}
+.sev-chain .card-head{background:var(--chain-soft)} .sev-chain .sev{color:var(--chain)}
+.card-body{padding:16px;display:flex;flex-direction:column;gap:10px;flex:1}
+.card-body p{margin:0;font-size:15px}
+.card-body .ontline{margin-top:-4px}
+.opts{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:8px}
+.optform{display:flex;gap:8px;width:100%}
+.optform input{flex:1;min-width:0}
+.quiet{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:28px;text-align:center;color:var(--ink-2)}
+.quiet h3{color:var(--ink);margin-bottom:6px}
+.undecided{margin-top:24px}
+.undecided ul{list-style:none;padding:0;margin:10px 0 0;display:flex;flex-wrap:wrap;gap:8px}
+
+/* Build */
+.bhead{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:end;margin-bottom:18px}
+.bhead .appname{max-width:420px}
+.bstat{font-size:14px;color:var(--ink-2)}
+.bstat b{color:var(--ink)}
+.build{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:22px;align-items:start}
+.build>section{min-width:0}
+.sectlab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px}
+.rules{margin-top:22px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.rules ul{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column}
+.rules li{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.rules li:first-child{border-top:0}
+.rules .rname{font-weight:700;font-size:14.5px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.rules .rtext{font-size:14px;color:var(--ink-2);display:flex;flex-direction:column;gap:3px}
+.rules .rtext .ex{color:var(--ink-3);font-style:italic}
+.exports{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+.filetabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px}
+.ftab{border:1px solid var(--line);background:transparent;border-radius:8px;padding:6px 10px;font-size:13.5px;font-weight:700;cursor:pointer;color:var(--ink-2)}
+.ftab[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.fmeta{display:flex;justify-content:space-between;gap:8px;align-items:center;font:12.5px var(--mono);color:var(--ink-3);margin-bottom:8px}
+.code{font:12px/1.55 var(--mono);background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:12px 14px;max-height:430px;overflow:auto;white-space:pre;margin:0;color:var(--ink);tab-size:2}
+.saves{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.savenote{font-size:13.5px;color:var(--ink-2);margin:10px 0 0}
+.empty-pane{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:40px 24px;text-align:center}
+.empty-pane p{color:var(--ink-2);margin:8px auto 18px;max-width:46ch}
+
+/* Toolchain strip */
+.eco{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.eco-item{display:inline-flex;align-items:baseline;gap:7px;padding:6px 11px;border:1px solid var(--line);border-radius:99px;font-size:13.5px;color:var(--ink-2);text-decoration:none;background:var(--surface)}
+.eco-item b{color:var(--ink)}
+a.eco-item:hover{border-color:var(--ink-3)}
+.eco-item.here{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.eco-arrow{color:var(--ink-3);align-self:center;font-size:13px}
+
+/* Ways in */
+.ways{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.way{display:flex;flex-direction:column;gap:3px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px;cursor:pointer}
+.way:hover{border-color:var(--ink-3)}
+.way[aria-selected="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.way-l{font:700 16px/1.25 var(--display)}
+.way-d{font-size:13.5px;color:var(--ink-2)}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.drop{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:2px dashed var(--line);border-radius:12px;padding:22px;margin:16px 0}
+.drop.over{border-color:var(--rec);background:var(--rec-soft)}
+.drop span{color:var(--ink-2);font-size:14.5px}
+.mode{border:0;padding:0;margin:0 0 6px;display:flex;flex-wrap:wrap;gap:6px 18px}
+.mode legend{padding:0;margin-bottom:6px}
+.mode label{display:inline-flex;gap:7px;align-items:center;font-size:14.5px}
+.mode input{accent-color:var(--rec)}
+.status.err{color:var(--crit)}
+.callout{margin-top:18px;padding:14px 16px;border-radius:12px;background:var(--sunk);font-size:14.5px}
+.callout p{margin:4px 0 0;color:var(--ink-2)}
+.handoff{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:h}
+.handoff li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;counter-increment:h}
+.handoff li::before{content:counter(h);font:600 13px var(--mono);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper)}
+.handoff p{margin:2px 0 8px;color:var(--ink-2);font-size:14.5px}
+.handoff .row{margin-top:0}
+
+/* Origin and provenance */
+.origin p{margin:6px 0 0}
+.prov{margin:10px 0 0;padding:10px 14px;border-left:3px solid var(--rec);background:var(--rec-soft);border-radius:0 8px 8px 0;font-size:14.5px}
+.prov cite{display:block;margin-top:4px;font:normal 12px var(--mono);color:var(--ink-2);overflow-wrap:anywhere}
+code{font-family:var(--mono);font-size:.88em;overflow-wrap:anywhere}
+
+/* Findings */
+.fsec{margin-top:30px}
+.sev-info .card-head{background:var(--sunk)} .sev-info .sev{color:var(--ink-2)}
+.verdict{font:600 11px/1 var(--mono);padding:4px 8px;border-radius:99px;text-transform:uppercase;letter-spacing:.05em}
+.verdict.fail{background:var(--crit);color:#fff}
+.verdict.undetermined{background:var(--warn-soft);color:var(--warn);box-shadow:inset 0 0 0 1px currentColor}
+.verdict.pass{background:var(--good-soft);color:var(--good)}
+.card.reviewed{opacity:.6}
+.termlinks{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:14px}
+details.axioms summary{cursor:pointer;font-size:13.5px;font-weight:700}
+details.axioms pre{font:12px/1.5 var(--mono);background:var(--sunk);padding:10px;border-radius:8px;overflow-x:auto;margin:8px 0 0;white-space:pre-wrap}
+
+/* Next in the toolchain */
+.next{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.nextrow{display:flex;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;align-items:center}
+.nextrow>div:first-child{display:flex;flex-direction:column;min-width:0;flex:1 1 220px}
+.nextrow span{font-size:13.5px;color:var(--ink-2)}
+.nb{display:flex;gap:8px;flex-wrap:wrap}
+a.btn{text-decoration:none}
+.bfields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px;max-width:760px}
+
+/* Generated-tool preview: runtime tokens mapped onto the page's tokens */
+.kwr{--r-bg:var(--surface);--r-sunk:var(--sunk);--r-ink:var(--ink);--r-ink2:var(--ink-2);--r-line:var(--line);--r-accent:var(--accent);--r-accent-ink:var(--accent-ink);--r-focus:var(--focus);
+  --r-good:var(--good);--r-good-soft:var(--good-soft);--r-warn:var(--warn);--r-warn-soft:var(--warn-soft);--r-crit:var(--crit);--r-crit-soft:var(--crit-soft);
+  --r-font:var(--body);--r-display:var(--display);--r-mono:var(--mono)}
+
+@media (max-width:980px){
+  .describe,.build{grid-template-columns:1fr}
+  .exports{position:static}
+  .dgrid{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .iv{grid-template-columns:1fr}
+  .tl{position:static}
+  .tlist{max-height:240px}
+  .bhead{grid-template-columns:1fr}
+  .rules li{grid-template-columns:1fr;gap:6px}
+  .cards{grid-template-columns:1fr}
+  .detail,.panel{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<style id="runtime-css">
+.kwr{font-family:var(--r-font);color:var(--r-ink)}
+.kwr *{box-sizing:border-box}
+.kwr-app{background:var(--r-bg);border:1px solid var(--r-line);border-radius:12px;overflow:hidden}
+.kwr-head{display:flex;justify-content:space-between;align-items:flex-end;gap:8px 16px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid var(--r-line)}
+.kwr-eyebrow{font:600 11px/1 var(--r-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--r-ink2)}
+.kwr-title{font:700 22px/1.2 var(--r-display);margin-top:6px}
+.kwr-meta{font-size:13px;color:var(--r-ink2)}
+.kwr-body{display:grid;grid-template-columns:210px minmax(0,1fr)}
+.kwr-nav{border-right:1px solid var(--r-line);padding:12px;display:flex;flex-direction:column;gap:14px;background:var(--r-sunk)}
+.kwr-navlab{font:600 10.5px/1.2 var(--r-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--r-ink2);margin:0 8px 4px}
+.kwr-navbtn{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:transparent;color:var(--r-ink);font:inherit;font-size:14px;padding:7px 8px;border-radius:7px;cursor:pointer}
+.kwr-navbtn:hover{background:var(--r-bg)}
+.kwr-navbtn.on{background:var(--r-bg);box-shadow:inset 0 0 0 1px var(--r-line);font-weight:700}
+.kwr-count{font:12px var(--r-mono);color:var(--r-ink2);font-variant-numeric:tabular-nums}
+.kwr-main{padding:18px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.kwr-colhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.kwr-kind{font:600 11px var(--r-mono);color:var(--r-ink2);text-transform:uppercase;letter-spacing:.06em}
+.kwr-colhead h2{font:700 20px/1.25 var(--r-display);margin:4px 0}
+.kwr-colhead p{margin:0;color:var(--r-ink2);font-size:14px;max-width:56ch}
+.kwr-note{font-size:13.5px;padding:9px 12px;border-radius:8px;background:var(--r-warn-soft);color:var(--r-ink)}
+.kwr-btn{font:inherit;font-size:14px;font-weight:700;padding:8px 14px;border-radius:8px;border:1px solid var(--r-line);background:var(--r-bg);color:var(--r-ink);cursor:pointer}
+.kwr-primary{background:var(--r-accent);color:var(--r-accent-ink);border-color:var(--r-accent)}
+.kwr-link{font:inherit;font-size:13px;background:none;border:0;color:var(--r-ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:2px 4px}
+.kwr-danger{color:var(--r-crit)}
+.kwr-form{border:1px solid var(--r-line);border-radius:10px;padding:14px;background:var(--r-sunk);display:flex;flex-direction:column;gap:12px}
+.kwr-formhead{font-weight:700}
+.kwr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.kwr-f{display:flex;flex-direction:column;gap:4px;min-width:0;border:0;padding:0;margin:0}
+.kwr-wide{grid-column:1/-1}
+.kwr-f label,.kwr-f legend{font-size:13px;font-weight:700;padding:0}
+.kwr-req{font-weight:400;color:var(--r-ink2);font-size:12px}
+.kwr-f input,.kwr-f select,.kwr-f textarea{font:inherit;font-size:14px;padding:7px 9px;border:1px solid var(--r-line);border-radius:7px;background:var(--r-bg);color:var(--r-ink);width:100%}
+.kwr-help{font-size:12px;color:var(--r-ink2)}
+.kwr-checks{display:flex;flex-wrap:wrap;gap:6px 14px}
+.kwr-check{font-size:14px;display:flex;gap:6px;align-items:center}
+.kwr-errs{margin:0;padding:10px 12px 10px 28px;border-radius:8px;background:var(--r-crit-soft);color:var(--r-ink);font-size:13.5px}
+.kwr-actions{display:flex;gap:8px}
+.kwr-empty{padding:22px;text-align:center;border:1px dashed var(--r-line);border-radius:10px;color:var(--r-ink2);font-size:14px}
+.kwr-tablewrap{overflow-x:auto;border:1px solid var(--r-line);border-radius:10px}
+.kwr-table{width:100%;border-collapse:collapse;font-size:14px}
+.kwr-table th{text-align:left;font:600 11px var(--r-mono);text-transform:uppercase;letter-spacing:.05em;color:var(--r-ink2);padding:9px 12px;border-bottom:1px solid var(--r-line);background:var(--r-sunk);white-space:nowrap}
+.kwr-table td{padding:9px 12px;border-bottom:1px solid var(--r-line);vertical-align:top}
+.kwr-table tr:last-child td{border-bottom:0}
+.kwr-rowact{white-space:nowrap;text-align:right}
+.kwr-dim{color:var(--r-ink2)}
+.kwr-pill{display:inline-block;font:600 11px/1.6 var(--r-mono);padding:1px 8px;border-radius:99px;white-space:nowrap}
+.kwr-pill.good{background:var(--r-good-soft);color:var(--r-good)}
+.kwr-pill.warn{background:var(--r-warn-soft);color:var(--r-warn)}
+.kwr-pill.crit{background:var(--r-crit-soft);color:var(--r-crit)}
+.kwr-pill.muted{background:var(--r-sunk);color:var(--r-ink2);box-shadow:inset 0 0 0 1px var(--r-line)}
+.kwr-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.kwr :focus-visible{outline:2px solid var(--r-focus);outline-offset:2px}
+@media (max-width:720px){.kwr-body{grid-template-columns:1fr}.kwr-nav{border-right:0;border-bottom:1px solid var(--r-line);flex-direction:row;overflow-x:auto}.kwr-navgroup{min-width:180px}}
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div>
+      <div class="mark">Kind<span>work</span></div>
+      <p class="tag">Describe a task. Answer plain questions about its terms. Get a working tracker, with the checked ontology and rules behind it.</p>
+      <nav class="eco" aria-label="Toolchain">
+        <span class="eco-item here" aria-current="page"><b>Kindwork</b> models the task</span>
+        <span class="eco-arrow" aria-hidden="true">→</span>
+        <a class="eco-item" href="http://bfo-agent.davidkoepsell.com" target="_blank" rel="noopener"><b>BFO-Agent</b> populates from documents</a>
+        <span class="eco-arrow" aria-hidden="true">→</span>
+        <a class="eco-item" href="https://ontology.davidkoepsell.com" target="_blank" rel="noopener"><b>OwlTester</b> verifies with a reasoner</a>
+      </nav>
+    </div>
+    <label class="switch" for="ont"><input type="checkbox" id="ont"><span class="track" aria-hidden="true"></span><span>Show the ontology</span></label>
+  </header>
+  <nav class="steps" id="steps" role="tablist" aria-label="Steps"></nav>
+  <main id="view"></main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/n3@1.17.4/browser/n3.min.js"></script>
+<script>
+/* ===== Generated-tool runtime. Self-contained: it is copied verbatim into every exported tracker. ===== */
+function KindworkRuntime(root, schema, opts) {
+  opts = opts || {};
+  var data = {};
+  try { data = (opts.load && opts.load()) || {}; } catch (e) { data = {}; }
+  var cols = schema.collections;
+  var cur = cols.length ? cols[0].id : null;
+  var mode = null, editId = null, errs = [], confirmId = null, draft = null;
+  var FAM = { things: 'Things and their features', records: 'Records and recognition', time: 'Happenings and time' };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function col(id) { for (var i = 0; i < cols.length; i++) if (cols[i].id === id) return cols[i]; return null; }
+  function rows(id) { if (!data[id]) data[id] = []; return data[id]; }
+  function persist() { if (opts.save) { try { opts.save(data); } catch (e) {} } }
+  function nameOf(cid, rid) { var r = rows(cid).filter(function (x) { return x.id === rid; })[0]; return r ? r.name : '(removed)'; }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function nowISO() { var d = new Date(); return today() + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function state(c, r) {
+    var t = today(), n = nowISO();
+    if (c.state === 'status') { if (r.standing === 'Revoked') return ['Revoked', 'crit']; if (r.standing === 'Suspended') return ['Suspended', 'warn']; if (r.expires && r.expires < t) return ['Expired', 'crit']; return ['In force', 'good']; }
+    if (c.state === 'obligation') { if (r.standing === 'Met') return ['Met', 'good']; if (r.standing === 'Waived') return ['Waived', 'muted']; if (r.due && r.due < t) return ['Overdue', 'crit']; return ['Open', 'warn']; }
+    if (c.state === 'happening') { if (r.start && r.start > n) return ['Scheduled', 'muted']; if (!r.end) return ['In progress', 'warn']; return ['Finished', 'good']; }
+    if (c.state === 'period') { if (r.starts && r.starts > t) return ['Upcoming', 'muted']; if (r.ends && r.ends < t) return ['Past', 'muted']; return ['Current', 'good']; }
+    if (c.state === 'role') { if (r.until && r.until < t) return ['Ended', 'muted']; return ['Current', 'good']; }
+    return null;
+  }
+  function none() { return '<span class="kwr-dim">none</span>'; }
+  function display(f, r) {
+    var v = r[f.key];
+    if (f.type === 'ref') return v ? esc(nameOf(f.ref, v)) : none();
+    if (f.type === 'refs') return (v && v.length) ? esc(v.map(function (x) { return nameOf(f.ref, x); }).join(', ')) : none();
+    if (f.type === 'datetime' && v) return esc(String(v).replace('T', ' '));
+    return (v == null || v === '') ? none() : esc(v);
+  }
+  function validate(c, r) {
+    var e = [];
+    c.fields.forEach(function (f) { var v = r[f.key]; if (f.req && (v == null || v === '' || (Array.isArray(v) && !v.length))) e.push(f.label + ' is needed for every ' + c.name + '.'); });
+    (c.rules || []).forEach(function (ru) {
+      if (ru.type === 'order' && r[ru.a] && r[ru.b] && r[ru.b] < r[ru.a]) e.push(ru.msg);
+      if (ru.type === 'unique' && r[ru.key] && rows(c.id).some(function (x) { return x.id !== r.id && x[ru.key] === r[ru.key]; })) e.push(ru.msg);
+    });
+    return e;
+  }
+  function field(c, f, r) {
+    var v = r[f.key], id = 'kwr-' + c.id + '-' + f.key, req = f.req ? ' <span class="kwr-req">required</span>' : '';
+    var lab = '<label for="' + id + '">' + esc(f.label) + req + '</label>';
+    if (f.type === 'textarea') return '<div class="kwr-f kwr-wide">' + lab + '<textarea id="' + id + '" data-f="' + f.key + '" rows="2">' + esc(v) + '</textarea></div>';
+    if (f.type === 'select') return '<div class="kwr-f">' + lab + '<select id="' + id + '" data-f="' + f.key + '">' + f.options.map(function (o) { return '<option' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select></div>';
+    if (f.type === 'ref') {
+      var list = rows(f.ref), tc = col(f.ref);
+      return '<div class="kwr-f">' + lab + '<select id="' + id + '" data-f="' + f.key + '"><option value="">Choose…</option>' + list.map(function (o) { return '<option value="' + o.id + '"' + (o.id === v ? ' selected' : '') + '>' + esc(o.name) + '</option>'; }).join('') + '</select>' + (list.length ? '' : '<span class="kwr-help">No ' + esc(tc ? tc.name : 'entries') + ' entries yet. Add one there first.</span>') + '</div>';
+    }
+    if (f.type === 'refs') {
+      var l2 = rows(f.ref), tc2 = col(f.ref); v = v || [];
+      return '<fieldset class="kwr-f kwr-wide"><legend>' + esc(f.label) + req + '</legend>' + (l2.length ? '<div class="kwr-checks">' + l2.map(function (o) { return '<label class="kwr-check"><input type="checkbox" data-fm="' + f.key + '" value="' + o.id + '"' + (v.indexOf(o.id) >= 0 ? ' checked' : '') + '> ' + esc(o.name) + '</label>'; }).join('') + '</div>' : '<span class="kwr-help">No ' + esc(tc2 ? tc2.name : 'entries') + ' entries yet.</span>') + '</fieldset>';
+    }
+    var type = f.type === 'datetime' ? 'datetime-local' : (f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text'));
+    return '<div class="kwr-f">' + lab + '<input id="' + id + '" type="' + type + '" data-f="' + f.key + '" value="' + esc(v) + '"' + (type === 'number' ? ' step="any"' : '') + '></div>';
+  }
+  function render() {
+    var c = col(cur);
+    var nav = ['things', 'records', 'time'].map(function (fam) {
+      var cs = cols.filter(function (x) { return x.fam === fam; });
+      if (!cs.length) return '';
+      return '<div class="kwr-navgroup"><div class="kwr-navlab">' + FAM[fam] + '</div>' + cs.map(function (x) { return '<button type="button" class="kwr-navbtn' + (x.id === cur ? ' on' : '') + '" data-k="nav" data-id="' + x.id + '"' + (x.id === cur ? ' aria-current="true"' : '') + '><span>' + esc(x.name) + '</span><span class="kwr-count">' + rows(x.id).length + '</span></button>'; }).join('') + '</div>';
+    }).join('');
+    var main = '';
+    if (!c) main = '<div class="kwr-empty">This tool has no record types yet.</div>';
+    else {
+      var list = rows(c.id);
+      var shown = c.fields.filter(function (f) { return f.key !== 'name' && f.type !== 'textarea'; }).slice(0, 3);
+      main += '<div class="kwr-colhead"><div><div class="kwr-kind">' + esc(c.kw) + '</div><h2>' + esc(c.name) + '</h2><p>' + esc(c.meaning) + '</p></div>' + (mode ? '' : '<button type="button" class="kwr-btn kwr-primary" data-k="add">Add ' + esc(c.name) + '</button>') + '</div>';
+      (c.notes || []).forEach(function (n) { main += '<div class="kwr-note">' + esc(n) + '</div>'; });
+      if (mode) {
+        var r = draft || (editId ? (list.filter(function (x) { return x.id === editId; })[0] || {}) : {});
+        if (!editId && !draft) c.fields.forEach(function (f) { if (f.type === 'select' && r[f.key] == null) r[f.key] = f.options[0]; });
+        main += '<form class="kwr-form" data-k="form" novalidate><div class="kwr-formhead">' + (editId ? 'Edit ' : 'New ') + esc(c.name) + '</div><div class="kwr-grid">' + c.fields.map(function (f) { return field(c, f, r); }).join('') + '</div>' + (errs.length ? '<ul class="kwr-errs" role="alert">' + errs.map(function (e) { return '<li>' + esc(e) + '</li>'; }).join('') + '</ul>' : '') + '<div class="kwr-actions"><button type="submit" class="kwr-btn kwr-primary">Save</button><button type="button" class="kwr-btn" data-k="cancel">Cancel</button></div></form>';
+      }
+      if (!list.length) main += '<div class="kwr-empty">No ' + esc(c.name) + ' entries yet. Use “Add ' + esc(c.name) + '” to record the first one.</div>';
+      else main += '<div class="kwr-tablewrap"><table class="kwr-table"><thead><tr><th>' + esc(c.fields[0].label) + '</th>' + shown.map(function (f) { return '<th>' + esc(f.label) + '</th>'; }).join('') + (c.state ? '<th>State</th>' : '') + '<th><span class="kwr-sr">Actions</span></th></tr></thead><tbody>' + list.map(function (r) {
+        var st = state(c, r), bad = validate(c, r).length;
+        return '<tr><td><b>' + esc(r.name) + '</b>' + (bad ? ' <span class="kwr-pill crit" title="This entry breaks a rule; open it to see which">Check</span>' : '') + '</td>' + shown.map(function (f) { return '<td>' + display(f, r) + '</td>'; }).join('') + (c.state ? '<td>' + (st ? '<span class="kwr-pill ' + st[1] + '">' + st[0] + '</span>' : '') + '</td>' : '') + '<td class="kwr-rowact"><button type="button" class="kwr-link" data-k="edit" data-id="' + r.id + '">Edit</button>' + (confirmId === r.id ? '<button type="button" class="kwr-link kwr-danger" data-k="del" data-id="' + r.id + '">Confirm delete</button>' : '<button type="button" class="kwr-link" data-k="askdel" data-id="' + r.id + '">Delete</button>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    }
+    root.innerHTML = '<div class="kwr-app"><header class="kwr-head"><div><div class="kwr-eyebrow">Tracker</div><div class="kwr-title">' + esc(schema.app) + '</div></div><div class="kwr-meta">' + cols.length + ' record types · rules from a checked model' + (opts.exportData ? ' · <button type="button" class="kwr-link" data-k="export">Export data</button>' : '') + '</div></header><div class="kwr-body"><nav class="kwr-nav" aria-label="Record types">' + nav + '</nav><section class="kwr-main">' + main + '</section></div></div>';
+  }
+  root.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-k]'); if (!b || !root.contains(b)) return;
+    var k = b.getAttribute('data-k'), id = b.getAttribute('data-id');
+    if (k === 'nav') { cur = id; mode = null; editId = null; errs = []; confirmId = null; draft = null; render(); }
+    else if (k === 'add') { mode = 'new'; editId = null; errs = []; draft = null; render(); var first = root.querySelector('.kwr-form input,.kwr-form select'); if (first) first.focus(); }
+    else if (k === 'cancel') { mode = null; editId = null; errs = []; draft = null; render(); }
+    else if (k === 'edit') { mode = 'edit'; editId = id; errs = []; draft = null; render(); }
+    else if (k === 'askdel') { confirmId = id; render(); }
+    else if (k === 'del') { data[cur] = rows(cur).filter(function (x) { return x.id !== id; }); confirmId = null; persist(); render(); }
+    else if (k === 'export' && opts.exportData) { opts.exportData(data); }
+  });
+  root.addEventListener('submit', function (ev) {
+    var form = ev.target.closest('[data-k="form"]'); if (!form) return;
+    ev.preventDefault();
+    var c = col(cur), list = rows(cur);
+    var base = editId ? (list.filter(function (x) { return x.id === editId; })[0] || {}) : {};
+    var r = JSON.parse(JSON.stringify(base));
+    r.id = r.id || ('r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    form.querySelectorAll('[data-f]').forEach(function (el) { r[el.getAttribute('data-f')] = el.value.trim(); });
+    c.fields.forEach(function (f) {
+      if (f.type === 'refs') r[f.key] = Array.prototype.map.call(form.querySelectorAll('[data-fm="' + f.key + '"]:checked'), function (x) { return x.value; });
+      if (f.type === 'number' && r[f.key] !== '' && r[f.key] != null) r[f.key] = Number(r[f.key]);
+    });
+    errs = validate(c, r);
+    if (errs.length) { draft = r; render(); var e = root.querySelector('.kwr-errs'); if (e) e.scrollIntoView({ block: 'nearest' }); return; }
+    if (editId) data[cur] = list.map(function (x) { return x.id === editId ? r : x; }); else list.push(r);
+    mode = null; editId = null; draft = null; persist(); render();
+  });
+  render();
+}
+</script>
+<script>
+(function () {
+'use strict';
+
+/* ---------- The keyword table ---------- */
+const KW = {
+  thing:      { fam: 'things',  bfo: 'material entity', iri: 'BFO:0000040', parent: 'obo:BFO_0000040', plain: 'A physical thing that stays the same thing while it changes.' },
+  group:      { fam: 'things',  bfo: 'object aggregate', iri: 'BFO:0000027', parent: 'obo:BFO_0000027', plain: 'Several things counted as one. Members can join or leave.' },
+  place:      { fam: 'things',  bfo: 'site', iri: 'BFO:0000029', parent: 'obo:BFO_0000029', plain: 'Somewhere things can be.' },
+  quality:    { fam: 'things',  bfo: 'quality', iri: 'BFO:0000019', parent: 'obo:BFO_0000019', plain: 'A measurable feature of one particular thing. It cannot move to another.' },
+  tendency:   { fam: 'things',  bfo: 'disposition', iri: 'BFO:0000016', parent: 'obo:BFO_0000016', plain: 'Something a thing can have without it ever showing.' },
+  function:   { fam: 'things',  bfo: 'function', iri: 'BFO:0000034', parent: 'obo:BFO_0000034', plain: 'What a made thing is for. Failing at it counts as a malfunction.' },
+  role:       { fam: 'things',  bfo: 'role', iri: 'BFO:0000023', parent: 'obo:BFO_0000023', plain: 'Gained or lost with no physical change to whoever has it.' },
+  authority:  { fam: 'things',  rec: true, bfo: 'role, authority pattern', iri: 'BFO:0000023', parent: 'obo:BFO_0000023', plain: 'The standing to grant, revoke, or recognize a status.' },
+  record:     { fam: 'records', bfo: 'information content entity', iri: 'IAO:0000030', parent: 'obo:IAO_0000030', plain: 'Written or recorded information about something else.' },
+  code:       { fam: 'records', bfo: 'information content entity, designative', iri: 'IAO:0000030', parent: 'obo:IAO_0000030', plain: 'A name, number, or label that points at something.' },
+  status:     { fam: 'records', rec: true, bfo: 'generically dependent continuant, recognition pattern', iri: 'BFO:0000031', parent: 'obo:BFO_0000031', plain: 'Exists because an authority granted it, and can be revoked.' },
+  obligation: { fam: 'records', rec: true, bfo: 'generically dependent continuant, obligation pattern', iri: 'BFO:0000031', parent: 'obo:BFO_0000031', plain: 'Requires someone to act, for someone who can claim it.' },
+  happening:  { fam: 'time',    bfo: 'process', iri: 'BFO:0000015', parent: 'obo:BFO_0000015', plain: 'Starts, takes time, and ends.' },
+  moment:     { fam: 'time',    bfo: 'process boundary', iri: 'BFO:0000035', parent: 'obo:BFO_0000035', plain: 'Takes no time. Marks the start or end of something.' },
+  period:     { fam: 'time',    bfo: 'one-dimensional temporal region', iri: 'BFO:0000038', parent: 'obo:BFO_0000038', plain: 'A span of time itself.' }
+};
+const FAM = { things: 'Things and their features', records: 'Records and recognition', time: 'Happenings and time' };
+
+const Q = {
+  r1:  { t: 'Does it happen, or is it a stretch or point of time?', h: 'Yes for an inspection, a shipment, a fiscal quarter. No for a worker, a license, a report.', ex: 'Picture it on a calendar. If it sits there as an event or a span, answer yes.' },
+  r2:  { t: 'Does it exist because something was written, declared, or decided?', h: 'Yes for a permit, a report, a duty, a license. No for a worker, a site, a noise level.', ex: 'If every document and decision about it vanished, would it still be there? If not, answer yes.' },
+  a1:  { t: 'Is it the time itself, not something going on during it?', h: 'Yes for a contract period or a fiscal year. No for an inspection.', ex: 'Could anyone take part in it? If nobody can, it is the time itself: answer yes.' },
+  a2:  { t: 'Does it take any time at all?', h: 'Yes for an inspection or a repair. No for an onset, a delivery, or a deadline passing.', ex: 'Could you ask how long it lasted? If that question makes no sense, answer no.' },
+  b1:  { t: 'Is it a name, code, or label for something else?', h: 'Yes for a permit number or a SKU. No for the permit itself.', ex: 'Could two different codes point at the same thing? Then it is a label: answer yes.' },
+  b2:  { t: 'Does it bind someone to do something, for someone who can claim it?', h: 'Yes for a payment due or a duty to notify. No for a license.', ex: 'Could someone complain that it was not done? If so, answer yes.' },
+  b3:  { t: 'Was it granted or recognized by someone with authority, who could revoke it?', h: 'Yes for a license, a clearance, an accreditation. No for a report.', ex: 'Could it be suspended or revoked with nothing physical changing? Then answer yes.' },
+  c1:  { t: 'Is it a place things can be in?', h: 'Yes for a job site, a cockpit, a warehouse bay.', ex: 'Could you say something is in it or at it? Then answer yes.' },
+  c2:  { t: 'Is it several things counted as one, with members that come and go?', h: 'Yes for a crew, a board, a company. No for one person.', ex: 'Could a member leave while it stays the same group? Then answer yes.' },
+  c3:  { t: 'Could you touch it or weigh it?', h: 'Yes for a person, a machine, a building.', ex: 'If you could put it on a scale or bump into it, answer yes.' },
+  c4:  { t: 'Is it always there and measurable right now, on one particular thing?', h: 'Yes for a weight, a temperature, a noise level. No for a job title.', ex: 'Could you read it off a meter or a ruler at this moment? Then answer yes.' },
+  c5:  { t: 'Could it be gained or lost with no physical change to whoever has it?', h: 'Yes for a job title or a membership. No for fragility.', ex: 'If they lost it tomorrow, would anything about their body or makeup change? If not, answer yes.' },
+  c5b: { t: 'Can whoever holds it grant, revoke, or recognize a status?', h: 'Yes for a licensing power or a signing authority. No for an ordinary job.', ex: 'Can they issue or cancel a license, permit, or clearance? Then answer yes.' },
+  c6:  { t: 'Was the thing that has it designed or made to do this?', h: 'Yes for a pump pumping or a fuse breaking a circuit. No for something nobody designed.', ex: 'If nobody designed it for this, it is a tendency: answer no.' }
+};
+
+const PATHS = { period: { r1: 'y', a1: 'y' }, happening: { r1: 'y', a1: 'n', a2: 'y' }, moment: { r1: 'y', a1: 'n', a2: 'n' } };
+(function () {
+  const R = { r1: 'n', r2: 'y' };
+  PATHS.code = { ...R, b1: 'y' }; PATHS.obligation = { ...R, b1: 'n', b2: 'y' };
+  PATHS.status = { ...R, b1: 'n', b2: 'n', b3: 'y' }; PATHS.record = { ...R, b1: 'n', b2: 'n', b3: 'n' };
+  const C = { r1: 'n', r2: 'n' };
+  PATHS.place = { ...C, c1: 'y' }; PATHS.group = { ...C, c1: 'n', c2: 'y' }; PATHS.thing = { ...C, c1: 'n', c2: 'n', c3: 'y' };
+  const C4 = { ...C, c1: 'n', c2: 'n', c3: 'n' }; PATHS.quality = { ...C4, c4: 'y' };
+  const C5 = { ...C4, c4: 'n' };
+  PATHS.role = { ...C5, c5: 'y', c5b: 'n' }; PATHS.authority = { ...C5, c5: 'y', c5b: 'y' };
+  PATHS.function = { ...C5, c5: 'n', c6: 'y' }; PATHS.tendency = { ...C5, c5: 'n', c6: 'n' };
+})();
+
+function walk(a) {
+  const path = [];
+  const q = id => { path.push(id); const v = a[id]; return (v === 'y' || v === 'n') ? v : null; };
+  const res = kw => ({ path, kw });
+  let v = q('r1'); if (!v) return res(null);
+  if (v === 'y') { v = q('a1'); if (!v) return res(null); if (v === 'y') return res('period'); v = q('a2'); if (!v) return res(null); return res(v === 'y' ? 'happening' : 'moment'); }
+  v = q('r2'); if (!v) return res(null);
+  if (v === 'y') { for (const [id, kw] of [['b1', 'code'], ['b2', 'obligation'], ['b3', 'status']]) { v = q(id); if (!v) return res(null); if (v === 'y') return res(kw); } return res('record'); }
+  for (const [id, kw] of [['c1', 'place'], ['c2', 'group'], ['c3', 'thing'], ['c4', 'quality']]) { v = q(id); if (!v) return res(null); if (v === 'y') return res(kw); }
+  v = q('c5'); if (!v) return res(null);
+  if (v === 'y') { v = q('c5b'); if (!v) return res(null); return res(v === 'y' ? 'authority' : 'role'); }
+  v = q('c6'); if (!v) return res(null); return res(v === 'y' ? 'function' : 'tendency');
+}
+
+const AGENTS = ['thing', 'group', 'role', 'authority'];
+const BEARERS = ['thing', 'group', 'place'];
+const SLOTS = {
+  status:     [{ r: 'heldBy', l: 'Held by', to: ['thing', 'group', 'role'] }, { r: 'issuedBy', l: 'Issued by', to: ['authority'] }],
+  obligation: [{ r: 'owedBy', l: 'Owed by', to: AGENTS }, { r: 'owedTo', l: 'Owed to', to: AGENTS }],
+  happening:  [{ r: 'participant', l: 'Who or what takes part', to: ['thing', 'group', 'role'], multi: true }, { r: 'at', l: 'Where', to: ['place'] }, { r: 'during', l: 'During', to: ['period'] }],
+  moment:     [{ r: 'marks', l: 'Marks the start or end of', to: ['happening'] }],
+  quality:    [{ r: 'bearer', l: 'Measured on', to: BEARERS }],
+  tendency:   [{ r: 'bearer', l: 'Belongs to', to: BEARERS }],
+  function:   [{ r: 'bearer', l: 'Belongs to', to: BEARERS }],
+  role:       [{ r: 'bearer', l: 'Held by', to: ['thing', 'group'] }],
+  authority:  [{ r: 'bearer', l: 'Held by', to: ['thing', 'group'] }, { r: 'scope', l: 'Can grant or revoke', to: ['status'], multi: true }],
+  record:     [{ r: 'about', l: 'About', to: null }],
+  code:       [{ r: 'designates', l: 'Labels', to: null }],
+  thing:      [{ r: 'at', l: 'Usually located at', to: ['place'] }],
+  group:      [{ r: 'member', l: 'Members are', to: ['thing', 'role'], multi: true }],
+  place: [], period: []
+};
+const RELNAMES = ['heldBy', 'issuedBy', 'scope', 'owedBy', 'owedTo', 'participant', 'at', 'during', 'marks', 'bearer', 'about', 'designates', 'member'];
+const SIGS = [
+  ['held', 'People hold, own, or have it in force'],
+  ['startsEnds', 'It has a start and an end'],
+  ['unshown', 'Someone can have it without it showing'],
+  ['extended', 'It can be extended, renewed, or cancelled'],
+  ['changes', 'It can worsen, improve, or change physically'],
+  ['assigned', 'Someone assigns or removes it'],
+  ['measured', 'It is measured on something']
+];
+const SEV = {
+  partition: ['Crosses the core divide', 'Continuant versus occurrent: the most basic disjointness in BFO.'],
+  within: ['Within one side', 'Both readings are on the same side of the divide, but they behave differently.'],
+  chain: ['Recognition chain', 'A status or duty that does not trace back to an authority or a claimant.'],
+  info: ['Note', 'Reported by OwlTester for review.']
+};
+
+/* ---------- Shared vocabulary and the BFO 2020 hierarchy ---------- */
+const RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#', RDFS = 'http://www.w3.org/2000/01/rdf-schema#', OWL = 'http://www.w3.org/2002/07/owl#';
+const OBO = 'http://purl.obolibrary.org/obo/', XMLNS = 'http://www.w3.org/XML/1998/namespace', SKOS = 'http://www.w3.org/2004/02/skos/core#';
+const KWV = 'https://ontology.davidkoepsell.com/kindwork/vocab#';
+const ECO = { agent: 'http://bfo-agent.davidkoepsell.com', tester: 'https://ontology.davidkoepsell.com' };
+const C5P = { r1: 'n', r2: 'n', c1: 'n', c2: 'n', c3: 'n', c4: 'n' };
+/* id: [label, parent, what it settles: a keyword, or the answers it fixes] */
+const BFO = {
+  '0000001': ['entity', null, {}],
+  '0000002': ['continuant', '0000001', { r1: 'n' }],
+  '0000003': ['occurrent', '0000001', { r1: 'y' }],
+  '0000004': ['independent continuant', '0000002', { r1: 'n', r2: 'n' }],
+  '0000020': ['specifically dependent continuant', '0000002', { r1: 'n', r2: 'n', c1: 'n', c2: 'n', c3: 'n' }],
+  '0000031': ['generically dependent continuant', '0000002', { r1: 'n', r2: 'y' }],
+  'IAO':     ['information content entity', '0000031', { r1: 'n', r2: 'y' }],
+  '0000040': ['material entity', '0000004', { r1: 'n', r2: 'n', c1: 'n' }],
+  '0000141': ['immaterial entity', '0000004', { r1: 'n', r2: 'n' }],
+  '0000030': ['object', '0000040', 'thing'],
+  '0000024': ['fiat object part', '0000040', 'thing'],
+  '0000027': ['object aggregate', '0000040', 'group'],
+  '0000029': ['site', '0000141', 'place'],
+  '0000006': ['spatial region', '0000141', 'place'],
+  '0000140': ['continuant fiat boundary', '0000141', { r1: 'n', r2: 'n' }],
+  '0000019': ['quality', '0000020', 'quality'],
+  '0000145': ['relational quality', '0000019', 'quality'],
+  '0000017': ['realizable entity', '0000020', { ...C5P }],
+  '0000016': ['disposition', '0000017', { ...C5P, c5: 'n' }],
+  '0000034': ['function', '0000016', 'function'],
+  '0000023': ['role', '0000017', { ...C5P, c5: 'y' }],
+  '0000015': ['process', '0000003', 'happening'],
+  '0000182': ['history', '0000015', 'happening'],
+  '0000144': ['process profile', '0000015', 'happening'],
+  '0000035': ['process boundary', '0000003', 'moment'],
+  '0000008': ['temporal region', '0000003', 'period'],
+  '0000038': ['one-dimensional temporal region', '0000008', 'period'],
+  '0000202': ['temporal interval', '0000038', 'period'],
+  '0000148': ['zero-dimensional temporal region', '0000008', 'period'],
+  '0000203': ['temporal instant', '0000148', 'period'],
+  '0000011': ['spatiotemporal region', '0000003', { r1: 'y' }]
+};
+function bfoKey(iri) { if (iri === OBO + 'IAO_0000030') return 'IAO'; const m = /^http:\/\/purl\.obolibrary\.org\/obo\/BFO_(\d{7})$/.exec(iri); return m && BFO[m[1]] ? m[1] : null; }
+function bfoChain(k) { const out = []; while (k) { out.push(k); k = BFO[k][1]; } return out; }
+function bfoAnswers(k) { const v = BFO[k][2]; return typeof v === 'string' ? { ...PATHS[v] } : { ...v }; }
+function bfoSide(k) { const ch = bfoChain(k); return ch.includes('0000003') ? 'occurrent' : ch.includes('0000002') ? 'continuant' : null; }
+function bfoBranch(k) { const ch = bfoChain(k); return ['0000004', '0000020', '0000031', '0000003'].find(x => ch.includes(x)) || null; }
+
+/* ---------- Example ---------- */
+const EXAMPLE_TASK = 'We manage electrical subcontractors on commercial job sites. For each worker we need to track their state electrical license: who issued it, when it expires, and whether it has been suspended. We schedule site inspections with the workers present and file an inspection report afterward. Each job has a permit number from the city. We log noise level readings at each site and record safety incidents. Before any excavation we have a duty to notify the city. Each job runs for a contract period, which the client sometimes extends.';
+function exampleModel() {
+  const T = (id, name, kw, desc, sig) => ({ id, name, desc, a: { ...PATHS[kw] }, sig: sig || {} });
+  return {
+    task: EXAMPLE_TASK, appName: 'Job site tracker',
+    terms: [
+      T('w', 'Worker', 'thing', 'A person who works on a job site.'),
+      T('el', 'Electrician', 'role', 'The job a worker does when doing electrical work.'),
+      T('lic', 'Electrical license', 'status', 'The state license that lets a worker do electrical work.', { held: true }),
+      T('board', 'State licensing board', 'group', 'The state body that licenses electricians.'),
+      T('auth', 'Licensing authority', 'authority', "The board's power to grant, suspend, and revoke electrical licenses."),
+      T('site', 'Job site', 'place', 'A commercial site where the work happens.'),
+      T('insp', 'Site inspection', 'happening', "A scheduled check of a site's work."),
+      T('rep', 'Inspection report', 'record', 'The report filed after an inspection.'),
+      T('pn', 'Permit number', 'code', "The city's number for a job's permit."),
+      T('noise', 'Noise level', 'quality', "A site's sound level, read by meter.", { measured: true }),
+      T('inc', 'Safety incident', 'happening', 'Something that went wrong and could hurt someone.'),
+      T('exc', 'Excavation', 'happening', 'Digging on a job site.'),
+      T('duty', 'Duty to notify the city', 'obligation', 'We must tell the city before any excavation.'),
+      T('per', 'Contract period', 'period', "The time a job's contract covers.", { extended: true })
+    ],
+    rels: [
+      ['el', 'bearer', 'w'], ['lic', 'heldBy', 'w'], ['auth', 'bearer', 'board'], ['auth', 'scope', 'lic'],
+      ['w', 'at', 'site'], ['insp', 'participant', 'w'], ['insp', 'at', 'site'], ['insp', 'during', 'per'],
+      ['rep', 'about', 'insp'], ['pn', 'designates', 'site'], ['noise', 'bearer', 'site'],
+      ['inc', 'at', 'site'], ['exc', 'at', 'site'], ['exc', 'during', 'per']
+    ].map(([f, r, t]) => ({ f, r, t })),
+    sel: 'lic', tab: 'interview'
+  };
+}
+
+/* ---------- State ---------- */
+const STORE = 'kindwork-v1';
+let S;
+try { S = JSON.parse(localStorage.getItem(STORE)); } catch (e) { S = null; }
+if (!S || !Array.isArray(S.terms)) S = { ...exampleModel(), ont: false };
+S.terms.forEach(t => { t.a = t.a || {}; t.sig = t.sig || {}; });
+S.findings = Array.isArray(S.findings) ? S.findings : [];
+S.way = S.way || 'task'; S.impMode = S.impMode || 'replace'; S.ns = S.ns || '';
+let X = { busy: false, msg: '' };
+let IMP = { msg: '', err: false };
+let fileTab = 'tracker', confirmDel = null, previewData = {};
+let sample = null, downloads = null;
+if (window.claude && claude.use) {
+  claude.use('sample').then(s => { sample = s; if (S.tab === 'describe') render(); }).catch(() => {});
+  claude.use('downloads').then(d => { downloads = d; if (S.tab === 'build') render(); }).catch(() => {});
+}
+
+function saveDraft() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
+function commit() { saveDraft(); render(); }
+const uid = () => 't' + Math.random().toString(36).slice(2, 9);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const kwOf = t => walk(t.a).kw;
+const termById = id => S.terms.find(t => t.id === id);
+const relsOf = (id, r) => S.rels.filter(x => x.f === id && x.r === r && termById(x.t)).map(x => x.t);
+function setRel(f, r, t) { S.rels = S.rels.filter(x => !(x.f === f && x.r === r)); if (t) S.rels.push({ f, r, t }); }
+function addRel(f, r, t) { if (!S.rels.some(x => x.f === f && x.r === r && x.t === t)) S.rels.push({ f, r, t }); }
+function toggleRel(f, r, t, on) { S.rels = S.rels.filter(x => !(x.f === f && x.r === r && x.t === t)); if (on) S.rels.push({ f, r, t }); }
+function setKw(t, kw) { t.a = { ...PATHS[kw] }; }
+function addTerm(name, kw, desc) { const t = { id: uid(), name: String(name).trim().slice(0, 80), desc: desc || '', a: kw ? { ...PATHS[kw] } : {}, sig: {} }; S.terms.push(t); return t; }
+const lc = s => String(s).charAt(0).toLowerCase() + String(s).slice(1);
+function chip(kw, big) { const k = KW[kw]; return `<span class="kw fam-${k.fam}${k.rec ? ' rec' : ''}${big ? ' big' : ''}"${S.ont ? ` title="${esc(k.bfo)}"` : ''}>${kw}</span>`; }
+
+/* ---------- Conflicts ---------- */
+function findConflicts() {
+  const out = [];
+  for (const t of S.terms) {
+    const s = t.sig, N = `<b>${esc(t.name)}</b>`, id = t.id, nm = t.name;
+    const add = (type, sev, title, body, opts) => out.push({ id: type + '-' + id, tid: id, type, sev, title, body, opts });
+    if (t.imp && t.imp.clash) {
+      const an = t.imp.anchors.map(x => `<b>${esc(x)}</b>`).join(' and ');
+      const done = () => { t.imp.clash = null; };
+      if (t.imp.clash === 'partition') add('imp', 'partition', 'Filed on both sides of the divide',
+        `The ontology you imported files ${N} under ${an}. One of those is something that happens and the other is something that persists. Nothing can be both, so every inference that touches ${N} is unsound until this is settled.`, [
+          { l: 'It persists', a: () => { t.a = { r1: 'n' }; done(); } },
+          { l: 'It happens', a: () => { t.a = { r1: 'y' }; done(); } },
+          { l: 'Split into two terms', p: true, a: () => { t.a = { r1: 'n' }; done(); const n = addTerm(nm + ' (occurrence)', null, `When ${lc(nm)} happens.`); n.a = { r1: 'y' }; S.sel = n.id; } }]);
+      else add('imp', 'within', 'Filed under two kinds at once',
+        `The ontology you imported files ${N} under ${an}. BFO keeps those apart: a physical thing, a feature of a thing, and a record are different kinds, and each answers different questions.`, [
+          { l: 'A physical thing or place', a: () => { t.a = { r1: 'n', r2: 'n' }; done(); } },
+          { l: 'A feature of something', a: () => { t.a = { r1: 'n', r2: 'n', c1: 'n', c2: 'n', c3: 'n' }; done(); } },
+          { l: 'Something written or declared', a: () => { t.a = { r1: 'n', r2: 'y' }; done(); } },
+          { l: 'Ask me the questions', p: true, a: () => { t.a = {}; done(); S.sel = t.id; } }]);
+    }
+    const kw = kwOf(t); if (!kw) continue;
+    if (kw === 'happening' && s.held) add('held', 'partition', 'Held, or happening?',
+      `You said ${N} can be in progress, and also that people hold or have it. Those are two things: the one that happens, and the one someone has.`, [
+        { l: 'It happens', a: () => { s.held = false; } },
+        { l: 'Someone holds it', a: () => { setKw(t, 'status'); s.held = false; } },
+        { l: 'Split into two terms', p: true, a: () => { s.held = false; const n = addTerm(nm + ' (held)', 'status', `What someone holds as a result of ${lc(nm)}.`); S.sel = n.id; } }]);
+    if ((kw === 'tendency' && s.startsEnds) || (kw === 'happening' && s.unshown)) add('episode', 'partition', 'A tendency, or something that happens?',
+      `You said someone can have ${N} without it ever showing, and that it starts and ends. Something that can sit unshown is a tendency; something that starts and ends is a happening. Your records may need both.`, [
+        { l: 'The tendency', a: () => { setKw(t, 'tendency'); s.startsEnds = s.unshown = false; } },
+        { l: 'The happening', a: () => { setKw(t, 'happening'); s.startsEnds = s.unshown = false; } },
+        { l: 'Split: the tendency and its episodes', p: true, a: () => { setKw(t, 'tendency'); s.startsEnds = s.unshown = false; const n = addTerm(nm + ' episode', 'happening', `A time when ${lc(nm)} showed itself.`); S.sel = n.id; } }]);
+    if (kw === 'period' && s.extended) add('period', 'partition', 'A span of time, or something that can be extended?',
+      `You said ${N} is a span of time, and also that it can be extended or cancelled. Time itself can't be extended. What changes is an agreement or a standing that covers the time.`, [
+        { l: 'Only the time span', a: () => { s.extended = false; } },
+        { l: 'It is an agreement in force', a: () => { setKw(t, 'status'); s.extended = false; } },
+        { l: 'Split: keep the span, add the agreement', p: true, a: () => { s.extended = false; const base = nm.replace(/\s*period$/i, '') || nm; const n = addTerm(base + ' agreement', 'status', `The agreement that sets the ${lc(nm)} and can be extended or cancelled.`); S.sel = n.id; } }]);
+    if (kw === 'record' && s.changes) add('record', 'within', 'A record, or what it records?',
+      `You said ${N} is written down, and also that it can worsen or change physically. A record can't worsen. The thing it describes can.`, [
+        { l: 'Only the record', a: () => { s.changes = false; } },
+        { l: 'Split: add the thing it describes', p: true, a: () => { s.changes = false; const n = addTerm(nm + ' (condition)', null, `What the ${lc(nm)} describes.`); n.a = { r1: 'n', r2: 'n' }; addRel(t.id, 'about', n.id); S.sel = n.id; S.tab = 'interview'; } }]);
+    if (kw === 'code' && s.changes) add('code', 'within', 'A label with features of its own?',
+      `You gave ${N} features that can change, like a severity. Those belong to what the code labels, not to the code.`, [
+        { l: 'Move them to what it labels', p: true, a: () => { s.changes = false; } },
+        { l: 'Keep them on the code', a: () => { s.changes = false; } }]);
+    if ((kw === 'quality' && s.assigned) || (kw === 'role' && s.measured)) add('qrole', 'within', 'Measured, or assigned?',
+      `You said ${N} can be measured on something right now, and also that someone assigns or removes it. A measurement and an assignment are different, and reports treat them differently.`, [
+        { l: 'The measured feature', a: () => { setKw(t, 'quality'); s.assigned = s.measured = false; } },
+        { l: 'The assigned label', a: () => { setKw(t, 'status'); s.assigned = s.measured = false; } },
+        { l: 'Both, linked', p: true, a: () => { setKw(t, 'quality'); s.assigned = s.measured = false; const n = addTerm(nm + ' rating', 'status', `The ${lc(nm)} rating someone assigns.`); S.sel = n.id; } }]);
+    if (kw === 'status' && !s.selfDeclared) {
+      const iss = relsOf(id, 'issuedBy');
+      if (!iss.length) {
+        const opts = S.terms.filter(x => kwOf(x) === 'authority').slice(0, 4).map(a => ({ l: 'Issued by ' + a.name, p: relsOf(a.id, 'scope').includes(id), a: () => setRel(id, 'issuedBy', a.id) }));
+        opts.push({ l: 'Add authority', input: 'Name a new authority', a: v => { const n = addTerm(v, 'authority', `The power to grant or revoke ${lc(nm)}.`); setRel(id, 'issuedBy', n.id); addRel(n.id, 'scope', id); S.sel = n.id; } });
+        opts.push({ l: 'Self-declared', a: () => { s.selfDeclared = true; } }, { l: 'Not a status: a record', a: () => setKw(t, 'record') });
+        add('auth', 'chain', 'Who issues it?', `Every status needs someone with the power to grant it. Nothing in the model says who issues ${N}, so nothing can check that one is valid.`, opts);
+      } else {
+        const a = termById(iss[0]);
+        if (a && !relsOf(a.id, 'scope').includes(id)) add('scope', 'chain', 'Can that authority grant it?',
+          `${N} is issued by <b>${esc(a.name)}</b>, but nothing says ${esc(a.name)} can grant it. The chain of recognition doesn't close.`, [
+            { l: `Let ${a.name} grant it`, p: true, a: () => addRel(a.id, 'scope', id) },
+            { l: 'Choose another authority', a: () => setRel(id, 'issuedBy', null) }]);
+      }
+    }
+    if (kw === 'obligation' && !s.publicCorrelate && !relsOf(id, 'owedTo').length) {
+      const opts = [{ l: 'Add', p: true, input: 'Who can claim it? For example, the City', a: v => { const n = addTerm(v, 'group', `Who can claim the ${lc(nm)}.`); setRel(id, 'owedTo', n.id); } }];
+      S.terms.filter(x => x.id !== id && AGENTS.includes(kwOf(x)) && kwOf(x) !== 'role').slice(0, 3).forEach(x => opts.push({ l: 'Owed to ' + x.name, a: () => setRel(id, 'owedTo', x.id) }));
+      opts.push({ l: 'A regulator or the public', a: () => { s.publicCorrelate = true; } }, { l: 'Not a duty: a rule', a: () => setKw(t, 'record') });
+      add('corr', 'chain', 'Owed to whom?', `${N} says who must act, but not who can claim it. An obligation nobody can claim can't be breached in any way the model can see.`, opts);
+    }
+  }
+  return out;
+}
+
+/* ---------- Schema for the generated tool ---------- */
+const slugify = s => String(s || 'tracker').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'tracker';
+function todayISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+function genSchema() {
+  const live = S.terms.filter(t => kwOf(t));
+  const liveIds = new Set(live.map(t => t.id));
+  const nameOf = id => (termById(id) || {}).name || '';
+  const one = (t, r) => relsOf(t.id, r).filter(id => liveIds.has(id))[0];
+  const many = (t, r) => relsOf(t.id, r).filter(id => liveIds.has(id));
+  const conf = findConflicts();
+  const cols = live.map(t => {
+    const kw = kwOf(t), N = t.name, f = [], rules = [], notes = [], says = [];
+    let excl = '';
+    const ref = (key, label, r, req, fallbackLabel) => {
+      const id = one(t, r);
+      if (id) { f.push({ key, label, type: 'ref', ref: id, req: !!req }); return id; }
+      if (req) f.push({ key, label: fallbackLabel || label, type: 'text', req: true });
+      return null;
+    };
+    const refs = (key, label, r) => { const ids = many(t, r); if (ids.length === 1) f.push({ key, label, type: 'refs', ref: ids[0] }); else ids.forEach((id, i) => f.push({ key: key + (i ? i : ''), label: label + ': ' + nameOf(id), type: 'refs', ref: id })); return ids; };
+    f.push({ key: 'name', label: kw === 'code' ? 'Code' : 'Name or reference', type: 'text', req: true });
+    switch (kw) {
+      case 'status': {
+        const h = ref('holder', 'Held by', 'heldBy', true);
+        if (h) says.push(`Every ${N} is held by a ${nameOf(h)} entry.`); else notes.push(`The model doesn't say who holds a ${N}, so the holder is typed by name.`);
+        if (s(t).selfDeclared) says.push(`${N} is self-declared: no issuing authority is required.`);
+        else {
+          const iss = ref('issuer', 'Issued by', 'issuedBy', true);
+          if (iss) { says.push(`Every ${N} must name its issuing ${nameOf(iss)}.`); if (!relsOf(iss, 'scope').includes(t.id)) notes.push(`${nameOf(iss)} is not recorded as able to grant a ${N}. Fix this in the model.`); }
+        }
+        f.push({ key: 'granted', label: 'Granted on', type: 'date', req: true }, { key: 'expires', label: 'Expires on', type: 'date' }, { key: 'standing', label: 'Standing', type: 'select', options: ['In force', 'Suspended', 'Revoked'], req: true });
+        rules.push({ type: 'order', a: 'granted', b: 'expires', msg: `A ${N} can't expire before it is granted.` });
+        says.push(`It shows as expired after its expiry date, even if nobody revokes it.`);
+        excl = `No start or end time: a ${N} is held, not something that happens.`;
+        break;
+      }
+      case 'obligation': {
+        ref('owedBy', 'Owed by', 'owedBy', false);
+        if (!one(t, 'owedBy')) f.push({ key: 'owedByName', label: 'Owed by', type: 'text' });
+        const to = one(t, 'owedTo');
+        if (to) { ref('owedTo', 'Owed to', 'owedTo', true); says.push(`Every ${N} is owed to a ${nameOf(to)} entry.`); }
+        else if (s(t).publicCorrelate) { f.push({ key: 'owedToName', label: 'Owed to', type: 'text', req: true }); says.push(`Owed to a regulator or the public, named on each entry.`); }
+        else f.push({ key: 'owedToName', label: 'Owed to', type: 'text', req: true });
+        f.push({ key: 'due', label: 'Due by', type: 'date' }, { key: 'standing', label: 'Standing', type: 'select', options: ['Open', 'Met', 'Waived'], req: true });
+        says.push(`It shows as overdue once its due date passes and it isn't met.`);
+        excl = `Never issued or revoked: it binds someone, for someone who can claim it.`;
+        break;
+      }
+      case 'happening': {
+        f.push({ key: 'start', label: 'Started', type: 'datetime', req: true }, { key: 'end', label: 'Ended', type: 'datetime' });
+        const ps = refs('participants', 'Taking part', 'participant');
+        ref('at', 'Where', 'at', false); ref('during', 'During', 'during', false);
+        rules.push({ type: 'order', a: 'start', b: 'end', msg: `A ${N} can't end before it starts.` });
+        says.push(`A ${N} with no end time shows as in progress.`);
+        if (ps.length) says.push(`Participants come from ${ps.map(nameOf).join(', ')}.`);
+        excl = `Nobody holds or owns a ${N}: it happens.`;
+        break;
+      }
+      case 'moment':
+        f.push({ key: 'when', label: 'When', type: 'datetime', req: true });
+        ref('marks', 'Marks', 'marks', false);
+        excl = `No duration: a ${N} takes no time.`;
+        break;
+      case 'period':
+        f.push({ key: 'starts', label: 'Starts', type: 'date', req: true }, { key: 'ends', label: 'Ends', type: 'date', req: true });
+        rules.push({ type: 'order', a: 'starts', b: 'ends', msg: `A ${N} can't end before it starts.` });
+        excl = `No participants: a ${N} is time itself. Extending it means a new entry or an agreement.`;
+        break;
+      case 'quality': {
+        const b = ref('bearer', 'Measured on', 'bearer', true);
+        f.push({ key: 'value', label: 'Value', type: 'number', req: true }, { key: 'unit', label: 'Unit', type: 'text' }, { key: 'measured', label: 'Measured at', type: 'datetime', req: true });
+        if (b) says.push(`Each reading belongs to one ${nameOf(b)} and can't move to another.`);
+        excl = `Not assigned by anyone: a change is a new reading.`;
+        break;
+      }
+      case 'role': {
+        const b = ref('bearer', 'Held by', 'bearer', true);
+        f.push({ key: 'from', label: 'From', type: 'date' }, { key: 'until', label: 'Until', type: 'date' });
+        rules.push({ type: 'order', a: 'from', b: 'until', msg: `A ${N} can't end before it begins.` });
+        if (b) says.push(`Each ${N} belongs to one ${nameOf(b)}.`);
+        excl = `No measurement: a ${N} depends on circumstances, not on the bearer's makeup.`;
+        break;
+      }
+      case 'authority': {
+        const b = ref('bearer', 'Held by', 'bearer', true);
+        const sc = relsOf(t.id, 'scope').filter(id => liveIds.has(id));
+        if (b) says.push(`Held by a ${nameOf(b)} entry.`);
+        says.push(sc.length ? `Can grant: ${sc.map(nameOf).join(', ')}.` : `Can't grant anything yet. Add what it grants in the model.`);
+        f.push({ key: 'jurisdiction', label: 'Jurisdiction', type: 'text' });
+        excl = `An authority is a standing, not a body: the body that holds it is a separate entry.`;
+        break;
+      }
+      case 'record':
+        ref('about', 'About', 'about', false);
+        f.push({ key: 'filed', label: 'Filed on', type: 'date' }, { key: 'docref', label: 'Document reference', type: 'text' }, { key: 'notes', label: 'Summary', type: 'textarea' });
+        excl = `A ${N} never happens or expires. It is about something else.`;
+        break;
+      case 'code': {
+        const d = ref('designates', 'Labels', 'designates', false);
+        f.push({ key: 'meaning', label: 'What it stands for', type: 'text' });
+        rules.push({ type: 'unique', key: 'name', msg: `That ${N} is already used. Each code labels one thing.` });
+        if (d) says.push(`Each ${N} labels one ${nameOf(d)} entry.`);
+        says.push(`Codes are unique.`);
+        excl = `A code has no features of its own: severity, size and so on belong to what it labels.`;
+        break;
+      }
+      case 'tendency': case 'function': {
+        const b = ref('bearer', 'Belongs to', 'bearer', true);
+        f.push({ key: 'notes', label: kw === 'function' ? 'What it is for' : 'When it shows', type: 'textarea' });
+        if (b) says.push(`Each ${N} belongs to one ${nameOf(b)}.`);
+        excl = kw === 'function' ? `Failing to do this counts as a malfunction.` : `It can be present without ever showing.`;
+        break;
+      }
+      case 'thing': ref('at', 'Located at', 'at', false); f.push({ key: 'notes', label: 'Notes', type: 'textarea' }); excl = `Never starts or ends: a ${N} persists while it changes.`; break;
+      case 'group': refs('members', 'Members', 'member'); f.push({ key: 'notes', label: 'Notes', type: 'textarea' }); excl = `Members can join or leave while the group stays the same.`; break;
+      case 'place': f.push({ key: 'address', label: 'Address or description', type: 'text' }); excl = `Things are located here. It has no material parts.`; break;
+    }
+    conf.filter(c => c.tid === t.id).forEach(c => notes.push(`Open question in the model: ${c.title}`));
+    const myIri = iriOf(t);
+    openFindings().filter(fd => fd.classes.includes(myIri)).forEach(fd => notes.push(`OwlTester (${fd.verdict}): ${fd.title}`));
+    const req = f.filter(x => x.req && x.key !== 'name').map(x => x.label);
+    if (req.length) says.unshift(`Required: ${req.join(', ')}.`);
+    const stateKind = { status: 'status', obligation: 'obligation', happening: 'happening', period: 'period', role: 'role' }[kw] || null;
+    return { id: t.id, name: N, kw, meaning: KW[kw].plain, fam: KW[kw].fam, fields: f, rules, notes, says, excl, state: stateKind, desc: t.desc };
+  });
+  const order = { things: 0, records: 1, time: 2 };
+  cols.sort((a, b) => order[a.fam] - order[b.fam]);
+  const app = (S.appName || 'Tracker').trim() || 'Tracker';
+  return { app, slug: slugify(app), built: todayISO(), collections: cols };
+}
+function s(t) { return t.sig || {}; }
+
+/* ---------- Exports ---------- */
+const RUNTIME_CSS = document.getElementById('runtime-css').textContent;
+const EXPORT_TOKENS = `body{margin:0;background:#F2F4F1;font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px max(16px,env(safe-area-inset-right,0px)) 48px max(16px,env(safe-area-inset-left,0px))}
+.kwr{max-width:1120px;margin:0 auto;--r-bg:#FFFFFF;--r-sunk:#E9EDE9;--r-ink:#15201A;--r-ink2:#4F5C55;--r-line:#D3DAD4;--r-accent:#15201A;--r-accent-ink:#F7F9F6;--r-focus:#2F62B8;--r-good:#1F6C46;--r-good-soft:#E0F1E7;--r-warn:#8F5E00;--r-warn-soft:#FAF0D9;--r-crit:#B42318;--r-crit-soft:#FBE8E6;--r-font:"Atkinson Hyperlegible",system-ui,sans-serif;--r-display:"Bricolage Grotesque","Atkinson Hyperlegible",system-ui,sans-serif;--r-mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark}body{background:#0E1411}.kwr{--r-bg:#151D19;--r-sunk:#1B2420;--r-ink:#E4EBE6;--r-ink2:#A7B4AD;--r-line:#2A3530;--r-accent:#E4EBE6;--r-accent-ink:#0E1411;--r-focus:#7FA8F0;--r-good:#76D19F;--r-good-soft:#13301F;--r-warn:#E6B65E;--r-warn-soft:#32260F;--r-crit:#F28A80;--r-crit-soft:#3A1714}}
+`;
+function genTracker(sch) {
+  const json = JSON.stringify(sch).replace(/</g, '\\u003c');
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="generator" content="Kindwork">
+<title>${esc(sch.app)}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+${EXPORT_TOKENS}${RUNTIME_CSS.trim()}
+</style>
+</head>
+<body>
+<div id="app" class="kwr"></div>
+<script>
+var SCHEMA = ${json};
+${KindworkRuntime.toString()}
+(function () {
+  var KEY = 'kindwork:' + SCHEMA.slug;
+  KindworkRuntime(document.getElementById('app'), SCHEMA, {
+    load: function () { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } },
+    save: function (d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} },
+    exportData: function (d) {
+      var blob = new Blob([JSON.stringify({ tool: SCHEMA.app, exported: new Date().toISOString(), data: d }, null, 2)], { type: 'application/json' });
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = SCHEMA.slug + '-data.json'; document.body.appendChild(a); a.click(); a.remove();
+    }
+  });
+})();
+<\/script>
+</body>
+</html>
+`;
+}
+
+function localNames() {
+  const used = new Set(), map = {};
+  for (const t of S.terms) {
+    let b = t.name.replace(/[^A-Za-z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join('') || 'Term';
+    if (/^[0-9]/.test(b)) b = 'T' + b;
+    let x = b, i = 2; while (used.has(x)) x = b + i++;
+    used.add(x); map[t.id] = x;
+  }
+  return map;
+}
+const lit = str => '"' + String(str).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\s+/g, ' ').trim() + '"@en';
+const PROP = { participant: 'obo:BFO_0000057', bearer: 'obo:BFO_0000197', about: 'obo:IAO_0000136', designates: 'obo:IAO_0000219', during: 'obo:BFO_0000199', member: 'obo:RO_0002351', heldBy: 'kwv:heldBy', issuedBy: 'kwv:issuedBy', scope: 'kwv:canGrant', owedBy: 'kwv:owedBy', owedTo: 'kwv:owedTo', marks: 'kwv:marks' };
+const expandProp = p => p.startsWith('obo:') ? OBO + p.slice(4) : p.startsWith('kwv:') ? KWV + p.slice(4) : p;
+function nsBase() { return (S.ns && S.ns.trim() ? S.ns.trim() : `https://example.org/kindwork/${slugify(S.appName)}`).replace(/[#\/]+$/, ''); }
+function iriOf(t, L) { return t.iri || nsBase() + '#' + (L || localNames())[t.id]; }
+function refOf(t, L) { return t.iri ? `<${t.iri}>` : `:${L[t.id]}`; }
+const openFindings = () => (S.findings || []).filter(f => !f.reviewed && f.verdict !== 'pass');
+function propFor(r, kw) { if (r === 'at') return (kw === 'happening' || kw === 'moment') ? 'obo:BFO_0000066' : 'obo:BFO_0000171'; return PROP[r]; }
+const CUSTOM_PROPS = [['kwv:heldBy', 'held by', 'Links a status to whoever holds it.'], ['kwv:issuedBy', 'issued by', 'Links a status to the authority that granted it.'], ['kwv:canGrant', 'can grant', 'Links an authority to a kind of status it can grant or revoke.'], ['kwv:owedBy', 'owed by', 'Links an obligation to whoever must act.'], ['kwv:owedTo', 'owed to', 'Links an obligation to whoever can claim it.'], ['kwv:marks', 'marks', 'Links a moment to the happening it starts or ends.']];
+const DATA_PROPS = { granted: 'grantedOn', expires: 'expiresOn', standing: 'standing', due: 'dueOn', start: 'startsAt', end: 'endsAt', when: 'occursAt', starts: 'startsOn', ends: 'endsOn', value: 'hasValue', unit: 'unit', measured: 'measuredAt', from: 'validFrom', until: 'validUntil', filed: 'filedOn', docref: 'documentReference', meaning: 'meaning', jurisdiction: 'jurisdiction', address: 'address' };
+const FIELD_REL = { holder: 'heldBy', issuer: 'issuedBy', owedBy: 'owedBy', owedTo: 'owedTo', bearer: 'bearer', about: 'about', designates: 'designates', at: 'at', during: 'during', marks: 'marks', participants: 'participant', members: 'member' };
+
+function genOWL(sch) {
+  const L = localNames(), base = nsBase();
+  const inBuild = id => sch.collections.some(x => x.id === id);
+  let o = `# ${sch.app}: ontology generated by Kindwork on ${sch.built}.
+# Every class is placed under BFO 2020 (ISO/IEC 21838-2) by the keyword it was given in the interview.
+# Import BFO and run an OWL DL reasoner before relying on it (OwlTester does this). Closed-world rules live in the SHACL file.
+# kwv: is the shared Kindwork vocabulary read by BFO-Agent and OwlTester.
+
+@prefix : <${base}#> .
+@prefix kwv: <${KWV}> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
+
+<${base}> a owl:Ontology ;
+  rdfs:label ${lit(sch.app)} ;
+  owl:imports <http://purl.obolibrary.org/obo/bfo.owl> .
+
+kwv:keyword a owl:AnnotationProperty ; rdfs:label ${lit('Kindwork keyword')} .
+
+`;
+  CUSTOM_PROPS.forEach(([p, l, d]) => { o += `${p} a owl:ObjectProperty ; rdfs:label ${lit(l)} ; obo:IAO_0000115 ${lit(d)} .\n`; });
+  o += '\n';
+  Object.values(DATA_PROPS).forEach(p => { o += `kwv:${p} a owl:DatatypeProperty ; rdfs:label ${lit(p.replace(/([A-Z])/g, ' $1').toLowerCase())} .\n`; });
+  o += '\n';
+  for (const c of sch.collections) {
+    const t = termById(c.id), kw = c.kw;
+    const parts = [`  rdfs:label ${lit(c.name)}`, `  kwv:keyword "${kw}"`, `  rdfs:subClassOf ${KW[kw].parent}`];
+    if (t.desc) parts.push(`  obo:IAO_0000115 ${lit(t.desc)}`);
+    if (KW[kw].rec) parts.push(`  rdfs:comment ${lit(kw === 'authority' ? 'Authority pattern: a role whose bearer can grant or revoke the statuses named by kwv:canGrant.' : kw === 'status' ? 'Recognition pattern: exists because an authority granted it; validity and revocation live here.' : 'Obligation pattern: binds a bearer for a correlate who can claim it.')}`);
+    relsOf(t.id, 'isA').filter(inBuild).forEach(id => parts.push(`  rdfs:subClassOf ${refOf(termById(id), L)}`));
+    for (const r of RELNAMES) {
+      relsOf(t.id, r).filter(inBuild).forEach(id => parts.push(`  rdfs:subClassOf [ a owl:Restriction ; owl:onProperty ${propFor(r, kw)} ; owl:someValuesFrom ${refOf(termById(id), L)} ]`));
+    }
+    (t.prov || []).forEach(p => { if (p.quote) parts.push(`  dcterms:source ${lit(p.quote)}`); else if (p.source) parts.push(`  dcterms:source ${lit(p.source)}`); });
+    o += `${refOf(t, L)} a owl:Class ;\n${parts.join(' ;\n')} .\n\n`;
+  }
+  const und = S.terms.filter(t => !kwOf(t));
+  if (und.length) o += `# Not yet placed (interview unfinished): ${und.map(t => t.name).join(', ')}\n`;
+  return o;
+}
+
+function genSHACL(sch) {
+  const L = localNames(), base = nsBase();
+  let o = `# ${sch.app}: SHACL shapes generated by Kindwork on ${sch.built}.
+# These are the closed-world checks: required links, required values, and date order.
+
+@prefix : <${base}#> .
+@prefix kwv: <${KWV}> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo: <http://purl.obolibrary.org/obo/> .
+
+`;
+  for (const c of sch.collections) {
+    const props = [];
+    for (const f of c.fields) {
+      if (f.key === 'name') { props.push(`[ sh:path rdfs:label ; sh:minCount 1 ; sh:message ${lit(`Every ${c.name} needs a name or reference.`)} ]`); continue; }
+      const relKey = Object.keys(FIELD_REL).find(k => f.key === k || (k === 'participants' && f.key.startsWith('participants')) || (k === 'members' && f.key.startsWith('members')));
+      if ((f.type === 'ref' || f.type === 'refs') && relKey) {
+        const parts = [`sh:path ${propFor(FIELD_REL[relKey], c.kw)}`, `sh:class ${refOf(termById(f.ref), L)}`];
+        if (f.req) parts.push('sh:minCount 1');
+        if (f.type === 'ref') parts.push('sh:maxCount 1');
+        parts.push(`sh:message ${lit(`${f.label} must be a ${(termById(f.ref) || {}).name}${f.req ? ', and is required' : ''}.`)}`);
+        props.push(`[ ${parts.join(' ; ')} ]`);
+      } else if (DATA_PROPS[f.key] && f.req) {
+        props.push(`[ sh:path kwv:${DATA_PROPS[f.key]} ; sh:minCount 1 ; sh:message ${lit(`${f.label} is needed for every ${c.name}.`)} ]`);
+      }
+    }
+    c.rules.filter(r => r.type === 'order').forEach(r => props.push(`[ sh:path kwv:${DATA_PROPS[r.a]} ; sh:lessThanOrEquals kwv:${DATA_PROPS[r.b]} ; sh:message ${lit(r.msg)} ]`));
+    o += `:${L[c.id]}Shape a sh:NodeShape ;\n  sh:targetClass ${refOf(termById(c.id), L)}${props.length ? ' ;\n  sh:property\n    ' + props.join(' ,\n    ') : ''} .\n\n`;
+  }
+  return o;
+}
+
+function genKW(sch) {
+  const snake = r => r.replace(/([A-Z])/g, '_$1').toLowerCase();
+  const conf = findConflicts();
+  let o = `# Keyword source generated by Kindwork on ${sch.built} from ${S.terms.length} terms.\n# Compiles to BFO 2020 OWL (classes and existential links) plus SHACL (required links and date order).\n\napp "${sch.app.replace(/"/g, "'")}"\nnamespace "${nsBase()}"\n\n`;
+  for (const c of sch.collections) {
+    const t = termById(c.id);
+    o += `${c.kw} "${c.name}"\n`;
+    if (t.desc) o += `  means "${t.desc.replace(/"/g, "'")}"\n`;
+    for (const r of ['isA', ...RELNAMES]) relsOf(t.id, r).forEach(id => { const x = termById(id); if (x && kwOf(x)) o += `  ${snake(r === 'scope' ? 'canGrant' : r)} "${x.name}"\n`; });
+    SIGS.forEach(([k]) => { if (t.sig[k]) o += `  signal ${k.replace(/([A-Z])/g, '_$1').toLowerCase()}\n`; });
+    if (t.sig.selfDeclared) o += `  self_declared\n`;
+    if (t.sig.publicCorrelate) o += `  owed_to public\n`;
+    conf.filter(x => x.tid === t.id).forEach(x => { o += `  # open: ${x.title}\n`; });
+    o += '\n';
+  }
+  S.terms.filter(t => !kwOf(t)).forEach(t => { o += `# undecided "${t.name}": finish the interview to place it\n`; });
+  return o;
+}
+
+function genReadme(sch) {
+  const conf = findConflicts();
+  return `# ${sch.app}
+
+Generated by Kindwork on ${sch.built}.
+
+## Files
+
+- \`${sch.slug}.html\`: the working tracker. Open it in any browser. Entries are kept in that browser; use Export data for a JSON copy.
+- \`${sch.slug}.ttl\`: the OWL ontology. Every class sits under a BFO 2020 category chosen in the interview.
+- \`${sch.slug}-shapes.ttl\`: SHACL shapes for the closed-world rules (required links, required values, date order).
+- \`${sch.slug}.kw\`: the keyword source, readable by people and by the compiler.
+- \`${sch.slug}.kindwork.json\`: the model in the shared interchange format.
+
+## Next in the toolchain
+
+- Verify: load \`${sch.slug}.ttl\` and \`${sch.slug}.kindwork.json\` into OwlTester (${ECO.tester}). Bring its findings file back into Kindwork.
+- Populate: give \`${sch.slug}.kindwork.json\` to BFO-Agent (${ECO.agent}) as a seed, with your documents. Import what it commits back into Kindwork; each class keeps the passage it came from.`;
+}
+function genReadmeTail(sch) {
+  const conf = findConflicts();
+  return `
+
+## Record types
+
+${sch.collections.map(c => `- **${c.name}** (${c.kw}, BFO ${KW[c.kw].iri}): ${c.meaning}`).join('\n')}
+
+## Open questions
+
+${conf.length ? conf.map(c => `- ${termById(c.tid).name}: ${c.title}`).join('\n') : 'None. Every status traces to an authority, every duty has a claimant, and no term sits on both sides of the BFO partition.'}
+`;
+}
+
+/* ---------- Interchange: the Kindwork model manifest ---------- */
+function genManifest(sch) {
+  const L = localNames(), conf = findConflicts();
+  return JSON.stringify({
+    format: 'kindwork-model', version: '0.1', generator: 'Kindwork', generated: new Date().toISOString(),
+    app: sch.app, namespace: nsBase(), vocabulary: KWV, task: S.task || '',
+    terms: S.terms.map(t => { const kw = kwOf(t); return { id: t.id, iri: iriOf(t, L), name: t.name, definition: t.desc || '', keyword: kw, bfo: kw ? KW[kw].iri : null, answers: t.a, signals: t.sig, provenance: t.prov || [], imported: t.imp ? { anchors: t.imp.anchors, clash: t.imp.clash } : null }; }),
+    relations: S.rels.filter(r => termById(r.f) && termById(r.t)).map(r => ({ from: r.f, rel: r.r, to: r.t, property: r.r === 'isA' ? RDFS + 'subClassOf' : expandProp(propFor(r.r, kwOf(termById(r.f)))) })),
+    conflicts: conf.map(c => ({ id: c.id, term: c.tid, type: c.type, severity: c.sev, title: c.title })),
+    findings: S.findings || []
+  }, null, 2);
+}
+
+/* ---------- Import: Turtle, RDF/XML, Kindwork models, OwlTester findings ---------- */
+function parseTurtle(text) {
+  if (!window.N3) throw new Error("The Turtle reader didn't load. Try again, or save the ontology as RDF/XML.");
+  const term = x => x.termType === 'BlankNode' ? '_:' + x.value : x.value;
+  const quads = new N3.Parser({ baseIRI: 'urn:kindwork:import#' }).parse(text);
+  return quads.map(q => ({ s: term(q.subject), p: q.predicate.value, o: term(q.object), lit: q.object.termType === 'Literal', lang: q.object.language || '' }));
+}
+function parseRdfXml(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error("That file isn't well-formed XML.");
+  const root = doc.documentElement, qn = el => (el.namespaceURI || '') + el.localName;
+  if (qn(root) === OWL + 'Ontology') throw new Error('This is OWL/XML. Save it as RDF/XML or Turtle (in Protégé: File, Save as) and try again.');
+  const T = []; let bn = 0;
+  const kids = el => Array.from(el.childNodes).filter(n => n.nodeType === 1);
+  const resolve = (ref, base) => { if (/^[a-z][a-z0-9+.-]*:/i.test(ref)) return ref; if (ref.startsWith('#')) return base.replace(/#.*$/, '') + ref; try { return new URL(ref, base).href; } catch (e) { return base + ref; } };
+  const xbase = (el, b) => el.hasAttributeNS(XMLNS, 'base') ? resolve(el.getAttributeNS(XMLNS, 'base'), b) : b;
+  const langOf = el => { for (let e = el; e && e.nodeType === 1; e = e.parentNode) if (e.hasAttributeNS(XMLNS, 'lang')) return e.getAttributeNS(XMLNS, 'lang'); return ''; };
+  const subj = (el, b) => el.hasAttributeNS(RDF, 'about') ? resolve(el.getAttributeNS(RDF, 'about'), b) : el.hasAttributeNS(RDF, 'ID') ? resolve('#' + el.getAttributeNS(RDF, 'ID'), b) : el.hasAttributeNS(RDF, 'nodeID') ? '_:' + el.getAttributeNS(RDF, 'nodeID') : '_:x' + (bn++);
+  const SKIP = ['about', 'ID', 'nodeID', 'resource', 'parseType', 'datatype'];
+  function nodeEl(el, b) {
+    b = xbase(el, b); const s = subj(el, b);
+    if (qn(el) !== RDF + 'Description') T.push({ s, p: RDF + 'type', o: qn(el) });
+    Array.from(el.attributes).forEach(a => {
+      if (!a.namespaceURI || a.namespaceURI === XMLNS || a.namespaceURI === 'http://www.w3.org/2000/xmlns/' || (a.namespaceURI === RDF && SKIP.includes(a.localName))) return;
+      if (a.namespaceURI === RDF && a.localName === 'type') T.push({ s, p: RDF + 'type', o: resolve(a.value, b) });
+      else T.push({ s, p: a.namespaceURI + a.localName, o: a.value, lit: true, lang: langOf(el) });
+    });
+    kids(el).forEach(pe => propEl(s, pe, b));
+    return s;
+  }
+  function propEl(s, pe, b) {
+    b = xbase(pe, b); const p = qn(pe);
+    if (pe.hasAttributeNS(RDF, 'resource')) { T.push({ s, p, o: resolve(pe.getAttributeNS(RDF, 'resource'), b) }); return; }
+    if (pe.hasAttributeNS(RDF, 'nodeID')) { T.push({ s, p, o: '_:' + pe.getAttributeNS(RDF, 'nodeID') }); return; }
+    const pt = pe.getAttributeNS(RDF, 'parseType'), ch = kids(pe);
+    if (pt === 'Collection') {
+      let head = null, prev = null;
+      ch.forEach(k => { const o = nodeEl(k, b), cell = '_:l' + (bn++); if (prev) T.push({ s: prev, p: RDF + 'rest', o: cell }); else head = cell; T.push({ s: cell, p: RDF + 'first', o }); prev = cell; });
+      if (prev) T.push({ s: prev, p: RDF + 'rest', o: RDF + 'nil' });
+      T.push({ s, p, o: head || RDF + 'nil' }); return;
+    }
+    if (pt === 'Resource') { const o = '_:x' + (bn++); T.push({ s, p, o }); ch.forEach(k => propEl(o, k, b)); return; }
+    if (ch.length && pt !== 'Literal') { T.push({ s, p, o: nodeEl(ch[0], b) }); return; }
+    T.push({ s, p, o: pe.textContent, lit: true, lang: langOf(pe) });
+  }
+  const base0 = xbase(root, 'urn:kindwork:import');
+  if (qn(root) === RDF + 'RDF') kids(root).forEach(k => nodeEl(k, base0)); else nodeEl(root, base0);
+  return T;
+}
+function importTriples(T) {
+  const out = new Map(); T.forEach(t => { if (!out.has(t.s)) out.set(t.s, []); out.get(t.s).push(t); });
+  const objs = (s, p) => (out.get(s) || []).filter(x => x.p === p);
+  const blank = s => s.startsWith('_:');
+  const upper = s => /^http:\/\/purl\.obolibrary\.org\/obo\/(BFO|IAO|RO)_/.test(s) || s.startsWith(OWL) || s.startsWith(RDFS) || s.startsWith(RDF);
+  const cls = new Set();
+  T.forEach(t => {
+    if (t.p === RDF + 'type' && t.o === OWL + 'Class' && !blank(t.s) && !upper(t.s)) cls.add(t.s);
+    if (t.p === RDFS + 'subClassOf' && !blank(t.s) && !upper(t.s)) cls.add(t.s);
+  });
+  if (!cls.size) throw new Error('No classes were found in that file.');
+  const pick = (s, ps) => { for (const p of ps) { const l = objs(s, p).filter(x => x.lit && String(x.o).trim()); const en = l.find(x => !x.lang || /^en/i.test(x.lang)); if (en || l[0]) return String((en || l[0]).o).trim(); } return ''; };
+  const local = s => { let x = s.replace(/^.*[#\/]/, ''); try { x = decodeURIComponent(x); } catch (e) {} return x.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim() || s; };
+  const supers = s => objs(s, RDFS + 'subClassOf').map(x => x.o).filter(o => !blank(o));
+  const label = c => pick(c, [RDFS + 'label', SKOS + 'prefLabel']) || local(c);
+  const info = new Map();
+  for (const c of cls) {
+    const seen = new Set([c]), anchors = new Set(); let frontier = [c], depth = 0, first = null;
+    while (frontier.length && depth < 40) {
+      const next = [];
+      frontier.forEach(x => supers(x).forEach(sup => { const k = bfoKey(sup); if (k) { anchors.add(k); if (first === null) first = depth; } else if (!seen.has(sup) && cls.has(sup)) { seen.add(sup); next.push(sup); } }));
+      frontier = next; depth++;
+    }
+    const A = [...anchors];
+    info.set(c, { specific: A.filter(a => !A.some(b => b !== a && bfoChain(b).includes(a))), depth: first === null ? 99 : first });
+  }
+  const all = [...cls].sort((a, b) => info.get(a).depth - info.get(b).depth || label(a).localeCompare(label(b)));
+  const CAP = 150, list = all.slice(0, CAP);
+  const DEF = [OBO + 'IAO_0000115', SKOS + 'definition', RDFS + 'comment'];
+  const PROVP = ['http://purl.org/dc/terms/source', 'http://www.w3.org/ns/prov#wasDerivedFrom', KWV + 'source'];
+  const terms = list.map(c => {
+    const inf = info.get(c), kwAnn = pick(c, [KWV + 'keyword']);
+    const imp = { anchors: inf.specific.map(k => BFO[k][0]), clash: null };
+    let a = {};
+    if (KW[kwAnn]) a = { ...PATHS[kwAnn] };
+    else if (inf.specific.length === 1) a = bfoAnswers(inf.specific[0]);
+    else if (inf.specific.length > 1) imp.clash = new Set(inf.specific.map(bfoSide)).size > 1 ? 'partition' : 'within';
+    const prov = [];
+    PROVP.forEach(p => objs(c, p).forEach(x => prov.push(x.lit ? { quote: String(x.o).slice(0, 500), source: '' } : { quote: '', source: x.o })));
+    return { id: uid(), name: label(c).slice(0, 80), desc: pick(c, DEF).slice(0, 300), a, sig: {}, iri: c, imp, prov: prov.slice(0, 5) };
+  });
+  const idOf = new Map(terms.map(t => [t.iri, t.id]));
+  const REV = { [OBO + 'BFO_0000057']: 'participant', [OBO + 'BFO_0000066']: 'at', [OBO + 'BFO_0000171']: 'at', [OBO + 'BFO_0000197']: 'bearer', [OBO + 'IAO_0000136']: 'about', [OBO + 'IAO_0000219']: 'designates', [OBO + 'BFO_0000199']: 'during', [OBO + 'RO_0002351']: 'member' };
+  const LOCALREL = { heldBy: 'heldBy', issuedBy: 'issuedBy', canGrant: 'scope', owedBy: 'owedBy', owedTo: 'owedTo', marks: 'marks' };
+  const rels = [], push = (f, r, t) => { if (f && t && f !== t && !rels.some(x => x.f === f && x.r === r && x.t === t)) rels.push({ f, r, t }); };
+  list.forEach(c => {
+    const f = idOf.get(c);
+    supers(c).forEach(sup => { if (idOf.has(sup)) push(f, 'isA', idOf.get(sup)); });
+    objs(c, RDFS + 'subClassOf').filter(x => blank(x.o)).forEach(x => {
+      const p = (objs(x.o, OWL + 'onProperty')[0] || {}).o, v = (objs(x.o, OWL + 'someValuesFrom')[0] || {}).o;
+      if (!p || !v || !idOf.has(v)) return;
+      if (p === OBO + 'BFO_0000196') { push(idOf.get(v), 'bearer', f); return; }
+      const r = REV[p] || LOCALREL[p.replace(/^.*[#\/]/, '')];
+      if (r) push(f, r, idOf.get(v));
+    });
+  });
+  const ont = T.find(t => t.p === RDF + 'type' && t.o === OWL + 'Ontology');
+  return { terms, rels, total: all.length, ontology: ont ? ont.s : '', label: ont ? pick(ont.s, [RDFS + 'label', 'http://purl.org/dc/terms/title']) : '' };
+}
+function applyImport(res, mode, fileName) {
+  if (mode === 'replace' || !S.terms.length) {
+    S.terms = res.terms; S.rels = res.rels; S.findings = []; S.task = '';
+    S.appName = (res.label || fileName.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ')).slice(0, 60);
+    if (res.ontology && /^https?:/.test(res.ontology)) S.ns = res.ontology;
+  } else {
+    const map = new Map();
+    res.terms.forEach(n => {
+      const ex = S.terms.find(t => (n.iri && iriOf(t) === n.iri) || t.name.toLowerCase() === n.name.toLowerCase());
+      if (!ex) { S.terms.push(n); map.set(n.id, n.id); return; }
+      map.set(n.id, ex.id);
+      if (!ex.iri && n.iri && !n.iri.startsWith('urn:')) ex.iri = n.iri;
+      ex.prov = [...(ex.prov || []), ...n.prov].slice(0, 8);
+      if (!kwOf(ex) && Object.keys(n.a).length) ex.a = n.a;
+      if (n.imp && n.imp.clash) ex.imp = n.imp;
+      if (!ex.desc) ex.desc = n.desc;
+    });
+    res.rels.forEach(r => { const f = map.get(r.f), t = map.get(r.t); if (f && t && f !== t) addRel(f, r.r, t); });
+  }
+  S.sel = res.terms[0].id; previewData = {};
+}
+function applyManifest(j) {
+  if (!Array.isArray(j.terms) || !j.terms.length) throw new Error('That Kindwork model has no terms.');
+  const ids = new Map();
+  S.terms = j.terms.slice(0, 300).map(x => { const id = uid(); ids.set(x.id, id); const a = {}; Object.keys(Q).forEach(k => { if (x.answers && (x.answers[k] === 'y' || x.answers[k] === 'n')) a[k] = x.answers[k]; }); if (!Object.keys(a).length && KW[x.keyword]) Object.assign(a, PATHS[x.keyword]); return { id, name: String(x.name || 'Untitled').slice(0, 80), desc: String(x.definition || '').slice(0, 300), a, sig: (x.signals && typeof x.signals === 'object') ? { ...x.signals } : {}, iri: x.iri || undefined, prov: Array.isArray(x.provenance) ? x.provenance.slice(0, 8) : [], imp: x.imported && x.imported.clash ? { anchors: x.imported.anchors || [], clash: x.imported.clash } : null }; });
+  S.rels = (j.relations || []).map(r => ({ f: ids.get(r.from), r: r.rel, t: ids.get(r.to) })).filter(r => r.f && r.t && (r.r === 'isA' || RELNAMES.includes(r.r)));
+  S.appName = String(j.app || 'Tracker').slice(0, 60); S.ns = j.namespace || ''; S.task = j.task || '';
+  S.findings = []; if (Array.isArray(j.findings) && j.findings.length) applyFindings({ findings: j.findings });
+  S.sel = S.terms[0].id; previewData = {};
+}
+function applyFindings(j) {
+  const SEVS = ['partition', 'within', 'chain', 'info'], VER = ['fail', 'undetermined', 'pass'];
+  S.findings = (Array.isArray(j.findings) ? j.findings : []).filter(f => f && f.title).slice(0, 300).map((f, i) => ({
+    id: String(f.id || 'f' + i), check: String(f.check || 'coherence'), severity: SEVS.includes(f.severity) ? f.severity : 'info',
+    verdict: VER.includes(f.verdict) ? f.verdict : 'undetermined', classes: Array.isArray(f.classes) ? f.classes.map(String) : [],
+    title: String(f.title).slice(0, 200), explanation: String(f.explanation || '').slice(0, 1500), axioms: Array.isArray(f.axioms) ? f.axioms.map(String).slice(0, 12) : [], reviewed: !!f.reviewed
+  }));
+  if (j.reasoner || j.verdict) S.findingsMeta = { reasoner: j.reasoner ? `${j.reasoner.name || ''} ${j.reasoner.version || ''}`.trim() : '', consistent: j.verdict ? j.verdict.consistent : null, coherent: j.verdict ? j.verdict.coherent : null, at: j.generated || '' };
+}
+async function handleFile(file) {
+  if (!file) return;
+  IMP = { msg: `Reading ${file.name}…`, err: false }; render();
+  try {
+    const text = await file.text(), head = text.trimStart().slice(0, 4000);
+    if (head.startsWith('{')) {
+      const j = JSON.parse(text);
+      if (j.format === 'owltester-findings') {
+        applyFindings(j); const n = openFindings().length;
+        IMP = { msg: `Imported ${S.findings.length} OwlTester findings; ${n} need attention.`, err: false }; S.tab = 'resolve';
+      } else if (j.format === 'kindwork-model') {
+        applyManifest(j); IMP = { msg: `Opened the Kindwork model ${S.appName}, ${S.terms.length} terms.`, err: false }; S.tab = 'interview';
+      } else throw new Error("That JSON isn't a Kindwork model or an OwlTester findings file.");
+    } else if (/^\s*(Prefix|Ontology)\s*\(/m.test(head) && !head.startsWith('<')) {
+      throw new Error('This looks like OWL functional syntax. Save it as Turtle or RDF/XML (in Protégé: File, Save as) and try again.');
+    } else {
+      const T = head.startsWith('<') ? parseRdfXml(text) : parseTurtle(text);
+      const res = importTriples(T);
+      applyImport(res, S.impMode, file.name);
+      const placed = res.terms.filter(t => walk(t.a).kw).length, clash = res.terms.filter(t => t.imp.clash).length, ask = res.terms.length - placed - clash;
+      IMP = { msg: `Imported ${res.terms.length} classes from ${file.name}${res.total > res.terms.length ? ` (the ${res.terms.length} closest to BFO, of ${res.total})` : ''}. ${placed} placed by their BFO category, ${ask} need answers${clash ? `, ${clash} filed under conflicting categories` : ''}.`, err: false };
+      S.tab = clash ? 'resolve' : 'interview';
+    }
+  } catch (e) {
+    IMP = { msg: (e && e.message && !/^Unexpected|JSON/.test(e.message)) ? e.message : "That file couldn't be read. Kindwork reads Turtle, RDF/XML, Kindwork models, and OwlTester findings.", err: true };
+  }
+  commit();
+}
+
+const FILES = [
+  { k: 'tracker', label: 'Tracker app', ext: '.html', gen: genTracker, note: 'A single file. Open it in a browser; entries stay in that browser.' },
+  { k: 'owl', label: 'Ontology', ext: '.ttl', gen: genOWL, note: 'OWL in Turtle. Classes under BFO 2020, links as existential restrictions.' },
+  { k: 'shacl', label: 'Rules', ext: '-shapes.ttl', gen: genSHACL, note: 'SHACL shapes for what OWL cannot require: links, values, date order.' },
+  { k: 'kw', label: 'Keyword source', ext: '.kw', gen: genKW, note: 'The model in the keyword language, for engineers and version control.' },
+  { k: 'manifest', label: 'Model (JSON)', ext: '.kindwork.json', gen: genManifest, note: 'The interchange file. BFO-Agent reads it as a seed; OwlTester reads it to report findings in your terms.' }
+];
+
+/* ---------- Extraction with Claude ---------- */
+function extractionPrompt(task) {
+  return `You help people who are not ontologists model a business task with Basic Formal Ontology (BFO 2020), using plain questions.
+
+TASK DESCRIPTION:
+"""
+${task.slice(0, 6000)}
+"""
+
+Find the 6 to 16 terms a tracking tool for this task would need: the things, places, records, statuses, duties, events, periods and measured features it mentions. Use the task's own wording, singular, capitalized like a heading (for example "Electrical license"). If the task uses one word for two different things, make two terms.
+
+For each term, answer these questions with "y" or "n", following ONLY the path your answers lead down and stopping at the keyword:
+r1: Does it happen, or is it a stretch or point of time?  y -> a1, n -> r2
+a1: Is it the time itself, not something going on during it?  y = period; n -> a2
+a2: Does it take any time at all?  y = happening; n = moment
+r2: Does it exist because something was written, declared, or decided?  y -> b1, n -> c1
+b1: Is it a name, code, or label for something else?  y = code; n -> b2
+b2: Does it bind someone to do something, for someone who can claim it?  y = obligation; n -> b3
+b3: Was it granted or recognized by someone with authority, who could revoke it?  y = status; n = record
+c1: Is it a place things can be in?  y = place; n -> c2
+c2: Is it several things counted as one, with members that come and go (a crew, a board, a company)?  y = group; n -> c3
+c3: Could you touch it or weigh it (a person, a machine)?  y = thing; n -> c4
+c4: Is it always there and measurable right now, on one particular thing?  y = quality; n -> c5
+c5: Could it be gained or lost with no physical change to whoever has it?  y -> c5b; n -> c6
+c5b: Can whoever holds it grant, revoke, or recognize a status?  y = authority; n = role
+c6: Was the thing that has it designed or made to do this?  y = function; n = tendency
+
+A body such as a board or agency is a group; its power to grant licenses is a separate term (an authority). A person is a thing; a job title is a role.
+
+Also give "signals", true ONLY when the task text says so about that term: held (people hold, own, or have it in force), startsEnds (it has a start and an end), unshown (someone can have it without it showing), extended (it can be extended, renewed, or cancelled), changes (it can worsen, improve, or change physically), assigned (someone assigns or removes it), measured (it is measured on something).
+
+Then list relations between your terms, using only these names, only when the task supports them:
+heldBy (status -> thing/group/role), issuedBy (status -> authority), scope (authority -> a status it can grant), owedBy and owedTo (obligation -> thing/group/role/authority), participant (happening -> thing/group/role), at (happening or thing -> place), during (happening -> period), marks (moment -> happening), bearer (quality/role/tendency/function/authority -> thing/group/place), about (record -> any term), designates (code -> any term), member (group -> thing/role).
+Do not invent relations the task does not support; missing links are useful findings.
+
+Reply with only JSON in exactly this shape:
+{"appName":"Short name for the tool","terms":[{"name":"Electrical license","desc":"One plain sentence.","answers":{"r1":"n","r2":"y","b1":"n","b2":"n","b3":"y"},"signals":{"held":true}}],"relations":[{"from":"Electrical license","rel":"heldBy","to":"Worker"}]}`;
+}
+function applyExtraction(res) {
+  if (!res || !Array.isArray(res.terms)) throw { code: 'invalid_json' };
+  const seen = new Set();
+  const terms = res.terms.filter(x => x && x.name && !seen.has(String(x.name).toLowerCase()) && seen.add(String(x.name).toLowerCase())).slice(0, 24).map(x => {
+    const a = {}; const ans = x.answers || {};
+    Object.keys(Q).forEach(k => { if (ans[k] === 'y' || ans[k] === 'n') a[k] = ans[k]; });
+    const sig = {}; SIGS.forEach(([k]) => { if (x.signals && x.signals[k] === true) sig[k] = true; });
+    return { id: uid(), name: String(x.name).trim().slice(0, 80), desc: String(x.desc || '').trim().slice(0, 300), a, sig };
+  });
+  if (!terms.length) throw { code: 'empty_completion' };
+  const byName = new Map(terms.map(t => [t.name.toLowerCase(), t.id]));
+  const rels = [];
+  (Array.isArray(res.relations) ? res.relations : []).forEach(r => {
+    const f = byName.get(String(r && r.from || '').toLowerCase()), t = byName.get(String(r && r.to || '').toLowerCase());
+    if (f && t && f !== t && RELNAMES.includes(r.rel) && !rels.some(x => x.f === f && x.r === r.rel && x.t === t)) rels.push({ f, r: r.rel, t });
+  });
+  S.terms = terms; S.rels = rels; S.appName = String(res.appName || 'Tracker').slice(0, 60); S.sel = terms[0].id;
+  previewData = {};
+}
+function sampleMessage(e) {
+  const c = e && e.code;
+  if (c === 'not_granted' || c === 'sampling_disabled' || c === 'not_declared' || c === 'capability_disabled' || c === 'capability_removed') return "Claude isn't available to this page. You can still add terms by hand below.";
+  if (c === 'rate_limited') return 'Too many requests just now. Try again in a minute.';
+  if (c === 'session_expired') return 'Your session expired. Sign in again, then try once more.';
+  if (c === 'invalid_json' || c === 'empty_completion') return 'The answer came back in the wrong shape. Try again, or shorten the description.';
+  if (c === 'prompt_too_large') return 'The description is too long. Trim it to a few paragraphs.';
+  if (c === 'refused') return "Claude declined this description. Reword it and try again.";
+  return 'Something went wrong reaching Claude. Try again.';
+}
+let ctl = null;
+async function extract() {
+  const task = (S.task || '').trim();
+  if (!sample) { X = { busy: false, msg: "Finding terms needs Claude, which isn't available in this view. Add terms by hand below." }; render(); return; }
+  if (task.length < 40) { X = { busy: false, msg: 'Write a few sentences about the task first.' }; render(); return; }
+  ctl = new AbortController();
+  X = { busy: true, msg: 'Reading the task and asking the questions for each term. This usually takes 20 to 60 seconds.' }; render();
+  try {
+    const res = await sample.json(extractionPrompt(task), { modelTier: 'default', signal: ctl.signal });
+    applyExtraction(res);
+    X = { busy: false, msg: `Found ${S.terms.length} terms. Check each one in the interview.` };
+    S.tab = 'interview';
+  } catch (e) {
+    X = { busy: false, msg: e && e.code === 'cancelled' ? 'Stopped.' : sampleMessage(e) };
+  }
+  ctl = null; commit();
+}
+
+/* ---------- Rendering ---------- */
+const view = document.getElementById('view');
+const stepsEl = document.getElementById('steps');
+const ontEl = document.getElementById('ont');
+
+function renderSteps(conf) {
+  const und = S.terms.filter(t => !kwOf(t)).length;
+  const tabs = [
+    ['describe', '1', 'Describe', ''],
+    ['interview', '2', 'Interview', `<span class="count${und ? ' alert' : ''}">${und ? und + ' open' : S.terms.length}</span>`],
+    ['resolve', '3', 'Resolve', `<span class="count${conf.length + openFindings().length ? ' alert' : ''}">${conf.length + openFindings().length}</span>`],
+    ['build', '4', 'Build', '']
+  ];
+  stepsEl.innerHTML = tabs.map(([k, n, l, c]) => `<button type="button" class="step" role="tab" id="tab-${k}" aria-selected="${S.tab === k}" aria-controls="view" data-act="tab" data-tab="${k}"><span class="n">${n}</span>${l}${c}</button>`).join('');
+}
+
+function renderDescribe() {
+  const ways = [['task', 'Describe a task', 'Start from plain words. Claude proposes the terms.'], ['import', 'Bring an ontology', 'Turtle or RDF/XML, a Kindwork model, or OwlTester findings.'], ['docs', 'Start from documents', 'BFO-Agent reads policies and manuals, and keeps each source passage.']];
+  const tabs = `<div class="ways" role="tablist" aria-label="Ways in">${ways.map(([k, l, d]) => `<button type="button" role="tab" class="way" aria-selected="${S.way === k}" data-act="way" data-way="${k}"><span class="way-l">${l}</span><span class="way-d">${d}</span></button>`).join('')}</div>`;
+  const body = S.way === 'import' ? renderImportPanel() : S.way === 'docs' ? renderDocsPanel() : renderTaskPanel();
+  return tabs + `<section class="describe">${body}${renderHow()}</section>`;
+}
+function renderImportPanel() {
+  const has = S.terms.length;
+  return `<div class="panel">
+    <h2>Bring an ontology</h2>
+    <p class="sub">Kindwork reads each class and walks it up to its BFO category. Questions the ontology already settles are answered for you; the rest are asked. A class filed under two BFO categories at once comes back as a conflict card.</p>
+    <div class="drop" data-drop>
+      <label class="btn primary" for="impfile">Choose a file</label>
+      <input type="file" id="impfile" class="vh" accept=".ttl,.owl,.rdf,.xml,.nt,.n3,.json,text/turtle,application/rdf+xml,application/json">
+      <span>or drop it here. Turtle, RDF/XML (.owl, .rdf), a Kindwork model (.kindwork.json), or an OwlTester findings file (.json).</span>
+    </div>
+    ${has ? `<fieldset class="mode"><legend class="lab">The current model has ${has} term${has > 1 ? 's' : ''}</legend>
+      <label><input type="radio" name="impmode" value="replace"${S.impMode !== 'merge' ? ' checked' : ''}> Replace it</label>
+      <label><input type="radio" name="impmode" value="merge"${S.impMode === 'merge' ? ' checked' : ''}> Merge into it, matching classes by IRI or name</label></fieldset>` : ''}
+    <p class="status${IMP.err ? ' err' : ''}" role="status">${esc(IMP.msg)}</p>
+    <div class="callout"><b>For the full check, use OwlTester.</b><p>Kindwork reads the asserted hierarchy only. OwlTester runs a DL reasoner over the whole ontology for consistency, coherence, and entailment. Load its findings file here and each one becomes a card in your terms. <a href="${ECO.tester}" target="_blank" rel="noopener">Open OwlTester</a></p></div>
+  </div>`;
+}
+function renderDocsPanel() {
+  const n = S.terms.filter(t => kwOf(t)).length;
+  return `<div class="panel">
+    <h2>Start from documents</h2>
+    <p class="sub">When the knowledge sits in policies, manuals, contracts, or regulations, BFO-Agent reads them and proposes classes and links. Its reasoner gate commits only what holds together, and every committed class keeps the passage it came from.</p>
+    <ol class="handoff">
+      <li><div><b>Save a seed.</b><p>${n ? `The seed tells BFO-Agent which kinds of thing you need: your ${n} placed terms, their keywords, and their links.` : 'Without a seed, BFO-Agent proposes classes freely. With one, it fills the kinds you name first.'}</p>
+        <div class="row">${downloads ? `<button type="button" class="btn" data-act="saveseed">Save the seed (.json)</button>` : ''}<button type="button" class="btn ghost" data-act="copyseed">Copy the seed</button></div></div></li>
+      <li><div><b>Run BFO-Agent on your documents.</b><p>Load the seed with your documents. Review what the gate commits and what it refuses.</p>
+        <div class="row"><a class="btn" href="${ECO.agent}" target="_blank" rel="noopener">Open BFO-Agent</a></div></div></li>
+      <li><div><b>Bring the result back.</b><p>Import the ontology it produces. New classes merge into this model with their source passages, and existing ones gain sources.</p>
+        <div class="row"><button type="button" class="btn primary" data-act="way" data-way="import" data-mode="merge">Import BFO-Agent output</button></div></div></li>
+    </ol>
+    <p class="savenote" id="savenote" role="status"></p>
+  </div>`;
+}
+function renderHow() {
+  return `<aside class="panel how">
+      <div class="eyebrow">How the toolchain fits</div>
+      <ol>
+        <li><span class="num">1</span><div><h3>Model in Kindwork</h3><p>Plain questions place every term under BFO. Conflicts come back as cards in your own words.</p></div></li>
+        <li><span class="num">2</span><div><h3>Populate with BFO-Agent</h3><p>Documents fill the model. Only reasoner-consistent classes are committed, each with its source passage.</p></div></li>
+        <li><span class="num">3</span><div><h3>Verify with OwlTester</h3><p>A DL reasoner checks consistency, coherence, and entailment. Findings return to Kindwork as cards.</p></div></li>
+        <li><span class="num">4</span><div><h3>Build</h3><p>A working tracker, plus the OWL, SHACL, keyword source, and model file behind it.</p></div></li>
+      </ol>
+      <div class="legend">${Object.keys(KW).map(k => chip(k)).join('')}</div>
+    </aside>`;
+}
+function renderTaskPanel() {
+  return `
+    <div class="panel">
+      <label class="lab" for="task">Describe the task in plain words</label>
+      <p class="sub" style="margin:0 0 12px">What needs tracking, who is involved, what is granted or owed, and what can go wrong. A paragraph is enough.</p>
+      <textarea id="task" data-in="task" rows="9">${esc(S.task)}</textarea>
+      <div class="row">
+        ${X.busy ? `<button type="button" class="btn" data-act="stop">Stop</button>` : `<button type="button" class="btn primary" data-act="extract"${sample ? '' : ' disabled'}>Find the terms</button>`}
+        <button type="button" class="btn ghost" data-act="example"${X.busy ? ' disabled' : ''}>Load the example</button>
+        <span class="status${X.busy ? ' busy' : ''}" role="status">${esc(X.msg || (sample ? 'Claude reads the description and proposes answers. You check every one.' : "Finding terms needs Claude, which isn't available in this view. Add terms by hand below."))}</span>
+      </div>
+      <div class="addrow">
+        <label class="lab" for="newterm">Add a term by hand</label>
+        <form class="inline" data-form="addterm"><input id="newterm" placeholder="For example, Delivery" autocomplete="off"><button type="submit" class="btn">Add and interview</button></form>
+      </div>
+    </div>`;
+}
+
+function slotUI(t, sl) {
+  const cands = S.terms.filter(x => x.id !== t.id && kwOf(x) && (sl.to === null || sl.to.includes(kwOf(x))));
+  const cur = relsOf(t.id, sl.r);
+  const fid = `slot-${sl.r}`;
+  if (sl.multi) return `<fieldset class="slot" style="border:0;padding:0;margin:0"><legend class="slab">${esc(sl.l)}</legend>${cands.length ? `<div class="checks">${cands.map(x => `<label class="check"><input type="checkbox" data-ch="relm" data-r="${sl.r}" value="${x.id}"${cur.includes(x.id) ? ' checked' : ''}> ${esc(x.name)}</label>`).join('')}</div>` : `<p class="sub">No matching terms yet.</p>`}</fieldset>`;
+  return `<div class="slot"><label class="slab" for="${fid}">${esc(sl.l)}</label><select id="${fid}" data-ch="rel" data-r="${sl.r}"><option value="">Not set</option>${cands.map(x => `<option value="${x.id}"${cur[0] === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>`;
+}
+
+function renderDetail(t, conf) {
+  const w = walk(t.a), kw = w.kw;
+  const qs = w.path.map((q, i) => {
+    const v = t.a[q];
+    return `<li class="q${(!v || v === '?') ? ' open' : ''}"><span class="qn">${i + 1}</span><div><p class="qt" id="qt-${q}">${esc(Q[q].t)}</p><p class="qh">${esc(Q[q].h)}</p><div class="seg" role="group" aria-labelledby="qt-${q}">${[['y', 'Yes'], ['n', 'No'], ['?', 'Not sure']].map(([val, l]) => `<button type="button" data-act="ans" data-q="${q}" data-v="${val}" aria-pressed="${v === val}">${l}</button>`).join('')}</div>${v === '?' ? `<p class="unsure"><b>Try this:</b> ${esc(Q[q].ex)}</p>` : ''}</div></li>`;
+  }).join('');
+  const result = kw
+    ? `<div class="result fam-${KW[kw].fam}"><div class="eyebrow">Keyword</div><div class="kwrow">${chip(kw, true)}</div><p>${esc(KW[kw].plain)}</p>${S.ont ? `<p class="ontline">BFO 2020: ${esc(KW[kw].bfo)} · <code>${KW[kw].iri}</code></p>` : ''}</div>`
+    : `<div class="result pending"><div class="eyebrow">Keyword</div><p style="margin-top:8px">Answer question ${w.path.length} to place this term.</p></div>`;
+  const slots = kw ? (SLOTS[kw] || []) : [];
+  const slotHtml = slots.length ? `<div class="block"><h3>Connections</h3><p class="sub">These become links in the tool and checks in the rules.</p><div class="slots">${slots.map(sl => slotUI(t, sl)).join('')}</div></div>` : '';
+  const tc = conf.filter(c => c.tid === t.id);
+  const flag = tc.length ? `<div class="flag" role="status">${tc.length} open conflict${tc.length > 1 ? 's' : ''} on this term: ${tc.map(c => esc(c.title)).join(' · ')} <button type="button" class="link" data-act="tab" data-tab="resolve">Resolve</button></div>` : '';
+  return `<div class="fields">
+      <label class="lab" for="tname">Term</label><input id="tname" class="tname-in" data-in="tname" value="${esc(t.name)}" autocomplete="off">
+      <label class="lab" for="tdesc">What it means here</label><textarea id="tdesc" data-in="tdesc" rows="2">${esc(t.desc)}</textarea>
+    </div>
+    ${flag}${renderFindingFlag(t)}${renderOrigin(t)}
+    <div class="dgrid">
+      <div class="block"><h3>Questions</h3><p class="sub">Each answer decides the next question.</p><ol class="qs">${qs}</ol></div>
+      <div class="side">${result}${slotHtml}</div>
+    </div>
+    <div class="block"><h3>What the task says about it</h3><p class="sub">Tick what is true. Conflicts are found where these disagree with the answers.</p>
+      <div class="sigs">${SIGS.map(([k, l]) => `<label class="sig"><input type="checkbox" data-ch="sig" data-k="${k}"${t.sig[k] ? ' checked' : ''}> ${esc(l)}</label>`).join('')}</div></div>
+    <div class="dfoot">${confirmDel === t.id ? `<button type="button" class="btn" data-act="canceldel">Keep it</button><button type="button" class="btn danger" data-act="delterm" data-id="${t.id}">Remove ${esc(t.name)}</button>` : `<button type="button" class="btn ghost" data-act="askdel" data-id="${t.id}">Remove term</button>`}</div>`;
+}
+
+function renderFindingFlag(t) {
+  const iri = iriOf(t), fs = openFindings().filter(f => f.classes.includes(iri));
+  return fs.length ? `<div class="flag" role="status">OwlTester: ${fs.map(f => esc(f.title)).join(' · ')} <button type="button" class="link" data-act="tab" data-tab="resolve">Review</button></div>` : '';
+}
+function renderOrigin(t) {
+  const isA = relsOf(t.id, 'isA').map(termById).filter(Boolean);
+  const prov = t.prov || [];
+  if (!t.imp && !prov.length && !isA.length) return '';
+  const anchors = t.imp ? (t.imp.anchors.length ? `Imported, filed under BFO ${t.imp.anchors.map(x => `<b>${esc(x)}</b>`).join(' and ')}.` : 'Imported with no BFO category, so every question is asked.') : '';
+  return `<div class="block origin"><h3>Where it came from</h3>
+    ${anchors ? `<p class="sub">${anchors}${t.iri && S.ont ? ` <code>${esc(t.iri)}</code>` : ''}</p>` : ''}
+    ${isA.length ? `<p class="sub">A kind of ${isA.map(x => `<button type="button" class="link" data-act="sel" data-id="${x.id}">${esc(x.name)}</button>`).join(', ')}.</p>` : ''}
+    ${prov.map(p => `<blockquote class="prov">${esc(p.quote || p.source)}${p.quote && p.source ? `<cite>${esc(p.source)}</cite>` : ''}</blockquote>`).join('')}
+  </div>`;
+}
+
+function renderInterview(conf) {
+  if (!S.terms.length) return `<section class="empty-pane"><h2>No terms yet</h2><p>Describe the task and let Claude find the terms, or add one by hand.</p><button type="button" class="btn primary" data-act="tab" data-tab="describe">Describe the task</button></section>`;
+  const cc = {}; conf.forEach(c => { cc[c.tid] = (cc[c.tid] || 0) + 1; });
+  const ord = { things: 0, records: 1, time: 2 };
+  const sorted = [...S.terms].sort((a, b) => { const ka = kwOf(a), kb = kwOf(b); return (ka ? ord[KW[ka].fam] : -1) - (kb ? ord[KW[kb].fam] : -1); });
+  let t = termById(S.sel); if (!t) { t = sorted[0]; S.sel = t.id; }
+  const items = sorted.map(x => { const kw = kwOf(x); return `<li><button type="button" class="titem${x.id === S.sel ? ' on' : ''}" data-act="sel" data-id="${x.id}"${x.id === S.sel ? ' aria-current="true"' : ''}><span class="tname">${esc(x.name)}</span><span class="tmeta">${cc[x.id] ? `<span class="dot" title="${cc[x.id]} open conflict${cc[x.id] > 1 ? 's' : ''}">${cc[x.id]}</span>` : ''}${kw ? chip(kw) : '<span class="pill warn">needs answers</span>'}</span></button></li>`; }).join('');
+  return `<section class="iv">
+    <div class="tl"><div class="tl-head"><span class="eyebrow">Terms · ${S.terms.length}</span><button type="button" class="link" data-act="tab" data-tab="describe">Add a term</button></div><ul class="tlist">${items}</ul></div>
+    <div class="detail">${renderDetail(t, conf)}</div>
+  </section>`;
+}
+
+function renderResolve(conf) {
+  const und = S.terms.filter(t => !kwOf(t));
+  const head = `<div class="rhead"><div><h2>${conf.length ? `${conf.length} thing${conf.length > 1 ? 's' : ''} to resolve` : 'Your answers hold together'}</h2><p>${conf.length ? 'Each card is a place where your answers disagree with what the task says, or where a status or duty doesn\'t trace back to anyone. Pick what you mean; the model and the tool update together.' : 'No term sits on both sides of the divide, every status has an authority, and every duty has someone who can claim it.'}</p></div>${conf.length ? '' : `<button type="button" class="btn primary" data-act="tab" data-tab="build">Build the tool</button>`}</div>`;
+  const cards = conf.map(c => {
+    const t = termById(c.tid);
+    return `<article class="card sev-${c.sev}" aria-labelledby="ct-${c.id}">
+      <div class="card-head"><span class="sev">${SEV[c.sev][0]}</span><button type="button" class="link" data-act="goterm" data-id="${c.tid}">${esc(t.name)}</button></div>
+      <div class="card-body"><h3 id="ct-${c.id}">${esc(c.title)}</h3><p>${c.body}</p>${S.ont ? `<p class="ontline">${esc(SEV[c.sev][1])}</p>` : ''}
+        <div class="opts">${c.opts.map((o, i) => o.input
+          ? `<form class="optform" data-form="opt" data-c="${c.id}" data-i="${i}"><input id="opt-${c.id}-${i}" placeholder="${esc(o.input)}" aria-label="${esc(o.input)}" autocomplete="off"><button type="submit" class="btn${o.p ? ' primary' : ''}">${esc(o.l)}</button></form>`
+          : `<button type="button" class="btn${o.p ? ' primary' : ''}" data-act="opt" data-c="${c.id}" data-i="${i}">${esc(o.l)}</button>`).join('')}</div>
+      </div></article>`;
+  }).join('');
+  const undHtml = und.length ? `<div class="undecided"><h3>Terms still waiting for answers</h3><p class="sub">These are left out of the build until they are placed.</p><ul>${und.map(t => `<li><button type="button" class="btn" data-act="goterm" data-id="${t.id}">${esc(t.name)}</button></li>`).join('')}</ul></div>` : '';
+  return head + (conf.length ? `<div class="cards">${cards}</div>` : '') + renderFindings() + undHtml;
+}
+function renderFindings() {
+  const fs = S.findings || [];
+  const L = localNames(), byIri = new Map(S.terms.map(t => [iriOf(t, L), t]));
+  const m = S.findingsMeta || {};
+  const verdictWord = { fail: 'Fails', undetermined: 'Undetermined', pass: 'Passes' };
+  const overall = m.consistent === true ? 'consistent' : m.consistent === false ? 'inconsistent' : null;
+  if (!fs.length) return `<div class="fsec"><div class="callout"><b>Run the full check in OwlTester.</b><p>Kindwork catches conflicts in your answers. OwlTester runs a DL reasoner over the built ontology. Save the files for it from Build, then import its findings file to see each finding here. <button type="button" class="link" data-act="way" data-way="import">Import findings</button></p></div></div>`;
+  const open = openFindings().length;
+  return `<div class="fsec"><div class="rhead"><div><h2>From OwlTester</h2><p>${fs.length} finding${fs.length > 1 ? 's' : ''}, ${open} open${m.reasoner ? ` · ${esc(m.reasoner)}` : ''}${overall ? ` · the ontology is ${overall}` : ''}. Undetermined means the reasoner could not decide; it is not a pass.</p></div><button type="button" class="btn ghost" data-act="clearfindings">Clear findings</button></div>
+    <div class="cards">${fs.map(f => {
+      const terms = f.classes.map(iri => { const t = byIri.get(iri); return t ? `<button type="button" class="link" data-act="goterm" data-id="${t.id}">${esc(t.name)}</button>` : `<code>${esc(iri.replace(/^.*[#\/]/, ''))}</code>`; }).join('');
+      return `<article class="card sev-${f.severity}${f.reviewed ? ' reviewed' : ''}">
+        <div class="card-head"><span class="sev">${SEV[f.severity][0]} · ${esc(f.check)}</span><span class="verdict ${f.verdict}">${verdictWord[f.verdict]}</span></div>
+        <div class="card-body"><h3>${esc(f.title)}</h3>${f.explanation ? `<p>${esc(f.explanation)}</p>` : ''}
+          ${terms ? `<div class="termlinks">${terms}</div>` : ''}
+          ${f.axioms.length ? `<details class="axioms"><summary>Assertions that produce it</summary><pre>${esc(f.axioms.join('\n'))}</pre></details>` : ''}
+          <div class="opts">${f.verdict !== 'pass' ? `<button type="button" class="btn${f.reviewed ? '' : ' primary'}" data-act="review" data-f="${esc(f.id)}">${f.reviewed ? 'Reopen' : 'Mark reviewed'}</button>` : ''}</div>
+        </div></article>`;
+    }).join('')}</div></div>`;
+}
+
+function renderBuild(conf) {
+  const sch = genSchema();
+  if (!sch.collections.length) return `<section class="empty-pane"><h2>Nothing to build yet</h2><p>Place at least one term in the interview, and the tool appears here.</p><button type="button" class="btn primary" data-act="tab" data-tab="interview">Go to the interview</button></section>`;
+  const und = S.terms.filter(t => !kwOf(t)).length;
+  const rules = sch.collections.map(c => `<li><div class="rname">${esc(c.name)}${chip(c.kw)}</div><div class="rtext">${c.says.map(x => `<span>${esc(x)}</span>`).join('')}<span class="ex">${esc(c.excl)}</span>${S.ont ? `<span class="ontline" style="margin:2px 0 0">subClassOf ${KW[c.kw].iri} (${esc(KW[c.kw].bfo)})</span>` : ''}</div></li>`).join('');
+  return `<div class="bhead">
+      <div class="bfields"><div><label class="lab" for="appname">Name of the tool</label><input id="appname" data-in="appname" value="${esc(S.appName)}" autocomplete="off"></div><div><label class="lab" for="ns">Namespace for its IRIs</label><input id="ns" data-in="ns" value="${esc(nsBase())}" autocomplete="off" spellcheck="false"></div></div>
+      <div class="bstat"><b>${sch.collections.length}</b> record types${conf.length ? ` · <b>${conf.length}</b> open conflict${conf.length > 1 ? 's' : ''}, shown as notes in the tool` : ' · no open conflicts'}${und ? ` · ${und} term${und > 1 ? 's' : ''} left out` : ''}</div>
+    </div>
+    <div class="build">
+      <section aria-label="Preview">
+        <div class="sectlab"><span class="eyebrow">Live preview · try adding entries</span></div>
+        <div id="preview" class="kwr"></div>
+        <div class="rules"><h3>What the tool enforces</h3><p class="sub">Each record type gets the fields and checks its kind calls for, and nothing its kind rules out.</p><ul>${rules}</ul></div>
+      </section>
+      <section class="exports" aria-label="Files">
+        <div class="eyebrow">Files</div>
+        <div class="filetabs" role="tablist" aria-label="Files">${FILES.map(f => `<button type="button" class="ftab" role="tab" aria-selected="${fileTab === f.k}" data-act="file" data-k="${f.k}">${f.label}</button>`).join('')}</div>
+        <div id="filebody"></div>
+        <div class="saves">
+          ${downloads ? `<button type="button" class="btn primary" data-act="savekit"${window.JSZip ? '' : ' hidden'}>Download the kit (.zip)</button><button type="button" class="btn" data-act="savetracker">Save the tracker (.html)</button>` : ''}
+        </div>
+        <p class="savenote" id="savenote" role="status">${downloads ? 'The kit holds the tracker, the ontology, the rules, the keyword source, the model file, and a README.' : "Saving files isn't available in this view. Copy each file instead."}</p>
+        <div class="next">
+          <div class="eyebrow">Next in the toolchain</div>
+          <div class="nextrow"><div><b>Verify in OwlTester</b><span>A DL reasoner checks consistency, coherence, and entailment.</span></div><div class="nb">${downloads && window.JSZip ? `<button type="button" class="btn" data-act="savetester">Save for OwlTester</button>` : ''}<a class="btn ghost" href="${ECO.tester}" target="_blank" rel="noopener">Open</a></div></div>
+          <div class="nextrow"><div><b>Populate from documents</b><span>BFO-Agent fills these kinds from your text, with sources.</span></div><div class="nb">${downloads ? `<button type="button" class="btn" data-act="saveseed">Save the seed</button>` : `<button type="button" class="btn" data-act="copyseed">Copy the seed</button>`}<a class="btn ghost" href="${ECO.agent}" target="_blank" rel="noopener">Open</a></div></div>
+          <div class="nextrow"><div><b>Bring results back</b><span>OwlTester findings become cards; BFO-Agent classes merge in.</span></div><div class="nb"><button type="button" class="btn primary" data-act="way" data-way="import">Import</button></div></div>
+        </div>
+      </section>
+    </div>`;
+}
+
+let fileCache = {};
+function renderFileBody() {
+  const host = document.getElementById('filebody'); if (!host) return;
+  const sch = genSchema(), f = FILES.find(x => x.k === fileTab);
+  const text = f.gen(sch); fileCache[f.k] = text;
+  host.innerHTML = `<div class="fmeta"><span>${esc(sch.slug + f.ext)} · ${text.split('\n').length} lines</span><button type="button" class="link" data-act="copy">Copy</button></div><pre class="code" tabindex="0" aria-label="${esc(f.label)}">${esc(text)}</pre><p class="savenote">${esc(f.note)}</p>`;
+  document.querySelectorAll('.ftab').forEach(b => b.setAttribute('aria-selected', b.getAttribute('data-k') === fileTab));
+}
+
+function mountPreview() {
+  const host = document.getElementById('preview'); if (!host) return;
+  const sch = genSchema();
+  const ids = new Set(sch.collections.map(c => c.id));
+  Object.keys(previewData).forEach(k => { if (!ids.has(k)) delete previewData[k]; });
+  KindworkRuntime(host, sch, { load: () => previewData, save: d => { previewData = d; } });
+}
+
+function render() {
+  const conf = findConflicts();
+  ontEl.checked = !!S.ont;
+  renderSteps(conf);
+  if (S.tab === 'describe') view.innerHTML = renderDescribe();
+  else if (S.tab === 'resolve') view.innerHTML = renderResolve(conf);
+  else if (S.tab === 'build') { view.innerHTML = renderBuild(conf); mountPreview(); renderFileBody(); }
+  else { S.tab = 'interview'; view.innerHTML = renderInterview(conf); }
+}
+
+/* ---------- Events ---------- */
+async function save(filename, data, note) {
+  const el = document.getElementById('savenote');
+  try { await downloads.save({ filename, data }); if (el) el.textContent = `Saved ${filename}.`; }
+  catch (e) {
+    const c = e && e.code;
+    if (el) el.textContent = c === 'declined' ? 'Not saved.' : c === 'rate_limited' ? 'A save is already waiting for your answer.' : "Saving didn't work in this view. Copy the files instead.";
+  }
+}
+async function saveKit() {
+  const sch = genSchema(), zip = new JSZip(), dir = zip.folder(sch.slug);
+  dir.file(sch.slug + '.html', genTracker(sch));
+  dir.file(sch.slug + '.ttl', genOWL(sch));
+  dir.file(sch.slug + '-shapes.ttl', genSHACL(sch));
+  dir.file(sch.slug + '.kw', genKW(sch));
+  dir.file(sch.slug + '.kindwork.json', genManifest(sch));
+  dir.file('README.md', genReadme(sch) + genReadmeTail(sch));
+  const blob = await zip.generateAsync({ type: 'blob' });
+  await save(sch.slug + '-kit.zip', blob);
+}
+async function saveForTester() {
+  const sch = genSchema(), zip = new JSZip();
+  zip.file(sch.slug + '.ttl', genOWL(sch));
+  zip.file(sch.slug + '-shapes.ttl', genSHACL(sch));
+  zip.file(sch.slug + '.kindwork.json', genManifest(sch));
+  const blob = await zip.generateAsync({ type: 'blob' });
+  await save(sch.slug + '-for-owltester.zip', blob);
+}
+function saveSeed() { const sch = genSchema(); return save(sch.slug + '.kindwork.json', genManifest(sch)); }
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  const act = b.getAttribute('data-act');
+  const t = termById(S.sel);
+  switch (act) {
+    case 'tab': S.tab = b.getAttribute('data-tab'); confirmDel = null; commit(); window.scrollTo({ top: 0 }); break;
+    case 'sel': S.sel = b.getAttribute('data-id'); confirmDel = null; commit(); break;
+    case 'goterm': S.sel = b.getAttribute('data-id'); S.tab = 'interview'; commit(); window.scrollTo({ top: 0 }); break;
+    case 'ans': if (t) { const q = b.getAttribute('data-q'), v = b.getAttribute('data-v'); t.a[q] = t.a[q] === v ? undefined : v; if (t.a[q] === undefined) delete t.a[q]; commit(); } break;
+    case 'askdel': confirmDel = b.getAttribute('data-id'); render(); break;
+    case 'canceldel': confirmDel = null; render(); break;
+    case 'delterm': { const id = b.getAttribute('data-id'); S.terms = S.terms.filter(x => x.id !== id); S.rels = S.rels.filter(x => x.f !== id && x.t !== id); confirmDel = null; S.sel = S.terms[0] ? S.terms[0].id : null; delete previewData[id]; commit(); break; }
+    case 'extract': extract(); break;
+    case 'stop': if (ctl) ctl.abort(); break;
+    case 'example': { const ex = exampleModel(); Object.assign(S, ex, { findings: [], findingsMeta: null, ns: '' }); previewData = {}; X = { busy: false, msg: 'Example loaded: 14 terms, three things to resolve.' }; commit(); break; }
+    case 'opt': { const c = findConflicts().find(x => x.id === b.getAttribute('data-c')); const o = c && c.opts[+b.getAttribute('data-i')]; if (o) { o.a(); commit(); } break; }
+    case 'file': fileTab = b.getAttribute('data-k'); renderFileBody(); break;
+    case 'copy': {
+      const text = fileCache[fileTab] || '';
+      const done = () => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy'; }, 1600); };
+      const fallback = () => { const pre = document.querySelector('#filebody pre'); if (pre) { const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = 'Selected: press copy'; } };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+      break;
+    }
+    case 'savetracker': { const sch = genSchema(); save(sch.slug + '.html', genTracker(sch)); break; }
+    case 'savekit': saveKit(); break;
+    case 'savetester': saveForTester(); break;
+    case 'saveseed': saveSeed(); break;
+    case 'copyseed': {
+      const text = genManifest(genSchema()), note = document.getElementById('savenote');
+      const ok = () => { if (note) note.textContent = 'Seed copied. Paste it into BFO-Agent, or save it as a .json file.'; };
+      const no = () => { if (note) note.textContent = "Copying didn't work here. In Build, open the Model (JSON) file and copy it from there."; };
+      try { navigator.clipboard.writeText(text).then(ok, no); } catch (e) { no(); }
+      break;
+    }
+    case 'way': S.way = b.getAttribute('data-way'); if (b.getAttribute('data-mode')) S.impMode = b.getAttribute('data-mode'); S.tab = 'describe'; IMP = { msg: '', err: false }; commit(); window.scrollTo({ top: 0 }); break;
+    case 'review': { const f = (S.findings || []).find(x => x.id === b.getAttribute('data-f')); if (f) { f.reviewed = !f.reviewed; commit(); } break; }
+    case 'clearfindings': S.findings = []; S.findingsMeta = null; commit(); break;
+  }
+});
+document.addEventListener('dragover', ev => { const z = ev.target.closest && ev.target.closest('[data-drop]'); if (!z) return; ev.preventDefault(); z.classList.add('over'); });
+document.addEventListener('dragleave', ev => { const z = ev.target.closest && ev.target.closest('[data-drop]'); if (z) z.classList.remove('over'); });
+document.addEventListener('drop', ev => { const z = ev.target.closest && ev.target.closest('[data-drop]'); if (!z) return; ev.preventDefault(); z.classList.remove('over'); const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]; if (f) handleFile(f); });
+document.addEventListener('submit', ev => {
+  const form = ev.target.closest('form[data-form]'); if (!form) return;
+  ev.preventDefault();
+  const kind = form.getAttribute('data-form'), input = form.querySelector('input'), v = input ? input.value.trim() : '';
+  if (!v) { if (input) input.focus(); return; }
+  if (kind === 'addterm') { const n = addTerm(v, null, ''); S.sel = n.id; S.tab = 'interview'; commit(); }
+  if (kind === 'opt') { const c = findConflicts().find(x => x.id === form.getAttribute('data-c')); const o = c && c.opts[+form.getAttribute('data-i')]; if (o) { o.a(v); commit(); } }
+});
+document.addEventListener('input', ev => {
+  const el = ev.target, k = el.getAttribute && el.getAttribute('data-in'); if (!k) return;
+  const t = termById(S.sel);
+  if (k === 'task') S.task = el.value;
+  else if (k === 'appname') S.appName = el.value;
+  else if (k === 'ns') S.ns = el.value;
+  else if (k === 'tname' && t) { t.name = el.value; const li = document.querySelector(`.titem[data-id="${t.id}"] .tname`); if (li) li.textContent = el.value || 'Untitled'; }
+  else if (k === 'tdesc' && t) t.desc = el.value;
+  saveDraft();
+});
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  if (el === ontEl) { S.ont = el.checked; commit(); return; }
+  if (el.id === 'impfile') { const f = el.files && el.files[0]; el.value = ''; handleFile(f); return; }
+  if (el.name === 'impmode') { S.impMode = el.value; saveDraft(); return; }
+  if (el.getAttribute && el.getAttribute('data-in') === 'ns') { commit(); return; }
+  const k = el.getAttribute && el.getAttribute('data-ch');
+  const di = el.getAttribute && el.getAttribute('data-in');
+  if (di === 'appname') { commit(); return; }
+  if (di === 'tname') { const t = termById(S.sel); if (t && !t.name.trim()) t.name = 'Untitled'; commit(); return; }
+  if (!k) return;
+  const t = termById(S.sel); if (!t) return;
+  if (k === 'sig') { t.sig[el.getAttribute('data-k')] = el.checked; if (!el.checked) delete t.sig[el.getAttribute('data-k')]; }
+  else if (k === 'rel') setRel(t.id, el.getAttribute('data-r'), el.value || null);
+  else if (k === 'relm') toggleRel(t.id, el.getAttribute('data-r'), el.value, el.checked);
+  commit();
+});
+
+render();
+/* Hook for the Kindwork build service, which runs this same code server-side. Inert in the browser. */
+if (window.__KINDWORK_EXPORT__) window.__KINDWORK_EXPORT__({ S, walk, kwOf, findConflicts, genSchema, genOWL, genSHACL, genKW, genManifest, genTracker, genReadme, genReadmeTail, parseTurtle, parseRdfXml, importTriples, applyImport, applyManifest, applyFindings, openFindings, iriOf, localNames, nsBase, termById, relsOf, KW, PATHS, Q, SLOTS, RELNAMES, BFO, KWV });
+})();
+</script>

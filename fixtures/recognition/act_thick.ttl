@@ -1,0 +1,41 @@
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo:  <http://purl.obolibrary.org/obo/> .
+@prefix ex:   <http://example.org/rec#> .
+
+# Row three of Table 8: act-thick and repair-thick. A licensure regime that
+# models the whole chain -- authority, criteria, assessor in role, presenting
+# facts, the conferring act, its effects, and the route by which a wrong
+# conferral is undone. Per Table 8 this is the only class in which all twelve
+# kernel primitives can fire.
+#
+# The act and remedy loci both ground to BFO process, which underdetermines
+# them; the labels carry cues ("certification", "appeal") that settle it. That
+# is deliberate -- it exercises the bfo-type+label route in the proposer.
+
+<http://example.org/rec/act-thick> a owl:Ontology .
+
+ex:LicensingBoard a owl:Class ; rdfs:subClassOf obo:BFO_0000027 ;
+    rdfs:label "licensing board" .
+
+ex:CompetenceRequirement a owl:Class ; rdfs:subClassOf obo:IAO_0000033 ;
+    rdfs:label "competence requirement" .
+ex:TrainingHoursRule a owl:Class ; rdfs:subClassOf ex:CompetenceRequirement ;
+    rdfs:label "training hours rule" .
+
+ex:BoardExaminer a owl:Class ; rdfs:subClassOf obo:BFO_0000023 ;
+    rdfs:label "board examiner" .
+
+ex:ExamPerformance a owl:Class ; rdfs:subClassOf obo:BFO_0000019 ;
+    rdfs:label "exam performance evidence" .
+
+ex:CertificationAct a owl:Class ; rdfs:subClassOf obo:BFO_0000015 ;
+    rdfs:label "certification act" .
+
+ex:PracticeEntitlement a owl:Class ; rdfs:subClassOf obo:BFO_0000023 ;
+    rdfs:label "practice entitlement" .
+
+ex:AppealProcess a owl:Class ; rdfs:subClassOf obo:BFO_0000015 ;
+    rdfs:label "appeal process" .
+ex:RevocationProcess a owl:Class ; rdfs:subClassOf obo:BFO_0000015 ;
+    rdfs:label "revocation process" .

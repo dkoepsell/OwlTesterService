@@ -54,6 +54,8 @@ The app uses **PostgreSQL in production** and **SQLite as fallback**. Tables are
 
 Uploads go to `uploads/` directory. Allowed extensions: `owl`, `rdf`, `xml`, `ttl`, `n3`, `nt`, `ofn`, `own`, `owx`. Max 16MB. The format detector normalizes files before analysis.
 
+**Multi-file (modular) uploads:** several files or a `.zip` (optionally with `catalog-v001.xml`) go through `ontology_bundle.py`, which resolves `owl:imports` locally (IRI / version IRI / catalog / file name; BFO → vendored), merges the top-level module's import closure into the single stored file, and writes `<file>.bundle.json` (manifest, per-entity module) plus a `<stem>_modules/` dir. `bundle_layers.py` + `/api/bundle/<filename>/layers` reason over each module's closure bottom-up to find the first breaking layer.
+
 ## Frontend
 
 Templates use Jinja2 with Bootstrap 5 dark theme. D3.js v7 handles interactive ontology graphs. Key JS files: `static/js/script.js` (main page FOL tester), `static/js/sandbox.js` (ontology builder), `static/js/ontology-visualizer.js` (D3 visualization).

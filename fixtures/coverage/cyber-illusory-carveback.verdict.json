@@ -1,0 +1,19 @@
+{
+  "fixture_id": "cyber-illusory-carveback",
+  "coherent": false,
+  "headline": "No possible claim can satisfy these three clauses at once.",
+  "checked_positions": [
+    {
+      "position": "restored_by_c1",
+      "label": "Does Endorsement 7 restore any coverage?",
+      "result": "empty",
+      "contradicting_clauses": [
+        "E1",
+        "C1",
+        "D1"
+      ]
+    }
+  ],
+  "plain_english_why": "Exclusion 4(f) applies only to claims where the Insured FAILED to maintain the Minimum Security Standards. Endorsement 7 restores coverage only for claims where the Insured MAINTAINED them \u2014 and the definition of Minimum Security Standards (\"maintained continuously\") makes maintaining and failing to maintain mutually exclusive. So every claim Endorsement 7 would give back was never excluded in the first place. The set of claims it restores is empty: the carveback is illusory. The policy reads as if Endorsement 7 broadens coverage; it broadens nothing.",
+  "scenario": null
+}

@@ -1,0 +1,238 @@
+{% extends "layout.html" %}
+
+{% block title %}Kindwork{% endblock %}
+
+{% block extra_head %}
+<style>
+    #kwSource { font-family: var(--bs-font-monospace); font-size: .82rem; min-height: 320px; }
+    .kw-finding { border-left: 4px solid var(--bs-secondary); }
+    .kw-finding.fail { border-left-color: var(--bs-danger); }
+    .kw-finding.undetermined { border-left-color: var(--bs-warning); }
+    .kw-finding.pass { border-left-color: var(--bs-success); }
+    .kw-finding code { font-size: .78rem; }
+    .kw-diag { cursor: pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-baseline mb-2">
+        <h2 class="h4 mb-1"><i class="fas fa-puzzle-piece me-2"></i>Kindwork</h2>
+        {% if kindwork_url %}
+        <a class="small" href="{{ kindwork_url }}" target="_blank" rel="noopener">Prefer the interview? Open Kindwork</a>
+        {% endif %}
+    </div>
+    <p class="text-muted">
+        Paste or load keyword source (<code>.kw</code>), a Kindwork model (<code>.json</code>),
+        or an ontology (<code>.ttl</code>, <code>.owl</code>, <code>.rdf</code>).
+        Lint checks keyword source, Check runs the reasoner, and Build downloads the OWL, shapes,
+        tracker app and model as a zip.
+    </p>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <input class="form-control form-control-sm mb-2" type="file" id="kwFile"
+                   accept=".kw,.json,.ttl,.owl,.rdf">
+            <textarea class="form-control" id="kwSource" spellcheck="false"
+                      placeholder='app "Job site tracker"&#10;thing "Worker"&#10;...'></textarea>
+            <div class="mt-2">
+                <button class="btn btn-outline-secondary" id="kwLint">Lint</button>
+                <button class="btn btn-primary" id="kwCheck">Check</button>
+                <button class="btn btn-outline-primary" id="kwBuild">Build</button>
+                <span id="kwStatus" class="ms-2 text-muted small"></span>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div id="kwErrors" class="d-none mb-3">
+                <h3 class="h6">Errors</h3>
+                <div class="list-group" id="kwErrorList"></div>
+            </div>
+            <div id="kwWarnings" class="d-none mb-3">
+                <h3 class="h6">Warnings</h3>
+                <div class="list-group" id="kwWarningList"></div>
+            </div>
+            <div id="kwLintClean" class="d-none alert alert-success py-2">No errors or warnings.</div>
+            <div id="kwResult" class="d-none">
+                <div class="d-flex justify-content-between align-items-baseline mb-2">
+                    <h3 class="h6 mb-0" id="kwVerdict"></h3>
+                    <button class="btn btn-sm btn-outline-primary" id="kwSave">Save findings</button>
+                </div>
+                <div id="kwFindings"></div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-4">
+    <details>
+        <summary class="h6">Check a Kindwork export with its shapes</summary>
+        <p class="text-muted small mt-2">
+            Upload the files Kindwork exported together: the ontology (<code>&lt;slug&gt;.ttl</code>),
+            and if you have them, the shapes (<code>&lt;slug&gt;-shapes.ttl</code>), the model
+            (<code>&lt;slug&gt;.kindwork.json</code>) and any records to validate. Several files or one zip
+            both work. This also runs the shape rules against the records.
+        </p>
+        <form id="kwBundleForm">
+            <input class="form-control form-control-sm mb-2" type="file" name="files" multiple
+                   accept=".ttl,.owl,.rdf,.xml,.json,.zip" required>
+            <button class="btn btn-sm btn-primary" type="submit">Check export</button>
+        </form>
+    </details>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const $ = id => document.getElementById(id);
+    const src = $('kwSource'), status = $('kwStatus');
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+    const SEVERITY = {partition: 'Crosses the core divide', within: 'Within one side', chain: 'Recognition chain', info: 'Note'};
+    const VERDICT = {fail: ['Fails', 'danger'], undetermined: ['Undetermined', 'warning'], pass: ['Passes', 'success']};
+    const word = v => v === true ? 'yes' : v === false ? 'no' : 'open';
+    let fileName = '', lastFindings = null;
+
+    $('kwFile').addEventListener('change', async e => {
+        const f = e.target.files[0];
+        if (!f) return;
+        fileName = f.name;
+        src.value = await f.text();
+        status.textContent = `Loaded ${f.name}.`;
+    });
+
+    function slug() {
+        const stem = fileName.replace(/\.(kindwork\.json|json|kw|ttl|owl|rdf)$/i, '');
+        if (stem) return stem;
+        const m = src.value.match(/^\s*app\s+"([^"]+)"/m);
+        return m ? m[1].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : 'model';
+    }
+
+    function reset() {
+        for (const id of ['kwErrors', 'kwWarnings', 'kwLintClean', 'kwResult']) $(id).classList.add('d-none');
+    }
+
+    function goToLine(line) {
+        if (!line) return;
+        const lines = src.value.split('\n');
+        let start = 0;
+        for (let i = 0; i < line - 1 && i < lines.length; i++) start += lines[i].length + 1;
+        src.focus();
+        src.setSelectionRange(start, start + (lines[line - 1] || '').length);
+        const lh = parseFloat(getComputedStyle(src).lineHeight) || 18;
+        src.scrollTop = Math.max(0, (line - 3) * lh);
+    }
+
+    function diagList(listId, boxId, items) {
+        $(listId).innerHTML = items.map(d => `
+            <button type="button" class="list-group-item list-group-item-action kw-diag small" data-line="${d.line || ''}">
+                ${d.line ? `<span class="badge bg-secondary me-2">line ${d.line}</span>` : ''}
+                ${d.term ? `<strong>${esc(d.term)}:</strong> ` : ''}${esc(d.message)}
+            </button>`).join('');
+        $(boxId).classList.toggle('d-none', !items.length);
+        $(listId).querySelectorAll('.kw-diag').forEach(b =>
+            b.addEventListener('click', () => goToLine(Number(b.dataset.line))));
+    }
+
+    async function post(op, accept) {
+        if (!src.value.trim()) { status.textContent = 'Paste or load something first.'; return null; }
+        reset();
+        status.textContent = op === 'check' ? 'Running the reasoner...' : 'Working...';
+        const resp = await fetch(`/kindwork/v1/${op}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': accept || 'application/json'},
+            body: JSON.stringify({source: src.value, name: fileName || 'model'})
+        });
+        if (resp.status === 422) {
+            const body = await resp.json();
+            status.textContent = body.error || 'The input was refused.';
+            diagList('kwErrorList', 'kwErrors', body.errors || []);
+            return null;
+        }
+        if (!resp.ok) {
+            let msg = `The request failed (${resp.status}).`;
+            try { msg = (await resp.json()).error || msg; } catch (e) {}
+            status.textContent = msg;
+            return null;
+        }
+        status.textContent = '';
+        return resp;
+    }
+
+    function showFindings(doc) {
+        lastFindings = doc;
+        $('kwVerdict').textContent = `Consistent: ${word(doc.verdict.consistent)}. Coherent: ${word(doc.verdict.coherent)}. ` +
+            `${doc.findings.length} finding${doc.findings.length === 1 ? '' : 's'}.`;
+        $('kwFindings').innerHTML = doc.findings.map(f => {
+            const [label, tone] = VERDICT[f.verdict] || [f.verdict, 'secondary'];
+            return `<div class="card kw-finding ${esc(f.verdict)} mb-2"><div class="card-body py-2">
+                <div class="small mb-1"><span class="badge bg-${tone} me-1">${esc(label)}</span>
+                    <span class="text-muted">${esc(SEVERITY[f.severity] || f.severity)}</span></div>
+                <div class="fw-semibold">${esc(f.title)}</div>
+                <div>${esc(f.explanation)}</div>
+                ${f.axioms && f.axioms.length ? `<details class="mt-1"><summary class="small text-muted">Axioms</summary>
+                    ${f.axioms.map(a => `<code class="d-block">${esc(a)}</code>`).join('')}</details>` : ''}
+            </div></div>`;
+        }).join('') || '<p class="text-muted">No findings.</p>';
+        $('kwResult').classList.remove('d-none');
+    }
+
+    function download(blob, name) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    async function guard(fn) {
+        const buttons = ['kwLint', 'kwCheck', 'kwBuild'].map($);
+        buttons.forEach(b => b.disabled = true);
+        try { await fn(); } catch (err) { status.textContent = 'The request failed: ' + err; }
+        finally { buttons.forEach(b => b.disabled = false); }
+    }
+
+    $('kwLint').addEventListener('click', () => guard(async () => {
+        const resp = await post('lint');
+        if (!resp) return;
+        const body = await resp.json();
+        diagList('kwErrorList', 'kwErrors', body.errors || []);
+        diagList('kwWarningList', 'kwWarnings', body.warnings || []);
+        if (!(body.errors || []).length && !(body.warnings || []).length) $('kwLintClean').classList.remove('d-none');
+    }));
+
+    $('kwCheck').addEventListener('click', () => guard(async () => {
+        const resp = await post('check');
+        if (resp) showFindings(await resp.json());
+    }));
+
+    $('kwBuild').addEventListener('click', () => guard(async () => {
+        const resp = await post('build', 'application/zip');
+        if (!resp) return;
+        const name = (resp.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+        download(await resp.blob(), name ? name[1] : 'kindwork.zip');
+        status.textContent = 'Build downloaded.';
+    }));
+
+    $('kwSave').addEventListener('click', () => {
+        if (!lastFindings) return;
+        download(new Blob([JSON.stringify(lastFindings, null, 2)], {type: 'application/json'}), `${slug()}.findings.json`);
+    });
+
+    $('kwBundleForm').addEventListener('submit', e => {
+        e.preventDefault();
+        guard(async () => {
+            reset();
+            status.textContent = 'Running the reasoner...';
+            const resp = await fetch('{{ url_for("kindwork.check") }}', {method: 'POST', body: new FormData(e.target)});
+            const body = await resp.json();
+            if (!resp.ok) { status.textContent = body.error || 'The check failed.'; return; }
+            status.textContent = '';
+            const name = (resp.headers.get('Content-Disposition') || '').match(/filename="([^"]+)\.findings\.json"/);
+            fileName = name ? name[1] : '';
+            showFindings(body);
+        });
+    });
+})();
+</script>
+{% endblock %}

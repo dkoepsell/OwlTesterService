@@ -1,0 +1,92 @@
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix obo:  <http://purl.obolibrary.org/obo/> .
+@prefix ex:   <http://example.org/rec#> .
+
+# A classification carrying one instance of each defect that only structural
+# analysis can see. Every one of these leaves the artifact CONSISTENT -- a
+# reasoner asked about them has nothing to report, because nothing is wrong
+# with the theory as a theory. That is the point of Table 7.
+
+<http://example.org/rec/structural> a owl:Ontology .
+
+ex:DiagnosticCriterion a owl:Class ; rdfs:subClassOf obo:IAO_0000033 ;
+    rdfs:label "diagnostic criterion" .
+
+# --- CT-5 / K-B3: residual definition, axiomatic route ------------------------
+# Genus named, then the siblings subtracted. No positive differentia of its own,
+# so its extension changes silently every time a sibling is revised.
+ex:PanicCriterion  a owl:Class ; rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "panic criterion" .
+ex:PhobiaCriterion a owl:Class ; rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "phobia criterion" .
+
+ex:OtherAnxietyCriterion a owl:Class ;
+    rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "other anxiety criterion" ;
+    owl:equivalentClass [
+        owl:intersectionOf ( ex:DiagnosticCriterion
+                             [ owl:complementOf ex:PanicCriterion ]
+                             [ owl:complementOf ex:PhobiaCriterion ] ) ] .
+
+# --- CT-5 / K-B3: residual definition, lexical route --------------------------
+# The same defect wearing a label instead of an axiom. Classifications produce
+# these constantly and no reasoner will ever object to one.
+ex:UnspecifiedMoodCondition a owl:Class ;
+    rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "unspecified mood condition, not otherwise specified" .
+
+# --- CT-4 / K-B2: criterion double-duty ---------------------------------------
+# LongTermImpairment is required as an inclusion filler and excluded outright in
+# the same definition. Which reading applies decides the case.
+ex:LongTermImpairment a owl:Class ; rdfs:label "long term impairment" .
+ex:Impairment a owl:Class ; rdfs:label "impairment" .
+
+ex:QualifyingDisabilityCriterion a owl:Class ;
+    rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "qualifying disability criterion" ;
+    owl:equivalentClass [
+        owl:intersectionOf ( ex:Impairment
+                             [ a owl:Restriction ;
+                               owl:onProperty ex:hasDuration ;
+                               owl:someValuesFrom ex:LongTermImpairment ]
+                             [ owl:complementOf ex:LongTermImpairment ] ) ] .
+
+ex:hasDuration a owl:ObjectProperty .
+
+# --- CT-2 / K-B1: definitional cycle ------------------------------------------
+# Each criterion's defining conditions depend transitively on the other. The
+# artifact stays consistent; only a walk of the definition graph finds it.
+ex:DependencyCriterion a owl:Class ;
+    rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "dependency criterion" ;
+    owl:equivalentClass [
+        owl:intersectionOf ( ex:DiagnosticCriterion ex:ToleranceCriterion ) ] .
+
+ex:ToleranceCriterion a owl:Class ;
+    rdfs:subClassOf ex:DiagnosticCriterion ;
+    rdfs:label "tolerance criterion" ;
+    owl:equivalentClass [
+        owl:intersectionOf ( ex:DiagnosticCriterion ex:DependencyCriterion ) ] .
+
+# --- CT-3 / K-A3: polythetic family -------------------------------------------
+# "Any three of the following" is not expressible in OWL, so it arrives as a
+# bare union of features sharing no essence. Membership is underconstrained and
+# borderline cases stay underivable.
+ex:FeatureWeightLoss   a owl:Class ; rdfs:label "weight loss feature" .
+ex:FeatureInsomnia     a owl:Class ; rdfs:label "insomnia feature" .
+ex:FeatureAnhedonia    a owl:Class ; rdfs:label "anhedonia feature" .
+ex:FeatureFatigue      a owl:Class ; rdfs:label "fatigue feature" .
+
+ex:PolytheticSyndromeCriterion a owl:Class ;
+    rdfs:label "polythetic syndrome criterion" ;
+    owl:equivalentClass [
+        owl:unionOf ( ex:FeatureWeightLoss ex:FeatureInsomnia
+                      ex:FeatureAnhedonia ex:FeatureFatigue ) ] .
+
+# --- K-C2: level confusion ----------------------------------------------------
+# A universal also declared a particular. OWL 2 punning makes this legal, which
+# is precisely why a reasoner cannot see it.
+ex:SeverityRating a owl:Class, owl:NamedIndividual ;
+    rdfs:label "severity rating" .

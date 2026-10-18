@@ -1,0 +1,43 @@
+{
+  "id": "cyber-illusory-carveback",
+  "title": "Cyber — Network Security Coverage, Endorsement 7 (Policy B)",
+  "line_of_business": "cyber",
+  "failure_pattern": "illusory-carveback",
+  "baseline_score": {
+    "presence": 94,
+    "conformity": "A-",
+    "components": [
+      { "label": "Insuring agreement present", "hit": true },
+      { "label": "Exclusion schedule complete", "hit": true },
+      { "label": "Carveback present (market-standard)", "hit": true },
+      { "label": "Defined terms present", "hit": true }
+    ]
+  },
+  "clauses": [
+    { "id": "G1", "role": "grant", "heading": "Insuring Agreement A",
+      "text": "We will pay Loss resulting from a Network Security Event first discovered during the Policy Period." },
+    { "id": "E1", "role": "exclusion", "heading": "Exclusion 4(f)",
+      "text": "This Policy does not apply to Loss arising out of the Insured's failure to maintain the Minimum Security Standards." },
+    { "id": "C1", "role": "carveback", "heading": "Endorsement 7",
+      "text": "Exclusion 4(f) shall not apply to Loss resulting from a Network Security Event occurring while the Insured maintained the Minimum Security Standards." },
+    { "id": "D1", "role": "definition", "heading": "Definitions — Minimum Security Standards",
+      "text": "\"Minimum Security Standards\" means the controls listed in Schedule B, maintained continuously." }
+  ],
+  "axioms": [
+    { "label": "ax_g1", "clause_id": "G1",
+      "formula": "all X (covered_by_g1(X) <-> (claim(X) & loss_from_nse(X) & discovered_in_period(X)))" },
+    { "label": "ax_e1", "clause_id": "E1",
+      "formula": "all X (excluded_by_e1(X) <-> (claim(X) & failed_mss(X)))" },
+    { "label": "ax_c1", "clause_id": "C1",
+      "formula": "all X (restored_by_c1(X) <-> (excluded_by_e1(X) & loss_from_nse(X) & maintained_mss(X)))" },
+    { "label": "ax_d1", "clause_id": "D1",
+      "formula": "all X (claim(X) -> (maintained_mss(X) <-> -failed_mss(X)))" }
+  ],
+  "check": {
+    "position": "restored_by_c1",
+    "question": "Does Endorsement 7 restore any coverage?"
+  },
+  "witness_scenario": null,
+  "plain_english_why": "Exclusion 4(f) applies only to claims where the Insured FAILED to maintain the Minimum Security Standards. Endorsement 7 restores coverage only for claims where the Insured MAINTAINED them — and the definition of Minimum Security Standards (\"maintained continuously\") makes maintaining and failing to maintain mutually exclusive. So every claim Endorsement 7 would give back was never excluded in the first place. The set of claims it restores is empty: the carveback is illusory. The policy reads as if Endorsement 7 broadens coverage; it broadens nothing.",
+  "verdict_cache": "cyber-illusory-carveback.verdict.json"
+}

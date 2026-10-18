@@ -39,6 +39,12 @@
                 <a href="{{ url_for('sandbox_download', ontology_id=ontology.id) }}" class="btn btn-outline-secondary">
                     <i class="fas fa-download me-2"></i>Download OWL
                 </a>
+                <form method="post" action="{{ url_for('sandbox_delete', ontology_id=ontology.id) }}" class="d-inline ms-2"
+                      onsubmit="return confirm('Delete this sandbox ontology and all its classes, properties and individuals? Files already exported to History are kept. This cannot be undone.');">
+                    <button type="submit" class="btn btn-outline-danger">
+                        <i class="fas fa-trash me-2"></i>Delete
+                    </button>
+                </form>
             </div>
         </div>
     </div>

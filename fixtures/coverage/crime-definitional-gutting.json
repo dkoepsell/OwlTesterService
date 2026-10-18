@@ -1,0 +1,49 @@
+{
+  "id": "crime-definitional-gutting",
+  "title": "Crime — Computer & Funds Transfer Fraud (Policy C)",
+  "line_of_business": "crime",
+  "failure_pattern": "definitional-gutting",
+  "baseline_score": {
+    "presence": 92,
+    "conformity": "A-",
+    "components": [
+      { "label": "Insuring agreement present", "hit": true },
+      { "label": "Computer fraud coverage present", "hit": true },
+      { "label": "Fraudulent instruction extension present", "hit": true },
+      { "label": "Defined terms present", "hit": true }
+    ]
+  },
+  "clauses": [
+    { "id": "G1", "role": "grant", "heading": "Insuring Agreement — Computer & Funds Transfer Fraud",
+      "pos": [210, 240],
+      "text": "We will pay for loss of Money resulting directly from Computer Fraud, including loss resulting from the Insured's transfer of Money in reliance on a Fraudulent Instruction." },
+    { "id": "D1", "role": "definition", "heading": "Definitions — Computer Fraud",
+      "pos": [110, 60],
+      "text": "\"Computer Fraud\" means the unlawful taking of Money through unauthorized entry into the Insured's Computer System, where the resulting transfer is initiated without the knowledge or consent of any Employee." },
+    { "id": "D2", "role": "definition", "heading": "Definitions — Fraudulent Instruction",
+      "pos": [310, 60],
+      "text": "\"Fraudulent Instruction\" means an electronic instruction that constitutes Computer Fraud and on which an Employee relies in initiating the transfer of Money." }
+  ],
+  "edges": [
+    { "from": "D1", "to": "D2", "label": "defines term in" },
+    { "from": "D1", "to": "G1", "label": "defines term in" },
+    { "from": "D2", "to": "G1", "label": "defines term in" }
+  ],
+  "axioms": [
+    { "label": "ax_g1", "clause_id": "G1",
+      "formula": "all X (covered_by_g1(X) <-> (claim(X) & money_loss(X) & (computer_fraud(X) | fi_reliance_loss(X))))" },
+    { "label": "ax_g1b", "clause_id": "G1",
+      "formula": "all X (se_advertised(X) <-> (covered_by_g1(X) & fi_reliance_loss(X)))" },
+    { "label": "ax_d1", "clause_id": "D1",
+      "formula": "all X (computer_fraud(X) <-> (claim(X) & unauthorized_entry(X) & -employee_initiated_transfer(X)))" },
+    { "label": "ax_d2", "clause_id": "D2",
+      "formula": "all X (fi_reliance_loss(X) <-> (claim(X) & computer_fraud(X) & employee_initiated_transfer(X)))" }
+  ],
+  "check": {
+    "position": "se_advertised",
+    "question": "Can the Fraudulent Instruction coverage the insuring clause names ever pay?"
+  },
+  "witness_scenario": null,
+  "plain_english_why": "The insuring clause advertises coverage for transfers made in reliance on a Fraudulent Instruction — the classic social-engineering loss, where a deceived Employee initiates the payment. But D2 requires every Fraudulent Instruction to constitute Computer Fraud, and D1 requires Computer Fraud to involve a transfer initiated without the knowledge or consent of any Employee. A transfer an Employee initiates in reliance on an instruction cannot also be a transfer no Employee initiated. The social-engineering coverage G1 names cannot pay any claim: the definitions gut the grant.",
+  "verdict_cache": "crime-definitional-gutting.verdict.json"
+}

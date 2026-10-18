@@ -234,7 +234,7 @@ function initializeClassFunctionality(ontologyId) {
     document.querySelectorAll('.delete-class-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const classId = this.dataset.id;
-            if (confirm('Are you sure you want to delete this class? This will also delete any subclasses or associated entities.')) {
+            if (confirm('Are you sure you want to delete this class? This will also delete its subclasses and their individuals. Properties that use it as domain or range are kept, with that domain/range cleared.')) {
                 // Delete class
                 fetch(`/api/sandbox/${ontologyId}/classes/${classId}`, {
                     method: 'DELETE'

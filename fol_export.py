@@ -297,7 +297,36 @@ def _membership_p9(kind, var, sym, t="T"):
     return f"{_P_CONT}({var},{sym},{t})"
 
 
-def render_prover9(theory, align_bfo=False):
+def axiom_table(theory):
+    """Map each axiom label to its provenance, aligned with render_prover9.
+
+    render_prover9(labels=True) tags every emitted formula with
+    `# label(sub_<i>)` / `# label(dis_<i>)`, indexed by position in
+    theory.subsumptions / theory.disjoints. This returns the matching
+    side-table {label: {kind, text, iris[, origin]}} so a Prover9 proof's used
+    labels can be rendered back as the ontology's own axioms. Both functions
+    must iterate the theory in the same order — keep them in lockstep.
+    """
+    table = {}
+    for i, (sub, sup) in enumerate(theory.subsumptions):
+        table[f"sub_{i}"] = {
+            "kind": "subsumption",
+            "text": (f"{theory.classes[sub]['label']} SubClassOf "
+                     f"{theory.classes[sup]['label']}"),
+            "iris": [sub, sup],
+        }
+    for i, (a, b, origin) in enumerate(theory.disjoints):
+        table[f"dis_{i}"] = {
+            "kind": "disjointness",
+            "origin": origin,  # 'asserted' (in the file) | 'bfo' (category clash)
+            "text": (f"{theory.classes[a]['label']} DisjointWith "
+                     f"{theory.classes[b]['label']}"),
+            "iris": [a, b],
+        }
+    return table
+
+
+def render_prover9(theory, align_bfo=False, labels=False):
     """Render the theory as a runnable Prover9 (LADR) input file.
 
     With align_bfo=True every class instantiates via the time-indexed ternary
@@ -306,6 +335,10 @@ def render_prover9(theory, align_bfo=False):
     the prover can carry entailments across both. With the default align_bfo=False
     the output is byte-for-byte the standalone export (occurrents keep the binary
     instance_of_at(x, O)).
+
+    With labels=True every formula carries a `# label(...)` attribute keyed to
+    axiom_table(theory), so proofs can name the axioms they used. Off by default
+    to keep the user-facing download exports unchanged.
     """
     head_note = ("% Aligned to the BFO background: all instantiation is ternary "
                  "instance_of(x, C, t)." if align_bfo else
@@ -331,34 +364,38 @@ def render_prover9(theory, align_bfo=False):
     def sym(iri):
         return theory.classes[iri]["sym"]
 
+    def attr(label):
+        # `formula # label(x).` — the attribute goes inside the final period.
+        return f" # label({label})" if labels else ""
+
     if theory.subsumptions:
         lines.append("  % --- Subsumptions (SubClassOf) ---")
-    for sub, sup in theory.subsumptions:
+    for i, (sub, sup) in enumerate(theory.subsumptions):
         ks, ku = memb_kind(sub), memb_kind(sup)
         note = ""
         if ks == "occurrent" and ku == "occurrent":
             body = (f"all X ({_membership_p9('occurrent','X',sym(sub))} -> "
-                    f"{_membership_p9('occurrent','X',sym(sup))}).")
+                    f"{_membership_p9('occurrent','X',sym(sup))}){attr(f'sub_{i}')}.")
         else:
             # Default to the time-indexed (continuant) form. A continuant/occurrent
             # mismatch is itself a modeling error the lint flags; we mark it.
             if ks != ku and "unknown" not in (ks, ku):
                 note = "  % NOTE category mismatch between sub and super"
             body = (f"all X all T ({_membership_p9('continuant','X',sym(sub))} -> "
-                    f"{_membership_p9('continuant','X',sym(sup))}).")
+                    f"{_membership_p9('continuant','X',sym(sup))}){attr(f'sub_{i}')}.")
         lines.append(f"  {body}{note}")
 
     if theory.disjoints:
         lines.append("  % --- Disjointness ---")
-    for a, b, origin in theory.disjoints:
+    for i, (a, b, origin) in enumerate(theory.disjoints):
         ka, kb = memb_kind(a), memb_kind(b)
         tag = "BFO" if origin == "bfo" else "asserted"
         if ka == "occurrent" and kb == "occurrent":
             body = (f"all X (-({_membership_p9('occurrent','X',sym(a))} & "
-                    f"{_membership_p9('occurrent','X',sym(b))})).")
+                    f"{_membership_p9('occurrent','X',sym(b))})){attr(f'dis_{i}')}.")
         else:
             body = (f"all X all T (-({_membership_p9('continuant','X',sym(a))} & "
-                    f"{_membership_p9('continuant','X',sym(b))})).")
+                    f"{_membership_p9('continuant','X',sym(b))})){attr(f'dis_{i}')}.")
         lines.append(f"  {body}  % {tag}: {theory.classes[a]['label']} / "
                      f"{theory.classes[b]['label']}")
 

@@ -12,3 +12,7 @@ nginx/
 docker-compose.yml
 Dockerfile
 *.md
+kindwork_core/node_modules
+kindwork_core/vendor/robot.jar
+owltester-kindwork-module/
+kindwork-ecosystem-spec/

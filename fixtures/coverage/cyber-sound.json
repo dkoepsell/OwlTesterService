@@ -1,0 +1,43 @@
+{
+  "id": "cyber-sound",
+  "title": "Cyber — Network Security Coverage, Endorsement 7 (Policy A)",
+  "line_of_business": "cyber",
+  "failure_pattern": null,
+  "baseline_score": {
+    "presence": 94,
+    "conformity": "A-",
+    "components": [
+      { "label": "Insuring agreement present", "hit": true },
+      { "label": "Exclusion schedule complete", "hit": true },
+      { "label": "Carveback present (market-standard)", "hit": true },
+      { "label": "Defined terms present", "hit": true }
+    ]
+  },
+  "clauses": [
+    { "id": "G1", "role": "grant", "heading": "Insuring Agreement A",
+      "text": "We will pay Loss resulting from a Network Security Event first discovered during the Policy Period." },
+    { "id": "E1", "role": "exclusion", "heading": "Exclusion 4(f)",
+      "text": "This Policy does not apply to Loss arising out of the Insured's failure to maintain the Minimum Security Standards." },
+    { "id": "C1", "role": "carveback", "heading": "Endorsement 7",
+      "text": "Exclusion 4(f) shall not apply to Loss resulting from a Network Security Event, provided the Insured complied with the notice obligations in Section 9." },
+    { "id": "D1", "role": "definition", "heading": "Definitions — Minimum Security Standards",
+      "text": "\"Minimum Security Standards\" means the controls listed in Schedule B, maintained continuously." }
+  ],
+  "axioms": [
+    { "label": "ax_g1", "clause_id": "G1",
+      "formula": "all X (covered_by_g1(X) <-> (claim(X) & loss_from_nse(X) & discovered_in_period(X)))" },
+    { "label": "ax_e1", "clause_id": "E1",
+      "formula": "all X (excluded_by_e1(X) <-> (claim(X) & failed_mss(X)))" },
+    { "label": "ax_c1", "clause_id": "C1",
+      "formula": "all X (restored_by_c1(X) <-> (excluded_by_e1(X) & loss_from_nse(X) & notice_compliant(X)))" },
+    { "label": "ax_d1", "clause_id": "D1",
+      "formula": "all X (claim(X) -> (maintained_mss(X) <-> -failed_mss(X)))" }
+  ],
+  "check": {
+    "position": "restored_by_c1",
+    "question": "Does Endorsement 7 restore any coverage?"
+  },
+  "witness_scenario": "Example: a ransomware event first discovered in March, where a Schedule B control had lapsed — excluded under 4(f) — but the Insured gave timely notice under Section 9. Endorsement 7 restores coverage and the claim pays.",
+  "plain_english_why": "Endorsement 7's condition — timely notice under Section 9 — is independent of what Exclusion 4(f) excludes. A claim can be excluded for a security-standards failure and still satisfy the notice condition, so there are real claim scenarios in which the carveback gives coverage back. The endorsement does the work it advertises.",
+  "verdict_cache": "cyber-sound.verdict.json"
+}

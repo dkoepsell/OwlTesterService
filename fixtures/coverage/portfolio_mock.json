@@ -1,0 +1,1006 @@
+{
+ "label": "Illustrative portfolio \u2014 synthetic data",
+ "metric": "Contradiction Debt",
+ "points": [
+  {
+   "id": "P-0001",
+   "lob": "crime",
+   "cd": 9.0
+  },
+  {
+   "id": "P-0002",
+   "lob": "management liability",
+   "cd": 2.4
+  },
+  {
+   "id": "P-0003",
+   "lob": "excess",
+   "cd": 4.3
+  },
+  {
+   "id": "P-0004",
+   "lob": "cyber",
+   "cd": 59.2
+  },
+  {
+   "id": "P-0005",
+   "lob": "crime",
+   "cd": 4.7
+  },
+  {
+   "id": "P-0006",
+   "lob": "management liability",
+   "cd": 6.7
+  },
+  {
+   "id": "P-0007",
+   "lob": "excess",
+   "cd": 8.4
+  },
+  {
+   "id": "P-0008",
+   "lob": "cyber",
+   "cd": 5.6
+  },
+  {
+   "id": "P-0009",
+   "lob": "crime",
+   "cd": 13.4
+  },
+  {
+   "id": "P-0010",
+   "lob": "management liability",
+   "cd": 7.3
+  },
+  {
+   "id": "P-0011",
+   "lob": "excess",
+   "cd": 8.8
+  },
+  {
+   "id": "P-0012",
+   "lob": "cyber",
+   "cd": 11.1
+  },
+  {
+   "id": "P-0013",
+   "lob": "crime",
+   "cd": 11.2
+  },
+  {
+   "id": "P-0014",
+   "lob": "management liability",
+   "cd": 1.6
+  },
+  {
+   "id": "P-0015",
+   "lob": "excess",
+   "cd": 4.9
+  },
+  {
+   "id": "P-0016",
+   "lob": "cyber",
+   "cd": 2.5
+  },
+  {
+   "id": "P-0017",
+   "lob": "crime",
+   "cd": 2.0
+  },
+  {
+   "id": "P-0018",
+   "lob": "management liability",
+   "cd": 9.9
+  },
+  {
+   "id": "P-0019",
+   "lob": "excess",
+   "cd": 2.7
+  },
+  {
+   "id": "P-0020",
+   "lob": "cyber",
+   "cd": 3.7
+  },
+  {
+   "id": "P-0021",
+   "lob": "crime",
+   "cd": 2.5
+  },
+  {
+   "id": "P-0022",
+   "lob": "management liability",
+   "cd": 5.4
+  },
+  {
+   "id": "P-0023",
+   "lob": "excess",
+   "cd": 42.2
+  },
+  {
+   "id": "P-0024",
+   "lob": "cyber",
+   "cd": 0.2
+  },
+  {
+   "id": "P-0025",
+   "lob": "crime",
+   "cd": 12.9
+  },
+  {
+   "id": "P-0026",
+   "lob": "management liability",
+   "cd": 82.3
+  },
+  {
+   "id": "P-0027",
+   "lob": "excess",
+   "cd": 2.2
+  },
+  {
+   "id": "P-0028",
+   "lob": "cyber",
+   "cd": 3.7
+  },
+  {
+   "id": "P-0029",
+   "lob": "crime",
+   "cd": 1.9
+  },
+  {
+   "id": "P-0030",
+   "lob": "management liability",
+   "cd": 0.4
+  },
+  {
+   "id": "P-0031",
+   "lob": "excess",
+   "cd": 0.8
+  },
+  {
+   "id": "P-0032",
+   "lob": "cyber",
+   "cd": 8.1
+  },
+  {
+   "id": "P-0033",
+   "lob": "crime",
+   "cd": 9.8
+  },
+  {
+   "id": "P-0034",
+   "lob": "management liability",
+   "cd": 10.5
+  },
+  {
+   "id": "P-0035",
+   "lob": "excess",
+   "cd": 6.0
+  },
+  {
+   "id": "P-0036",
+   "lob": "cyber",
+   "cd": 5.1
+  },
+  {
+   "id": "P-0037",
+   "lob": "crime",
+   "cd": 5.5
+  },
+  {
+   "id": "P-0038",
+   "lob": "management liability",
+   "cd": 0.5
+  },
+  {
+   "id": "P-0039",
+   "lob": "excess",
+   "cd": 3.2
+  },
+  {
+   "id": "P-0040",
+   "lob": "cyber",
+   "cd": 6.8
+  },
+  {
+   "id": "P-0041",
+   "lob": "crime",
+   "cd": 10.4
+  },
+  {
+   "id": "P-0042",
+   "lob": "management liability",
+   "cd": 4.2
+  },
+  {
+   "id": "P-0043",
+   "lob": "excess",
+   "cd": 7.0
+  },
+  {
+   "id": "P-0044",
+   "lob": "cyber",
+   "cd": 12.3
+  },
+  {
+   "id": "P-0045",
+   "lob": "crime",
+   "cd": 10.4
+  },
+  {
+   "id": "P-0046",
+   "lob": "management liability",
+   "cd": 4.7
+  },
+  {
+   "id": "P-0047",
+   "lob": "excess",
+   "cd": 10.3
+  },
+  {
+   "id": "P-0048",
+   "lob": "cyber",
+   "cd": 5.8
+  },
+  {
+   "id": "P-0049",
+   "lob": "crime",
+   "cd": 52.9
+  },
+  {
+   "id": "P-0050",
+   "lob": "management liability",
+   "cd": 2.3
+  },
+  {
+   "id": "P-0051",
+   "lob": "excess",
+   "cd": 11.6
+  },
+  {
+   "id": "P-0052",
+   "lob": "cyber",
+   "cd": 3.9
+  },
+  {
+   "id": "P-0053",
+   "lob": "crime",
+   "cd": 5.0
+  },
+  {
+   "id": "P-0054",
+   "lob": "management liability",
+   "cd": 1.2
+  },
+  {
+   "id": "P-0055",
+   "lob": "excess",
+   "cd": 11.9
+  },
+  {
+   "id": "P-0056",
+   "lob": "cyber",
+   "cd": 10.7
+  },
+  {
+   "id": "P-0057",
+   "lob": "crime",
+   "cd": 3.8
+  },
+  {
+   "id": "P-0058",
+   "lob": "management liability",
+   "cd": 11.3
+  },
+  {
+   "id": "P-0059",
+   "lob": "excess",
+   "cd": 11.7
+  },
+  {
+   "id": "P-0060",
+   "lob": "cyber",
+   "cd": 11.9
+  },
+  {
+   "id": "P-0061",
+   "lob": "crime",
+   "cd": 9.6
+  },
+  {
+   "id": "P-0062",
+   "lob": "management liability",
+   "cd": 4.3
+  },
+  {
+   "id": "P-0063",
+   "lob": "excess",
+   "cd": 10.5
+  },
+  {
+   "id": "P-0064",
+   "lob": "cyber",
+   "cd": 6.3
+  },
+  {
+   "id": "P-0065",
+   "lob": "crime",
+   "cd": 10.2
+  },
+  {
+   "id": "P-0066",
+   "lob": "management liability",
+   "cd": 9.8
+  },
+  {
+   "id": "P-0067",
+   "lob": "excess",
+   "cd": 13.6
+  },
+  {
+   "id": "P-0068",
+   "lob": "cyber",
+   "cd": 8.8
+  },
+  {
+   "id": "P-0069",
+   "lob": "crime",
+   "cd": 15.9
+  },
+  {
+   "id": "P-0070",
+   "lob": "management liability",
+   "cd": 69.4
+  },
+  {
+   "id": "P-0071",
+   "lob": "excess",
+   "cd": 2.1
+  },
+  {
+   "id": "P-0072",
+   "lob": "cyber",
+   "cd": 4.0
+  },
+  {
+   "id": "P-0073",
+   "lob": "crime",
+   "cd": 3.0
+  },
+  {
+   "id": "P-0074",
+   "lob": "management liability",
+   "cd": 44.2
+  },
+  {
+   "id": "P-0075",
+   "lob": "excess",
+   "cd": 11.4
+  },
+  {
+   "id": "P-0076",
+   "lob": "cyber",
+   "cd": 10.3
+  },
+  {
+   "id": "P-0077",
+   "lob": "crime",
+   "cd": 11.2
+  },
+  {
+   "id": "P-0078",
+   "lob": "management liability",
+   "cd": 2.7
+  },
+  {
+   "id": "P-0079",
+   "lob": "excess",
+   "cd": 7.6
+  },
+  {
+   "id": "P-0080",
+   "lob": "cyber",
+   "cd": 3.6
+  },
+  {
+   "id": "P-0081",
+   "lob": "crime",
+   "cd": 6.7
+  },
+  {
+   "id": "P-0082",
+   "lob": "management liability",
+   "cd": 6.7
+  },
+  {
+   "id": "P-0083",
+   "lob": "excess",
+   "cd": 3.3
+  },
+  {
+   "id": "P-0084",
+   "lob": "cyber",
+   "cd": 10.0
+  },
+  {
+   "id": "P-0085",
+   "lob": "crime",
+   "cd": 79.9
+  },
+  {
+   "id": "P-0086",
+   "lob": "management liability",
+   "cd": 5.9
+  },
+  {
+   "id": "P-0087",
+   "lob": "excess",
+   "cd": 5.4
+  },
+  {
+   "id": "P-0088",
+   "lob": "cyber",
+   "cd": 5.3
+  },
+  {
+   "id": "P-0089",
+   "lob": "crime",
+   "cd": 3.4
+  },
+  {
+   "id": "P-0090",
+   "lob": "management liability",
+   "cd": 4.7
+  },
+  {
+   "id": "P-0091",
+   "lob": "excess",
+   "cd": 3.7
+  },
+  {
+   "id": "P-0092",
+   "lob": "cyber",
+   "cd": 17.2
+  },
+  {
+   "id": "P-0093",
+   "lob": "crime",
+   "cd": 3.9
+  },
+  {
+   "id": "P-0094",
+   "lob": "management liability",
+   "cd": 1.9
+  },
+  {
+   "id": "P-0095",
+   "lob": "excess",
+   "cd": 5.0
+  },
+  {
+   "id": "P-0096",
+   "lob": "cyber",
+   "cd": 14.5
+  },
+  {
+   "id": "P-0097",
+   "lob": "crime",
+   "cd": 13.3
+  },
+  {
+   "id": "P-0098",
+   "lob": "management liability",
+   "cd": 1.3
+  },
+  {
+   "id": "P-0099",
+   "lob": "excess",
+   "cd": 2.5
+  },
+  {
+   "id": "P-0100",
+   "lob": "cyber",
+   "cd": 2.1
+  },
+  {
+   "id": "P-0101",
+   "lob": "crime",
+   "cd": 0.0
+  },
+  {
+   "id": "P-0102",
+   "lob": "management liability",
+   "cd": 7.7
+  },
+  {
+   "id": "P-0103",
+   "lob": "excess",
+   "cd": 18.0
+  },
+  {
+   "id": "P-0104",
+   "lob": "cyber",
+   "cd": 16.2
+  },
+  {
+   "id": "P-0105",
+   "lob": "crime",
+   "cd": 13.8
+  },
+  {
+   "id": "P-0106",
+   "lob": "management liability",
+   "cd": 9.9
+  },
+  {
+   "id": "P-0107",
+   "lob": "excess",
+   "cd": 3.4
+  },
+  {
+   "id": "P-0108",
+   "lob": "cyber",
+   "cd": 3.6
+  },
+  {
+   "id": "P-0109",
+   "lob": "crime",
+   "cd": 1.4
+  },
+  {
+   "id": "P-0110",
+   "lob": "management liability",
+   "cd": 3.7
+  },
+  {
+   "id": "P-0111",
+   "lob": "excess",
+   "cd": 8.9
+  },
+  {
+   "id": "P-0112",
+   "lob": "cyber",
+   "cd": 5.7
+  },
+  {
+   "id": "P-0113",
+   "lob": "crime",
+   "cd": 8.4
+  },
+  {
+   "id": "P-0114",
+   "lob": "management liability",
+   "cd": 1.6
+  },
+  {
+   "id": "P-0115",
+   "lob": "excess",
+   "cd": 5.1
+  },
+  {
+   "id": "P-0116",
+   "lob": "cyber",
+   "cd": 0.7
+  },
+  {
+   "id": "P-0117",
+   "lob": "crime",
+   "cd": 2.0
+  },
+  {
+   "id": "P-0118",
+   "lob": "management liability",
+   "cd": 16.0
+  },
+  {
+   "id": "P-0119",
+   "lob": "excess",
+   "cd": 12.9
+  },
+  {
+   "id": "P-0120",
+   "lob": "cyber",
+   "cd": 7.8
+  },
+  {
+   "id": "P-0121",
+   "lob": "crime",
+   "cd": 9.4
+  },
+  {
+   "id": "P-0122",
+   "lob": "management liability",
+   "cd": 0.1
+  },
+  {
+   "id": "P-0123",
+   "lob": "excess",
+   "cd": 0.3
+  },
+  {
+   "id": "P-0124",
+   "lob": "cyber",
+   "cd": 6.5
+  },
+  {
+   "id": "P-0125",
+   "lob": "crime",
+   "cd": 12.2
+  },
+  {
+   "id": "P-0126",
+   "lob": "management liability",
+   "cd": 5.2
+  },
+  {
+   "id": "P-0127",
+   "lob": "excess",
+   "cd": 0.8
+  },
+  {
+   "id": "P-0128",
+   "lob": "cyber",
+   "cd": 9.0
+  },
+  {
+   "id": "P-0129",
+   "lob": "crime",
+   "cd": 10.0
+  },
+  {
+   "id": "P-0130",
+   "lob": "management liability",
+   "cd": 8.7
+  },
+  {
+   "id": "P-0131",
+   "lob": "excess",
+   "cd": 0.3
+  },
+  {
+   "id": "P-0132",
+   "lob": "cyber",
+   "cd": 17.5
+  },
+  {
+   "id": "P-0133",
+   "lob": "crime",
+   "cd": 9.3
+  },
+  {
+   "id": "P-0134",
+   "lob": "management liability",
+   "cd": 9.9
+  },
+  {
+   "id": "P-0135",
+   "lob": "excess",
+   "cd": 7.0
+  },
+  {
+   "id": "P-0136",
+   "lob": "cyber",
+   "cd": 63.4
+  },
+  {
+   "id": "P-0137",
+   "lob": "crime",
+   "cd": 54.3
+  },
+  {
+   "id": "P-0138",
+   "lob": "management liability",
+   "cd": 2.1
+  },
+  {
+   "id": "P-0139",
+   "lob": "excess",
+   "cd": 0.6
+  },
+  {
+   "id": "P-0140",
+   "lob": "cyber",
+   "cd": 2.4
+  },
+  {
+   "id": "P-0141",
+   "lob": "crime",
+   "cd": 7.9
+  },
+  {
+   "id": "P-0142",
+   "lob": "management liability",
+   "cd": 10.2
+  },
+  {
+   "id": "P-0143",
+   "lob": "excess",
+   "cd": 9.0
+  },
+  {
+   "id": "P-0144",
+   "lob": "cyber",
+   "cd": 16.6
+  },
+  {
+   "id": "P-0145",
+   "lob": "crime",
+   "cd": 10.4
+  },
+  {
+   "id": "P-0146",
+   "lob": "management liability",
+   "cd": 13.3
+  },
+  {
+   "id": "P-0147",
+   "lob": "excess",
+   "cd": 15.5
+  },
+  {
+   "id": "P-0148",
+   "lob": "cyber",
+   "cd": 12.7
+  },
+  {
+   "id": "P-0149",
+   "lob": "crime",
+   "cd": 6.6
+  },
+  {
+   "id": "P-0150",
+   "lob": "management liability",
+   "cd": 7.6
+  },
+  {
+   "id": "P-0151",
+   "lob": "excess",
+   "cd": 15.5
+  },
+  {
+   "id": "P-0152",
+   "lob": "cyber",
+   "cd": 8.7
+  },
+  {
+   "id": "P-0153",
+   "lob": "crime",
+   "cd": 1.0
+  },
+  {
+   "id": "P-0154",
+   "lob": "management liability",
+   "cd": 0.8
+  },
+  {
+   "id": "P-0155",
+   "lob": "excess",
+   "cd": 9.3
+  },
+  {
+   "id": "P-0156",
+   "lob": "cyber",
+   "cd": 17.8
+  },
+  {
+   "id": "P-0157",
+   "lob": "crime",
+   "cd": 4.4
+  },
+  {
+   "id": "P-0158",
+   "lob": "management liability",
+   "cd": 9.6
+  },
+  {
+   "id": "P-0159",
+   "lob": "excess",
+   "cd": 8.7
+  },
+  {
+   "id": "P-0160",
+   "lob": "cyber",
+   "cd": 5.4
+  },
+  {
+   "id": "P-0161",
+   "lob": "crime",
+   "cd": 7.3
+  },
+  {
+   "id": "P-0162",
+   "lob": "management liability",
+   "cd": 4.5
+  },
+  {
+   "id": "P-0163",
+   "lob": "excess",
+   "cd": 5.4
+  },
+  {
+   "id": "P-0164",
+   "lob": "cyber",
+   "cd": 5.3
+  },
+  {
+   "id": "P-0165",
+   "lob": "crime",
+   "cd": 4.0
+  },
+  {
+   "id": "P-0166",
+   "lob": "management liability",
+   "cd": 1.3
+  },
+  {
+   "id": "P-0167",
+   "lob": "excess",
+   "cd": 7.4
+  },
+  {
+   "id": "P-0168",
+   "lob": "cyber",
+   "cd": 10.8
+  },
+  {
+   "id": "P-0169",
+   "lob": "crime",
+   "cd": 0.3
+  },
+  {
+   "id": "P-0170",
+   "lob": "management liability",
+   "cd": 4.6
+  },
+  {
+   "id": "P-0171",
+   "lob": "excess",
+   "cd": 2.0
+  },
+  {
+   "id": "P-0172",
+   "lob": "cyber",
+   "cd": 5.0
+  },
+  {
+   "id": "P-0173",
+   "lob": "crime",
+   "cd": 9.0
+  },
+  {
+   "id": "P-0174",
+   "lob": "management liability",
+   "cd": 2.8
+  },
+  {
+   "id": "P-0175",
+   "lob": "excess",
+   "cd": 12.9
+  },
+  {
+   "id": "P-0176",
+   "lob": "cyber",
+   "cd": 3.3
+  },
+  {
+   "id": "P-0177",
+   "lob": "crime",
+   "cd": 4.7
+  },
+  {
+   "id": "P-0178",
+   "lob": "management liability",
+   "cd": 5.8
+  },
+  {
+   "id": "P-0179",
+   "lob": "excess",
+   "cd": 13.1
+  },
+  {
+   "id": "P-0180",
+   "lob": "cyber",
+   "cd": 14.9
+  },
+  {
+   "id": "P-0181",
+   "lob": "crime",
+   "cd": 6.4
+  },
+  {
+   "id": "P-0182",
+   "lob": "management liability",
+   "cd": 7.7
+  },
+  {
+   "id": "P-0183",
+   "lob": "excess",
+   "cd": 72.1
+  },
+  {
+   "id": "P-0184",
+   "lob": "cyber",
+   "cd": 17.7
+  },
+  {
+   "id": "P-0185",
+   "lob": "crime",
+   "cd": 14.4
+  },
+  {
+   "id": "P-0186",
+   "lob": "management liability",
+   "cd": 15.2
+  },
+  {
+   "id": "P-0187",
+   "lob": "excess",
+   "cd": 5.7
+  },
+  {
+   "id": "P-0188",
+   "lob": "cyber",
+   "cd": 6.5
+  },
+  {
+   "id": "P-0189",
+   "lob": "crime",
+   "cd": 9.8
+  },
+  {
+   "id": "P-0190",
+   "lob": "management liability",
+   "cd": 8.8
+  },
+  {
+   "id": "P-0191",
+   "lob": "excess",
+   "cd": 10.8
+  },
+  {
+   "id": "P-0192",
+   "lob": "cyber",
+   "cd": 4.3
+  },
+  {
+   "id": "P-0193",
+   "lob": "crime",
+   "cd": 1.5
+  },
+  {
+   "id": "P-0194",
+   "lob": "management liability",
+   "cd": 9.4
+  },
+  {
+   "id": "P-0195",
+   "lob": "excess",
+   "cd": 10.9
+  },
+  {
+   "id": "P-0196",
+   "lob": "cyber",
+   "cd": 82.1
+  },
+  {
+   "id": "P-0197",
+   "lob": "crime",
+   "cd": 7.8
+  },
+  {
+   "id": "P-0198",
+   "lob": "management liability",
+   "cd": 3.0
+  },
+  {
+   "id": "P-0199",
+   "lob": "excess",
+   "cd": 3.7
+  },
+  {
+   "id": "P-0200",
+   "lob": "cyber",
+   "cd": 3.3
+  }
+ ]
+}

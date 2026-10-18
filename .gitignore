@@ -31,3 +31,7 @@ Thumbs.db
 .replit
 replit.nix
 .cache/
+
+# Kindwork module: installed deps and optional local ROBOT for reference test A11
+kindwork_core/node_modules/
+kindwork_core/vendor/robot.jar

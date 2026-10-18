@@ -16,6 +16,15 @@ RUN git clone --depth 1 https://github.com/laitep/ladr /tmp/ladr && \
     make all CFLAGS="-O2 -w -fcommon -std=gnu89 -Wno-implicit-int -Wno-implicit-function-declaration -Wno-return-mismatch" && \
     test -x bin/prover9 && test -x bin/mace4
 
+# --- Builder stage: kindwork-core sidecar dependencies -------------------------
+# The Kindwork module runs the vendored Kindwork page's generators in Node
+# (kindwork_core/). Install its locked runtime deps here; the final image takes
+# the node binary and node_modules only.
+FROM node:20-slim AS kwnode
+WORKDIR /kw
+COPY kindwork_core/package.json kindwork_core/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+
 # --- Final image --------------------------------------------------------------
 FROM python:3.11-slim
 
@@ -23,8 +32,10 @@ FROM python:3.11-slim
 #   default-jre-headless — Java runtime for OWL reasoners (Pellet/HermiT) and ROBOT
 #   libpq-dev + gcc    — needed to build psycopg2-binary
 #   wget               — to fetch ROBOT during image build
+#   graphviz           — `dot` layout for the UML view (owl2uml)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
+    graphviz \
     libpq-dev \
     gcc \
     wget \
@@ -55,6 +66,13 @@ RUN python -c "import nltk; nltk.download('wordnet'); nltk.download('omw-1.4')"
 
 # Copy application code (vendors bfo/bfo-2020.owl into the image; no runtime fetch)
 COPY . .
+
+# Node runtime + deps for the kindwork-core sidecar; fail the build if it can't
+# load the vendored Kindwork page.
+COPY --from=kwnode /usr/local/bin/node /usr/local/bin/node
+COPY --from=kwnode /kw/node_modules /app/kindwork_core/node_modules
+RUN echo '{"op":"health"}' | node kindwork_core/bin/kindwork-core.mjs | grep -q '"ok":true' && \
+    echo "kindwork-core OK"
 
 # Sanity-check the vendored BFO bundle at build time: fail the build if the OWL
 # is missing or the disjointness structure regressed below the SPEC acceptance.

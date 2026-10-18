@@ -1,0 +1,231 @@
+{% extends "layout.html" %}
+{% block title %}Recognition layer — {{ filename }}{% endblock %}
+
+{#
+  Panel order is the argument, not a layout preference.
+
+  The fingerprint comes first because it is the one verdict available before
+  any content is examined: what kind of institutional object this is, and
+  therefore which strata can fire at all. The paper's central diagnostic --
+  applying a row-one instrument to a row-two object -- is settled here.
+
+  Instrument coverage comes last and is never collapsed, because a report that
+  lists findings without saying what it never looked for invites exactly the
+  reading the paper warns against: an empty stratum as a clean bill of health.
+#}
+
+{% block extra_head %}
+<style>
+  .rec-card { border: 1px solid #333; border-radius: 6px; padding: 1rem 1.25rem;
+              margin-bottom: 1.25rem; background: rgba(255,255,255,0.02); }
+  .rec-card h2 { font-size: 1.15rem; margin-bottom: .75rem; }
+  .rec-verdict { font-size: 1.35rem; font-weight: 600; }
+  .rec-sub { opacity: .75; font-size: .9rem; }
+  .rec-warn { border-left: 3px solid #d9822b; padding-left: .75rem;
+              margin: .5rem 0; font-size: .92rem; }
+  .rec-chain { display: flex; flex-wrap: wrap; gap: .5rem; align-items: stretch; }
+  .rec-locus { flex: 1 1 8.5rem; border: 1px solid #333; border-radius: 5px;
+               padding: .6rem .7rem; }
+  .rec-locus.empty { opacity: .45; }
+  .rec-locus .n { font-size: 1.5rem; font-weight: 600; }
+  .rec-arrow { align-self: center; opacity: .4; }
+  .rec-status-assessed { color: #4caf50; }
+  .rec-status-partially-assessed { color: #d9822b; }
+  .rec-status-not-assessed { color: #e05252; }
+  .rec-status-not-applicable { opacity: .55; }
+  .rec-scroll { overflow-x: auto; }
+  .rec-pill { display: inline-block; border: 1px solid #444; border-radius: 10px;
+              padding: 0 .5rem; font-size: .78rem; }
+  .rec-muted { opacity: .6; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set fp = report.fingerprint %}
+{% set m = report.measure %}
+
+<h1 class="mb-1">Recognition layer</h1>
+<p class="rec-sub mb-4">
+  {{ filename }} — the artifact evaluated as an institutional object.
+  Vocabulary {{ report.vocabulary_version }}.
+</p>
+
+{# ---------- 1. fingerprint ---------- #}
+<div class="rec-card">
+  <h2>What kind of object is this?</h2>
+  <div class="rec-verdict">{{ fp.artifact_class_name }}</div>
+  <div class="rec-sub">{{ fp.chain_thickness }} — {{ fp.character }}</div>
+
+  <ul class="mt-2 mb-2">
+    {% for reason in fp.reasons %}<li>{{ reason }}</li>{% endfor %}
+  </ul>
+
+  {% if fp.stratum_mismatch %}
+    <div class="rec-warn"><strong>Stratum-profile mismatch.</strong>
+      This is detectable before any content is examined, and it is not an error
+      of execution — it is a mismatch of profile.</div>
+  {% endif %}
+
+  {% for warning in fp.warnings %}
+    <div class="rec-warn">{{ warning }}</div>
+  {% endfor %}
+</div>
+
+{# ---------- 2. the chain ---------- #}
+<div class="rec-card">
+  <h2>Where along the recognition chain</h2>
+  <p class="rec-sub">
+    A status is conferred by an authority, under criteria, applied by an
+    assessor in role, to presenting facts, through an act, producing effects,
+    subject to a remedy. Debt is shown per locus.
+  </p>
+
+  <div class="rec-chain">
+    {% for row in report.locus_table if row.key != 'unbound' %}
+      <div class="rec-locus {% if not row.findings %}empty{% endif %}">
+        <div class="rec-sub">{{ row.name }}</div>
+        <div class="n">{{ row.debt }}</div>
+        <div class="rec-sub">{{ row.findings }} finding{{ '' if row.findings == 1 else 's' }}</div>
+      </div>
+      {% if not loop.last %}<div class="rec-arrow">→</div>{% endif %}
+    {% endfor %}
+  </div>
+
+  {% set unbound = report.locus_table | selectattr('key', 'equalto', 'unbound') | first %}
+  {% if unbound and unbound.findings %}
+    <p class="rec-sub mt-3">
+      {{ unbound.findings }} finding{{ '' if unbound.findings == 1 else 's' }}
+      could not be placed on the chain. They are held separately rather than
+      attributed to a locus on a guess.
+    </p>
+  {% endif %}
+
+  {% if report.chain.ambiguous %}
+    <p class="rec-sub mt-2">
+      {{ report.chain.ambiguous | length }} entities have evidence for more
+      than one locus and were left unassigned. Declare them to resolve.
+    </p>
+  {% endif %}
+</div>
+
+{# ---------- 3. debt ---------- #}
+<div class="rec-card">
+  <h2>Contradiction debt</h2>
+  <div class="row">
+    <div class="col-sm-4">
+      <div class="rec-verdict">{{ m.cd_corrected }}</div>
+      <div class="rec-sub">corrected, per category</div>
+    </div>
+    <div class="col-sm-4">
+      <div class="rec-verdict rec-muted">{{ m.cd_raw }}</div>
+      <div class="rec-sub">raw, per category</div>
+    </div>
+    <div class="col-sm-4">
+      <div class="rec-sub">over {{ m.category_count }} categories,
+        {{ m.weighting }} weighting</div>
+    </div>
+  </div>
+
+  {% if m.excluded.blanket or m.excluded.artifact_attributed %}
+    <p class="rec-sub mt-3">
+      The corrected figure excludes
+      {% if m.excluded.blanket %}{{ m.excluded.blanket }} blanket flag{{ '' if m.excluded.blanket == 1 else 's' }}
+        (a modelling decision inherited from a parent, not a per-entity discovery){% endif %}
+      {%- if m.excluded.blanket and m.excluded.artifact_attributed %} and {% endif %}
+      {%- if m.excluded.artifact_attributed %}{{ m.excluded.artifact_attributed }}
+        defect{{ '' if m.excluded.artifact_attributed == 1 else 's' }} attributed to
+        our own extraction rather than to the source{% endif %}.
+      Both readings are shown so the correction stays auditable.
+    </p>
+  {% endif %}
+
+  <p class="rec-sub mt-2"><em>{{ m.not_an_inconsistency_measure }}</em></p>
+</div>
+
+{# ---------- 4. findings ---------- #}
+<div class="rec-card">
+  <h2>Findings <span class="rec-sub">({{ report.findings | length }})</span></h2>
+  {% if report.findings %}
+    <div class="rec-scroll">
+    <table class="table table-sm">
+      <thead><tr>
+        <th>Kernel</th><th>Type</th><th>Locus</th><th>Entity</th>
+        <th>Attribution</th><th>Scope</th><th>Counts</th>
+      </tr></thead>
+      <tbody>
+      {% for f in report.findings %}
+        <tr>
+          <td><span class="rec-pill">{{ f.kernel }}</span> {{ f.kernel_name }}</td>
+          <td>{% if f.type %}{{ f.type }} — {{ f.type_name }}{% else %}<span class="rec-muted">—</span>{% endif %}</td>
+          <td>{{ f.locus or '—' }}</td>
+          <td class="rec-sub">{{ (f.iri or '').split('#')[-1].split('/')[-1] or '—' }}</td>
+          <td>{{ f.attribution }}</td>
+          <td>{{ f.flag_scope }}</td>
+          <td>{{ 'yes' if f.counts_toward_debt else 'no' }}</td>
+        </tr>
+        <tr><td colspan="7" class="rec-sub">{{ f.message }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  {% else %}
+    <p class="rec-sub">No findings from the instruments that ran. Read that
+      alongside the coverage below, not instead of it.</p>
+  {% endif %}
+</div>
+
+{# ---------- 5. instrument coverage ---------- #}
+<div class="rec-card">
+  <h2>What was assessed, and what was not</h2>
+  <p class="rec-sub">
+    The primitives partition by the instrument each requires, and the partition
+    is a matter of principle rather than of tooling. A reasoner is necessary and
+    never sufficient.
+  </p>
+
+  <div class="rec-scroll">
+  <table class="table table-sm">
+    <thead><tr>
+      <th>Stratum</th><th>Status</th><th>Assessed</th><th>Not assessed</th><th>Findings</th>
+    </tr></thead>
+    <tbody>
+    {% for s in strata %}
+      {% set row = fp.strata[s.key] %}
+      <tr>
+        <td>{{ s.key }} — {{ s.name }}<div class="rec-sub">{{ s.gloss }}</div></td>
+        <td class="rec-status-{{ row.status }}">{{ row.status }}</td>
+        <td class="rec-sub">{{ row.primitives_assessed | join(', ') or '—' }}</td>
+        <td class="rec-sub">{{ row.primitives_unassessed | join(', ') or '—' }}</td>
+        <td>{{ row.findings }}</td>
+      </tr>
+      {% if row.reading %}
+        <tr><td colspan="5" class="rec-sub">{{ row.reading }}</td></tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% if report.primitives_not_attempted %}
+    <p class="rec-warn">
+      Never looked for: {{ report.primitives_not_attempted | join(', ') }}.
+      Absence of a flag is not evidence of absence of the failure.
+    </p>
+  {% endif %}
+
+  {% if report.instrument_notes %}
+    <ul class="rec-sub mt-2">
+      {% for key, note in report.instrument_notes.items() %}
+        <li><strong>{{ key }}:</strong> {{ note }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>
+
+{% if debug %}
+<div class="rec-card">
+  <h2>Debug</h2>
+  <pre class="rec-scroll">{{ report | tojson(indent=2) }}</pre>
+</div>
+{% endif %}
+{% endblock %}

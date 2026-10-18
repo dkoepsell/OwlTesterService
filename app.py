@@ -15,6 +15,7 @@ from html import escape
 import json
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session, make_response, Response
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import HTTPException
 # We'll use urllib for URL parsing instead of werkzeug
 from urllib.parse import urlparse
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -24,6 +25,8 @@ from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationE
 from owl_tester import OwlTester
 from owl_format_detector import auto_convert_ontology, OntologyFormatConverter
 from models import db, User, OntologyFile, OntologyAnalysis, FOLExpression, SandboxOntology, OntologyClass, OntologyProperty, OntologyIndividual
+from ownership import (owned_file_or_404, owned_analysis_or_404, owned_files_query, owned_analyses_query,
+                       owned_sandbox_or_404, owned_sandboxes_query, owned_expressions_query, claim_anonymous_records)
 # Import from improved OpenAI utils to avoid hanging issues
 from improved_openai_utils import suggest_ontology_classes, suggest_ontology_properties, suggest_bfo_category, generate_class_description  
 from openai_utils import generate_real_world_implications
@@ -70,6 +73,20 @@ login_manager.login_message_category = 'info'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+# Abuse controls: ProxyFix (real client IP behind the host nginx), rate limits
+# and hard sandbox caps. See abuse_limits.py.
+from abuse_limits import (limiter, init_abuse_controls, limit_endpoint, SandboxCapError,
+                          check_sandbox_count_cap, check_sandbox_size_cap,
+                          SANDBOX_CREATE_LIMIT, SANDBOX_WRITE_LIMIT, UPLOAD_LIMIT,
+                          ANALYSIS_LIMIT, AI_LIMIT, FOL_TEST_LIMIT, LOGIN_LIMIT, REGISTER_LIMIT)
+init_abuse_controls(app)
+
+_post_only = dict(methods=['POST'])
+_sandbox_create_limit = limiter.shared_limit(SANDBOX_CREATE_LIMIT, scope='sandbox-create', **_post_only)
+_sandbox_write_limit = limiter.shared_limit(SANDBOX_WRITE_LIMIT, scope='sandbox-write', **_post_only)
+_ai_limit = limiter.shared_limit(AI_LIMIT, scope='ai')
+_analysis_limit = limiter.shared_limit(ANALYSIS_LIMIT, scope='analysis', **_post_only)
+
 # Configure file uploads
 app.config['UPLOADED_OWLS_DEST'] = os.path.join(app.root_path, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024  # 64MB max upload size
@@ -89,6 +106,55 @@ try:
     logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)
+
+# Mount the Coverage Coherence Checker demo (GET /coverage plus its JSON API).
+# Best-effort for the same reason as the gate above.
+try:
+    from coverage_demo import coverage_bp as _coverage_bp
+    app.register_blueprint(_coverage_bp)
+    logging.getLogger(__name__).info("coverage coherence demo mounted at /coverage")
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("coverage demo not mounted: %s", _e)
+
+# Mount the recognition layer (GET /recognition/<filename> plus its JSON API),
+# which evaluates an uploaded ontology as an institutional object rather than
+# only as a logical one. Best-effort for the same reason as the gate above.
+try:
+    from recognition_layer import recognition_bp as _recognition_bp
+    app.register_blueprint(_recognition_bp)
+    logging.getLogger(__name__).info("recognition layer mounted at /recognition")
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("recognition layer not mounted: %s", _e)
+
+# Mount the SHACL workbench (GET /shacl/<filename> plus its JSON API): generate
+# shapes from an ontology, edit and save them, and validate data against them.
+try:
+    from shacl_layer import shacl_bp as _shacl_bp
+    app.register_blueprint(_shacl_bp)
+    logging.getLogger(__name__).info("SHACL workbench mounted at /shacl")
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("SHACL workbench not mounted: %s", _e)
+
+# Mount the Kindwork adapter (GET /kindwork, POST /kindwork/check, GET
+# /kindwork/vocab): checks a Kindwork export and returns owltester-findings.
+try:
+    from kindwork.routes import kindwork_bp as _kindwork_bp
+    from kindwork.module_routes import module_bp as _kindwork_module_bp
+    app.register_blueprint(_kindwork_bp)
+    # The Kindwork module: /kindwork/v1/{health,build,import,lint,check} and the
+    # /kindwork/mcp endpoint, backed by the kindwork_core/ Node sidecar.
+    app.register_blueprint(_kindwork_module_bp)
+    logging.getLogger(__name__).info("Kindwork adapter mounted at /kindwork")
+except Exception as _e:  # noqa: BLE001
+    logging.getLogger(__name__).warning("Kindwork adapter not mounted: %s", _e)
+
+# The gate accepts uploaded artifacts and runs the reasoner on them.
+limit_endpoint(app, 'owltester.http_check', UPLOAD_LIMIT)
+limit_endpoint(app, 'owltester.http_repair', UPLOAD_LIMIT)
+limit_endpoint(app, 'kindwork.check', UPLOAD_LIMIT)
+limit_endpoint(app, 'kindwork_module.check', UPLOAD_LIMIT)
+for _kw_endpoint in ('build', 'import_model', 'lint', 'mcp'):
+    limit_endpoint(app, f'kindwork_module.{_kw_endpoint}', ANALYSIS_LIMIT)
 
 # Helper function to check if a file has an allowed extension
 def allowed_file(filename):
@@ -179,6 +245,7 @@ def about():
 
 # API Endpoints
 @app.route('/api/test-expression', methods=['POST'])
+@limiter.limit(FOL_TEST_LIMIT)
 def test_expression():
     """API endpoint to test a FOL expression."""
     try:
@@ -312,8 +379,7 @@ def validate_ontology_completeness(analysis_id):
     Returns detailed report about missing classes, properties, and individuals.
     """
     try:
-        analysis = OntologyAnalysis.query.get_or_404(analysis_id)
-        ontology_file = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+        analysis, ontology_file = owned_analysis_or_404(analysis_id)
         
         # Create an OwlTester instance
         tester = OwlTester()
@@ -406,6 +472,8 @@ def validate_ontology_completeness(analysis_id):
             'total_premises': len(fol_premises)
         })
         
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         app.logger.error(f"Error validating ontology completeness: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -418,8 +486,7 @@ def check_enhanced_consistency(analysis_id):
     Returns detailed report about contradictions and problematic axioms.
     """
     try:
-        analysis = OntologyAnalysis.query.get_or_404(analysis_id)
-        ontology_file = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+        analysis, ontology_file = owned_analysis_or_404(analysis_id)
         
         # Create an OwlTester instance
         tester = OwlTester()
@@ -458,24 +525,100 @@ def check_enhanced_consistency(analysis_id):
             'ontology_name': analysis.ontology_name
         })
         
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         app.logger.error(f"Error checking enhanced consistency: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # File Upload and Analysis
+def _upload_bundle(files):
+    """Store a multi-file (or zipped) modular ontology as one merged file.
+
+    owl:imports between the uploaded modules are resolved locally (see
+    ontology_bundle); the merged import closure of the top-level module is
+    what gets analysed, and the manifest keeps per-module provenance.
+    """
+    from ontology_bundle import BundleError, create_bundle
+    filename = f"{uuid.uuid4().hex}.owl"
+    try:
+        file_path, manifest = create_bundle(
+            files, app.config['UPLOADED_OWLS_DEST'], filename,
+            app.config['ALLOWED_EXTENSIONS'],
+            root_name=request.form.get('root_module') or None)
+    except BundleError as e:
+        flash(f"Could not assemble the ontology bundle: {e}", 'error')
+        return redirect(url_for('upload_owl'))
+
+    if len(manifest['roots']) > 1:
+        flash(f"Several top-level modules ({', '.join(manifest['roots'])}); analysing "
+              f"them together. Pick one under 'Top-level ontology' to analyse a single stack.",
+              'warning')
+    if manifest['unresolved']:
+        missing = ', '.join(sorted({u['iri'] for u in manifest['unresolved']}))
+        flash(f"Some imports were not in the upload and were skipped: {missing}", 'warning')
+
+    imported = len(manifest['order']) - len(manifest['roots'])
+    display = ' + '.join(manifest['roots'])
+    if imported:
+        display += f" (+{imported} imported module{'s' if imported != 1 else ''})"
+    file_record = OntologyFile(
+        filename=filename,
+        original_filename=display[:255],
+        file_path=file_path,
+        file_size=os.path.getsize(file_path),
+        mime_type='application/rdf+xml',
+        user_id=current_user.id if current_user.is_authenticated else None
+    )
+    db.session.add(file_record)
+    db.session.commit()
+    return redirect(url_for('analyze_owl', filename=filename))
+
+
+@app.route('/api/bundle/<filename>/layers', methods=['GET', 'POST'])
+@_analysis_limit
+def bundle_layers(filename):
+    """Layer-by-layer check of a multi-file upload.
+
+    POST starts the check in the background and returns 'running'; GET polls
+    the stored report. Each module is reasoned over with its import closure,
+    bottom-up, to find the first layer that makes the stack inconsistent or
+    introduces unsatisfiable classes.
+    """
+    from bundle_layers import mark_running, read_layers, run_and_store
+    from ontology_bundle import load_manifest
+    file_record = owned_file_or_404(filename=filename)
+    if not load_manifest(file_record.file_path):
+        return jsonify({'status': 'done', 'error': 'not a multi-file upload'}), 404
+    if request.method == 'GET':
+        return jsonify(read_layers(file_record.file_path))
+    marker = mark_running(file_record.file_path)
+    if marker is None:
+        return jsonify(read_layers(file_record.file_path)), 202
+    threading.Thread(target=run_and_store, args=(file_record.file_path,),
+                     daemon=True, name=f"bundle-layers-{filename}").start()
+    return jsonify(marker), 202
+
+
 @app.route('/upload', methods=['GET', 'POST'])
+@limiter.limit(UPLOAD_LIMIT, methods=['POST'])
 def upload_owl():
     """Handle OWL file upload and redirection to analysis page."""
     if request.method == 'GET':
         return render_template('upload.html')
     try:
         # Check if a file was uploaded
-        if 'file' not in request.files:
+        files = [f for f in request.files.getlist('file') if f and f.filename]
+        if not files:
             flash('No file selected', 'error')
             return redirect(url_for('index'))
-            
-        file = request.files['file']
-        
+
+        # Several files, or a zip: a modular ontology whose imports resolve locally.
+        if len(files) > 1 or files[0].filename.lower().endswith('.zip'):
+            return _upload_bundle(files)
+
+        file = files[0]
+
         # Check if the file has a name
         if file.filename == '' or file.filename is None:
             flash('No file selected', 'error')
@@ -597,12 +740,33 @@ def _match_straddle_finding(analysis, class_iri, drop_iri):
     return None
 
 
+@app.route('/download/<filename>')
+def download_owl(filename):
+    """Download the stored ontology file as analysed: the merged import closure
+    for a multi-file upload, the corrected file for an auto-fixed one."""
+    from ontology_bundle import load_manifest
+    file_record = owned_file_or_404(filename=filename)
+    if not file_record.file_path or not os.path.exists(file_record.file_path):
+        flash("The stored file is no longer available.", "error")
+        return redirect(url_for('index'))
+
+    ext = os.path.splitext(file_record.filename)[1] or '.owl'
+    manifest = load_manifest(file_record.file_path)
+    if manifest:
+        base = os.path.splitext(manifest['roots'][0])[0] + '.merged'
+    else:
+        base = os.path.splitext(file_record.original_filename or 'ontology')[0]
+    download_name = (secure_filename(base) or 'ontology') + ext
+    return send_from_directory(
+        os.path.dirname(file_record.file_path), os.path.basename(file_record.file_path),
+        as_attachment=True, download_name=download_name)
+
+
 @app.route('/api/analysis/<int:analysis_id>/fix-straddle')
 def fix_straddle_download(analysis_id):
     """Drop one clashing subClassOf edge and return the corrected ontology file."""
     from ontology_fixer import fix_straddle
-    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
-    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+    analysis, file_record = owned_analysis_or_404(analysis_id)
     class_iri = request.args.get('class_iri', '')
     drop_iri = request.args.get('drop_iri', '')
 
@@ -667,12 +831,12 @@ def _autofix_trivialization_block(original_path, corrected_bytes, removed_count=
 
 
 @app.route('/analysis/<int:analysis_id>/fix-and-reanalyze', methods=['POST'])
+@_analysis_limit
 def fix_and_reanalyze(analysis_id):
     """Drop one clashing subClassOf edge, save the corrected ontology as a new
     file, and run full coherence analysis on it."""
     from ontology_fixer import fix_straddle
-    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
-    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+    analysis, file_record = owned_analysis_or_404(analysis_id)
     class_iri = request.args.get('class_iri', '')
     drop_iri = request.args.get('drop_iri', '')
 
@@ -718,8 +882,7 @@ def auto_fix_straddles_download(analysis_id):
     category in each) and return the corrected ontology file."""
     from ontology_fixer import fix_all_straddles
     from bfo.catalog import load_catalog
-    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
-    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+    analysis, file_record = owned_analysis_or_404(analysis_id)
 
     try:
         corrected, removed = fix_all_straddles(
@@ -743,13 +906,13 @@ def auto_fix_straddles_download(analysis_id):
 
 
 @app.route('/analysis/<int:analysis_id>/auto-fix-and-reanalyze', methods=['POST'])
+@_analysis_limit
 def auto_fix_and_reanalyze(analysis_id):
     """Resolve every partition straddle at once, save the corrected ontology as a
     new file, and run full coherence analysis on it."""
     from ontology_fixer import fix_all_straddles
     from bfo.catalog import load_catalog
-    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
-    file_record = OntologyFile.query.get_or_404(analysis.ontology_file_id)
+    analysis, file_record = owned_analysis_or_404(analysis_id)
 
     try:
         corrected, removed = fix_all_straddles(
@@ -793,6 +956,7 @@ def auto_fix_and_reanalyze(analysis_id):
 
 
 @app.route('/analyze/<filename>/reanalyze', methods=['POST'])
+@_analysis_limit
 def reanalyze_owl(filename):
     """Discard the stored analysis for a file and run a fresh one.
 
@@ -800,7 +964,7 @@ def reanalyze_owl(filename):
     re-uploading. Deletes prior analyses for the file, then redirects through
     analyze_owl, which re-runs the full pipeline when none is found.
     """
-    file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+    file_record = owned_file_or_404(filename=filename)
     OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id).delete()
     db.session.commit()
     flash("Re-analyzing with the latest coherence and BFO conformance checks.", "info")
@@ -812,7 +976,7 @@ def analyze_owl(filename):
     """Analyze an uploaded OWL file and display results."""
     try:
         # Find the file in the database
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         
         # Check if the file actually exists on disk
         if not os.path.exists(file_record.file_path):
@@ -861,9 +1025,12 @@ def analyze_owl(filename):
             if analysis.individual_count is None:
                 analysis.individual_count = 0
                 
-            return render_template('analysis.html', 
-                                 file=file_record, 
+            from ontology_bundle import load_manifest
+            return render_template('analysis.html',
+                                 file=file_record,
                                  analysis=analysis,
+                                 bundle=load_manifest(file_record.file_path),
+                                 labels=analysis.entity_labels or {},
                                  classes=class_list,
                                  relations=object_properties,
                                  data_properties=data_properties,
@@ -872,6 +1039,8 @@ def analyze_owl(filename):
             # Create a new analysis
             return redirect(url_for('api_analyze_owl', filename=filename))
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         import traceback
         trace = traceback.format_exc()
@@ -888,7 +1057,7 @@ def full_report(filename):
     inferred/asserted axioms, FOL export stats, prover cross-check, entity
     inventory and AI implications — into one standalone printable document.
     """
-    file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+    file_record = owned_file_or_404(filename=filename)
     analysis = OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id) \
         .order_by(OntologyAnalysis.id.desc()).first()
     if not analysis:
@@ -909,7 +1078,7 @@ def api_analyze_owl(filename):
     try:
         # Find the file in the database
         t = _time.perf_counter()
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         logger.info(f"[STAGE] db_lookup: {_time.perf_counter()-t:.2f}s")
 
         # Create an OwlTester instance
@@ -1041,7 +1210,8 @@ def api_analyze_owl(filename):
             derivation_steps=derivation_steps,
             lint_findings=lint_findings,
             unsatisfiable_classes=unsatisfiable_classes,
-            coherence_status=coherence_status
+            coherence_status=coherence_status,
+            entity_labels=analysis_result.get('entity_labels') or {}
         )
         
         # Build FOL premises from the structural lists produced by analyze_ontology
@@ -1129,6 +1299,8 @@ def api_analyze_owl(filename):
         # Redirect to the analysis page
         return redirect(url_for('analyze_owl', filename=filename))
         
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         import traceback
         trace = traceback.format_exc()
@@ -1137,6 +1309,7 @@ def api_analyze_owl(filename):
         return redirect(url_for('index'))
 
 @app.route('/api/analysis/<analysis_id>/implications', methods=['GET', 'POST'])
+@limiter.shared_limit(AI_LIMIT, scope='ai', methods=['POST'])
 def generate_implications(analysis_id):
     """
     Generate or retrieve real-world implications for an ontology analysis.
@@ -1145,7 +1318,7 @@ def generate_implications(analysis_id):
     POST: Generate new implications
     """
     try:
-        analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+        analysis, _owned_file = owned_analysis_or_404(analysis_id)
         
         if request.method == 'GET':
             # Return the existing implications if they exist
@@ -1164,41 +1337,19 @@ def generate_implications(analysis_id):
                 })
         
         elif request.method == 'POST':
-            # Generate new implications
-            fol_premises = analysis.fol_premises
-            
-            if not fol_premises or len(fol_premises) == 0:
-                return jsonify({
-                    'success': False,
-                    'message': 'No FOL premises found for this analysis'
-                }), 400
-            
-            # Generate implications using OpenAI
+            # Generate implications from the ontology's own axioms, labels and
+            # definitions (not the placeholder fol_premises, which carry no
+            # logical content and produced generic, domain-name-only results).
             try:
-                # Extract domain classes from analysis class_list if available
-                domain_classes = []
-                if analysis.class_list:
-                    # Check if class_list contains dictionaries with 'name' field
-                    if isinstance(analysis.class_list, list) and len(analysis.class_list) > 0:
-                        if isinstance(analysis.class_list[0], dict) and 'name' in analysis.class_list[0]:
-                            domain_classes = [cls['name'] for cls in analysis.class_list if 'name' in cls]
-                        else:
-                            domain_classes = analysis.class_list  # Assume it's already a list of class names
-                
-                # Get the ontology name
-                ontology_name = analysis.ontology_name if analysis.ontology_name else "Unknown Ontology"
-                
-                # Log what we're passing to the implications generator
-                app.logger.info(f"Generating implications for ontology '{ontology_name}'")
-                app.logger.info(f"Domain classes: {domain_classes}")
-                app.logger.info(f"FOL premises count: {len(fol_premises) if fol_premises else 0}")
-                
-                # Call the function with the correct parameters
-                implications = generate_real_world_implications(
-                    ontology_name=ontology_name,
-                    domain_classes=domain_classes,
-                    fol_premises=fol_premises
-                )
+                from implication_context import build_context
+                file_record = OntologyFile.query.get(analysis.ontology_file_id)
+                context = build_context(analysis, file_record.file_path if file_record else None)
+                app.logger.info(
+                    f"Generating implications for '{context['ontology_name']}': "
+                    f"{len(context['axioms'])} axioms, {len(context['inferred'])} inferred, "
+                    f"{len(context['definitions'])} definitions")
+
+                implications = generate_real_world_implications(context)
 
                 # The generator reports failure as [{"error": ..., "title": ...}]
                 # instead of raising. Surface that as an error response — don't
@@ -1229,6 +1380,8 @@ def generate_implications(analysis_id):
                     'message': f"Error generating implications: {str(e)}"
                 }), 500
         
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         app.logger.error(f"Error in generate_implications: {str(e)}")
         return jsonify({
@@ -1245,7 +1398,7 @@ def fol_export(analysis_id):
     file attachment. Regenerates on the fly if the analysis predates the export
     columns (older records).
     """
-    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    analysis, _owned_file = owned_analysis_or_404(analysis_id)
     fmt = (request.args.get('format') or 'prover9').lower()
     if fmt not in ('prover9', 'clif'):
         return jsonify({'error': "format must be 'prover9' or 'clif'"}), 400
@@ -1389,6 +1542,7 @@ def start_prover_check(analysis, bfo_background=False):
 
 
 @app.route('/api/analysis/<analysis_id>/prover-check', methods=['GET', 'POST'])
+@_analysis_limit
 def prover_check(analysis_id):
     """Prover9/Mace4 cross-check against the OWL reasoner.
 
@@ -1398,7 +1552,7 @@ def prover_check(analysis_id):
     ontologies get a prover verdict without a manual trigger. Degrades
     gracefully when the prover9 binary is absent.
     """
-    analysis = OntologyAnalysis.query.get_or_404(analysis_id)
+    analysis, _owned_file = owned_analysis_or_404(analysis_id)
 
     if request.method == 'GET':
         pc = analysis.prover_cross_check
@@ -1419,6 +1573,57 @@ def prover_check(analysis_id):
     except Exception as e:
         app.logger.error(f"Error in prover_check: {e}")
         return jsonify({'ran': False, 'status': 'done',
+                        'reason': f"{type(e).__name__}: {e}"}), 200
+
+
+@app.route('/api/analysis/<analysis_id>/probe', methods=['POST'])
+@_analysis_limit
+def analysis_probe(analysis_id):
+    """Satisfiability probe: can the named class have any instance at all?
+
+    Body: {"class": <label | FOL symbol | IRI>, "bfo_background": bool}.
+    Runs synchronously (a single class is fast — the same Prover9-first,
+    Mace4-on-the-no-proof-side ordering as the coverage demo) and returns
+    {'status': 'empty'|'inhabited'|'undetermined'|'unknown', plus 'core'
+    (the axioms that cannot all hold) when empty and 'witness' (decoded
+    Mace4 model memberships) when inhabited}. Nothing is stored.
+    """
+    from fol_export import build_theory
+    from prover9_runner import probe_class
+    from bfo.catalog import DEFAULT_OWL_PATH
+
+    analysis, _owned_file = owned_analysis_or_404(analysis_id)
+    data = request.get_json(silent=True) or {}
+    target = (data.get('class') or '').strip()
+    if not target:
+        return jsonify({'status': 'unknown', 'reason': "missing 'class'"}), 400
+    bfo_background = bool(data.get('bfo_background'))
+
+    file_record = OntologyFile.query.get(analysis.ontology_file_id)
+    if not file_record or not os.path.exists(file_record.file_path):
+        return jsonify({'status': 'unknown',
+                        'reason': 'source ontology file is no longer on disk'}), 404
+    try:
+        theory = build_theory(file_path=file_record.file_path,
+                              bfo_path=DEFAULT_OWL_PATH)
+        # Resolve by IRI, then FOL symbol, then label (case-insensitive).
+        iri = None
+        if target in theory.classes:
+            iri = target
+        else:
+            folded = target.lower()
+            for candidate, rec in theory.classes.items():
+                if rec['sym'] == target or rec['label'].lower() == folded:
+                    iri = candidate
+                    break
+        if iri is None:
+            return jsonify({'status': 'unknown',
+                            'reason': f"class '{target}' not found in the FOL "
+                                      f"export"}), 404
+        return jsonify(probe_class(theory, iri, bfo_background=bfo_background))
+    except Exception as e:  # noqa: BLE001
+        app.logger.error(f"Probe failed for analysis {analysis_id}: {e}")
+        return jsonify({'status': 'unknown',
                         'reason': f"{type(e).__name__}: {e}"}), 200
 
 
@@ -1502,7 +1707,7 @@ def show_implications(filename):
     """Show real-world implications for an ontology file."""
     try:
         # Find the file in the database
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         
         # Get the latest analysis for this file
         analysis = OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id).order_by(OntologyAnalysis.id.desc()).first_or_404()
@@ -1511,6 +1716,8 @@ def show_implications(filename):
                              file=file_record, 
                              analysis=analysis)
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         app.logger.error(f"Error showing implications: {str(e)}")
         flash(f"Error showing implications: {str(e)}", 'error')
@@ -1521,7 +1728,8 @@ def view_history():
     """View history of uploaded ontologies and analyses."""
     try:
         # Get all ontology files, ordered by upload date (newest first)
-        ontologies = OntologyFile.query.order_by(OntologyFile.upload_date.desc()).all()
+        # Only the visitor's own files: history is private to its owner.
+        ontologies = owned_files_query().order_by(OntologyFile.upload_date.desc()).all()
 
         # Count analyses per file with a single aggregate query. Loading the
         # analyses relationship per row (for a count) pulls every OntologyAnalysis
@@ -1532,11 +1740,12 @@ def view_history():
             db.session.query(
                 OntologyAnalysis.ontology_file_id,
                 func.count(OntologyAnalysis.id),
-            ).group_by(OntologyAnalysis.ontology_file_id).all()
+            ).filter(OntologyAnalysis.ontology_file_id.in_([o.id for o in ontologies]))
+            .group_by(OntologyAnalysis.ontology_file_id).all()
         )
 
-        # Get all FOL expressions, ordered by test date (newest first)
-        expressions = FOLExpression.query.order_by(FOLExpression.test_date.desc()).limit(20).all()
+        # Get the visitor's FOL expressions, ordered by test date (newest first)
+        expressions = owned_expressions_query().order_by(FOLExpression.test_date.desc()).limit(20).all()
 
         return render_template('history.html',
                               ontologies=ontologies,
@@ -1547,7 +1756,19 @@ def view_history():
         flash(f"Error viewing history: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+def _check_imported_sandbox_size(ontology):
+    """Flush pending rows and enforce the per-sandbox class/property caps."""
+    db.session.flush()
+    classes = OntologyClass.query.filter_by(ontology_id=ontology.id).count()
+    props = OntologyProperty.query.filter_by(ontology_id=ontology.id).count()
+    if classes > app.config['MAX_CLASSES_PER_SANDBOX'] or props > app.config['MAX_PROPERTIES_PER_SANDBOX']:
+        raise SandboxCapError(
+            f"This ontology is too large for the sandbox ({classes} classes, {props} properties; "
+            f"limits {app.config['MAX_CLASSES_PER_SANDBOX']} and {app.config['MAX_PROPERTIES_PER_SANDBOX']}).")
+
+
 @app.route('/import_to_sandbox/<int:file_id>', methods=['POST'])
+@_sandbox_create_limit
 def import_to_sandbox(file_id):
     """Import an ontology file from history to the sandbox."""
     success = False
@@ -1555,25 +1776,16 @@ def import_to_sandbox(file_id):
     
     try:
         # Get the file or return 404
-        file = OntologyFile.query.get_or_404(file_id)
-        
+        file = owned_file_or_404(file_id=file_id)
+
+        # Hard caps: sandboxes per visitor, and classes per sandbox (cheap
+        # pre-check from the stored analysis; re-checked before each commit).
+        check_sandbox_count_cap()
+        if file.analyses and isinstance(file.analyses[0].class_list, list):
+            check_sandbox_size_cap(None, add_classes=len(file.analyses[0].class_list))
+
         # Add debug logging
         logger.debug(f"Importing file ID {file_id} - Original filename: {file.original_filename}")
-        
-        # Create a base ontology first, before doing anything that might fail
-        ontology = SandboxOntology()
-        ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
-        ontology.domain = "Imported Ontology"
-        ontology.subject = "Imported from History"
-        ontology.description = f"Imported from file '{file.original_filename}'."
-        ontology.user_id = current_user.id if not current_user.is_anonymous else None
-        
-        # Save and COMMIT to get a permanent ID before creating related records
-        db.session.add(ontology)
-        db.session.commit()
-        
-        # Log the newly created ontology ID for debugging
-        logger.debug(f"Created new sandbox ontology with ID: {ontology.id}")
         
         # Get the file path
         file_path = file.file_path
@@ -1581,6 +1793,21 @@ def import_to_sandbox(file_id):
         # Handle missing files by creating a basic ontology structure from database records
         # This allows us to work with ontologies even if the original file is missing
         if not os.path.exists(file_path):
+            # Create the base ontology here: the other branches build their own,
+            # so creating it unconditionally left an empty orphan per import.
+            ontology = SandboxOntology()
+            ontology.title = f"{file.original_filename.rsplit('.', 1)[0]}"
+            ontology.domain = "Imported Ontology"
+            ontology.subject = "Imported from History"
+            ontology.description = f"Imported from file '{file.original_filename}'."
+            ontology.user_id = current_user.id if not current_user.is_anonymous else None
+
+            # Flush to get an ID before creating related records (committed
+            # with them at the end, so a failed import leaves nothing behind)
+            db.session.add(ontology)
+            db.session.flush()
+            logger.debug(f"Created new sandbox ontology with ID: {ontology.id}")
+
             logger.warning(f"File not found at {file_path}. Using database records instead.")
             
             # Update the existing ontology description to note the missing file
@@ -1836,6 +2063,7 @@ def import_to_sandbox(file_id):
                     logger.error(f"Error processing object_property_list: {str(e)}")
             
             # Final commit for any remaining changes
+            _check_imported_sandbox_size(ontology)
             db.session.commit()
             
             # Success message
@@ -1936,6 +2164,7 @@ def import_to_sandbox(file_id):
                     db.session.add(prop)
             
             # Final commit for all changes
+            _check_imported_sandbox_size(ontology)
             db.session.commit()
             
             logger.debug(f"Successfully imported ontology to sandbox with ID: {ontology.id}")
@@ -2003,12 +2232,16 @@ def import_to_sandbox(file_id):
                 db.session.add(ontology_prop)
             
             # Final commit for all changes
+            _check_imported_sandbox_size(ontology)
             db.session.commit()
             
             logger.debug(f"Successfully imported ontology to sandbox with ID: {ontology.id}")
             flash(f"Ontology '{file.original_filename}' successfully imported to Sandbox.", 'success')
             return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
+        except SandboxCapError:
+            raise
         except Exception as e:
+            db.session.rollback()  # drop any half-built sandbox before the fallback
             logger.warning(f"Could not parse ontology with Owlready2: {str(e)}")
             
             # Create a basic sandbox ontology
@@ -2025,6 +2258,12 @@ def import_to_sandbox(file_id):
             flash(f"Created sandbox ontology from '{file.original_filename}', but could not parse classes and properties. You'll need to add them manually.", 'warning')
             return redirect(url_for('sandbox_edit', ontology_id=ontology.id))
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
+    except SandboxCapError as e:
+        db.session.rollback()
+        flash(str(e), 'warning')
+        return redirect(url_for('sandbox_list'))
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error importing file to sandbox: {str(e)}")
@@ -2041,7 +2280,7 @@ def delete_files():
         return redirect(url_for('view_history'))
 
     try:
-        files = OntologyFile.query.filter(OntologyFile.id.in_(int_ids)).all()
+        files = owned_files_query().filter(OntologyFile.id.in_(int_ids)).all()
         paths = [f.file_path for f in files]
         for f in files:
             db.session.delete(f)  # cascade removes analyses
@@ -2068,7 +2307,7 @@ def delete_file(file_id):
     """Delete an ontology file and all its analyses."""
     try:
         # Get the file or return 404
-        file = OntologyFile.query.get_or_404(file_id)
+        file = owned_file_or_404(file_id=file_id)
         
         # Get file path to delete the physical file
         file_path = file.file_path
@@ -2089,6 +2328,8 @@ def delete_file(file_id):
         
         flash(f"File '{filename}' deleted successfully.", 'success')
         return redirect(url_for('view_history'))
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting file: {str(e)}")
@@ -2101,7 +2342,7 @@ def generate_diagram(filename):
     """Generate an interactive diagram for an ontology file using D3.js."""
     try:
         # Find the file in the database
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         
         # Create an OwlTester instance
         tester = OwlTester()
@@ -2134,6 +2375,8 @@ def generate_diagram(filename):
                              class_count=class_count,
                              property_count=property_count)
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error generating D3.js diagram: {str(e)}")
         flash(f"Error generating diagram: {str(e)}", 'error')
@@ -2144,7 +2387,7 @@ def api_diagram_data(filename):
     """API endpoint to get ontology data in JSON format for D3.js visualization."""
     try:
         # Find the file in the database
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         
         # Get the latest analysis for this file to use stored data if loading fails
         analysis = OntologyAnalysis.query.filter_by(ontology_file_id=file_record.id).order_by(OntologyAnalysis.id.desc()).first_or_404()
@@ -2350,6 +2593,8 @@ def api_diagram_data(filename):
                 'properties': []
             })
         
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         import traceback
         trace = traceback.format_exc()
@@ -2375,12 +2620,41 @@ def api_generate_diagram(filename):
     # Redirect to the new interactive diagram
     return redirect(url_for('generate_diagram', filename=filename))
 
+@app.route('/analyze/<filename>/uml')
+def uml_view(filename):
+    """UML class diagram of a stored ontology (vendored owl2uml).
+
+    The page fetches ?format=json for the SVG; ?format=svg downloads it.
+    Graphviz lays it out when `dot` is installed, else the built-in layout.
+    """
+    from owl2uml import layout, parse_ontology, render_svg
+    from owl2uml.dot import dot_available, render_dot_svg
+    file_record = owned_file_or_404(filename=filename)
+    fmt = request.args.get('format')
+    if fmt not in ('json', 'svg'):
+        return render_template('uml_view.html', file=file_record)
+    if not os.path.exists(file_record.file_path):
+        return jsonify(error=f"Ontology file not found: {filename}"), 404
+    try:
+        model = parse_ontology(file_record.file_path)
+        if dot_available():
+            svg, engine = render_dot_svg(model), 'graphviz'
+        else:
+            svg, engine = render_svg(model, *layout(model)), 'builtin'
+    except Exception as e:
+        logger.warning(f"UML render failed for {filename}: {e}")
+        return jsonify(error=f"Could not render UML: {e}"), 500
+    if fmt == 'svg':
+        return Response(svg, mimetype='image/svg+xml')
+    return jsonify(svg=svg, engine=engine, classes=len(model.classes), edges=len(model.edges))
+
+
 @app.route('/analyze/<filename>/bvss')
 def bvss_visualize(filename):
     """Generate a BVSS visualization for an ontology file."""
     try:
         # Find the file in the database
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         
         # Get the file path
         file_path = file_record.file_path
@@ -2419,6 +2693,8 @@ def bvss_visualize(filename):
                              bvss_data=bvss_data,
                              bvss_findings=findings)
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         app.logger.error(f"Error generating BVSS visualization: {str(e)}")
         flash(f"Error generating BVSS visualization: {str(e)}", 'error')
@@ -2429,7 +2705,7 @@ def api_bvss_data(filename):
     """API endpoint to get BVSS visualization data in JSON format."""
     try:
         # Find the file in the database
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         
         # Get the file path
         file_path = file_record.file_path
@@ -2447,6 +2723,8 @@ def api_bvss_data(filename):
         
         return jsonify(bvss_data)
         
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         app.logger.error(f"Error getting BVSS data: {str(e)}")
         return jsonify({
@@ -2460,7 +2738,7 @@ def api_validate_bvss(filename):
     """API endpoint to validate BVSS graph for logical consistency."""
     try:
         # Find the file in the database
-        file_record = OntologyFile.query.filter_by(filename=filename).first_or_404()
+        file_record = owned_file_or_404(filename=filename)
         
         # Get the file path
         file_path = file_record.file_path
@@ -2482,6 +2760,8 @@ def api_validate_bvss(filename):
         
         return jsonify(validation_results)
         
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         app.logger.error(f"Error validating BVSS graph: {str(e)}")
         return jsonify({
@@ -2505,6 +2785,7 @@ def server_error(e):
 
 # User Authentication
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit(LOGIN_LIMIT, methods=['POST'])
 def login():
     """User login page"""
     if current_user.is_authenticated:
@@ -2520,8 +2801,9 @@ def login():
             flash('Invalid email or password', 'error')
             return redirect(url_for('login'))
             
-        # Log the user in
+        # Log the user in, and give them what they created anonymously this session
         login_user(user, remember=form.remember_me.data)
+        claim_anonymous_records(user)
         
         # Update last login timestamp
         user.last_login = datetime.datetime.utcnow()
@@ -2538,6 +2820,7 @@ def login():
     return render_template('login.html', form=form)
 
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit(REGISTER_LIMIT, methods=['POST'])
 def register():
     """User registration page"""
     if current_user.is_authenticated:
@@ -2616,17 +2899,11 @@ class DomainForm(FlaskForm):
 def sandbox_list():
     """Show a list of sandbox ontologies for the current user or public ones."""
     try:
-        if current_user.is_authenticated:
-            # Get ontologies for the current user
-            ontologies = SandboxOntology.query.filter_by(user_id=current_user.id).order_by(SandboxOntology.last_modified.desc()).all()
-            # Get history files for the import from history modal
-            history_files = OntologyFile.query.filter_by(user_id=current_user.id).order_by(OntologyFile.upload_date.desc()).all()
-        else:
-            # Get public ontologies
-            # For anonymous users, we'll get a subset of history files
-            ontologies = []
-            history_files = OntologyFile.query.filter_by(user_id=None).order_by(OntologyFile.upload_date.desc()).limit(10).all()
-            ontologies = SandboxOntology.query.order_by(SandboxOntology.last_modified.desc()).limit(20).all()
+        # Only the visitor's own sandbox ontologies and history files (anonymous
+        # visitors: the ones created in this browser session).
+        ontologies = owned_sandboxes_query().order_by(SandboxOntology.last_modified.desc()).all()
+        # History files for the import from history modal
+        history_files = owned_files_query().order_by(OntologyFile.upload_date.desc()).all()
             
         return render_template('sandbox_list.html', ontologies=ontologies, history_files=history_files)
     except Exception as e:
@@ -2634,13 +2911,25 @@ def sandbox_list():
         flash(f"Error listing sandbox ontologies: {str(e)}", 'error')
         return redirect(url_for('index'))
 
+@app.route('/sandbox/guide')
+def sandbox_guide():
+    """Step-by-step guide to building a statute ontology in the sandbox."""
+    return render_template('sandbox_guide.html')
+
 @app.route('/sandbox/new', methods=['GET', 'POST'])
+@_sandbox_create_limit
 def sandbox_new():
     """Create a new sandbox ontology."""
     try:
         form = DomainForm()
         
         if form.validate_on_submit():
+            try:
+                check_sandbox_count_cap()
+            except SandboxCapError as cap_error:
+                flash(str(cap_error), 'warning')
+                return redirect(url_for('sandbox_list'))
+
             # Create a new ontology
             ontology = SandboxOntology(
                 title=form.title.data,
@@ -2666,7 +2955,7 @@ def sandbox_new():
 def sandbox_view(ontology_id):
     """View a sandbox ontology."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         
         # Get the ontology's classes, properties, and individuals
         classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
@@ -2678,6 +2967,8 @@ def sandbox_view(ontology_id):
                              classes=classes,
                              properties=properties,
                              individuals=individuals)
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error viewing sandbox ontology: {str(e)}")
         flash(f"Error viewing sandbox ontology: {str(e)}", 'error')
@@ -2687,7 +2978,7 @@ def sandbox_view(ontology_id):
 def sandbox_edit(ontology_id):
     """Edit a sandbox ontology."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         
         # Check if the current user can edit this ontology
         if current_user.is_authenticated and ontology.user_id == current_user.id:
@@ -2705,16 +2996,49 @@ def sandbox_edit(ontology_id):
         else:
             flash('You do not have permission to edit this ontology', 'error')
             return redirect(url_for('sandbox_view', ontology_id=ontology_id))
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error editing sandbox ontology: {str(e)}")
         flash(f"Error editing sandbox ontology: {str(e)}", 'error')
         return redirect(url_for('sandbox_list'))
 
+@app.route('/sandbox/<int:ontology_id>/delete', methods=['POST'])
+def sandbox_delete(ontology_id):
+    """Delete a sandbox ontology and everything in it.
+
+    Files previously exported to history are kept; they just lose the link
+    back to this sandbox.
+    """
+    ontology = owned_sandbox_or_404(ontology_id)
+    title = ontology.title
+    try:
+        OntologyFile.query.filter_by(sandbox_ontology_id=ontology_id).update(
+            {OntologyFile.sandbox_ontology_id: None}, synchronize_session=False)
+        OntologyIndividual.query.filter_by(ontology_id=ontology_id).delete(
+            synchronize_session=False)
+        OntologyProperty.query.filter_by(ontology_id=ontology_id).delete(
+            synchronize_session=False)
+        OntologyClass.query.filter_by(ontology_id=ontology_id).update(
+            {OntologyClass.parent_id: None}, synchronize_session=False)
+        OntologyClass.query.filter_by(ontology_id=ontology_id).delete(
+            synchronize_session=False)
+        db.session.expire_all()
+        db.session.delete(db.session.get(SandboxOntology, ontology_id))
+        db.session.commit()
+        flash(f'Deleted sandbox ontology "{title}"', 'success')
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting sandbox ontology {ontology_id}: {str(e)}")
+        flash(f"Error deleting sandbox ontology: {str(e)}", 'error')
+    return redirect(url_for('sandbox_list'))
+
 @app.route('/sandbox/<int:ontology_id>/export_to_history', methods=['POST'])
+@limiter.limit(UPLOAD_LIMIT)
 def export_to_history(ontology_id):
     """Export a sandbox ontology to history for analysis."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         
         # Get the ontology's classes, properties, and individuals
         classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
@@ -2728,7 +3052,7 @@ def export_to_history(ontology_id):
         # Reuse the previous export when nothing changed. Every sandbox
         # "analyze" used to mint a new uploads/ file + history row even for
         # identical content, so one ontology accumulated hundreds of entries.
-        prev = (OntologyFile.query
+        prev = (owned_files_query()
                 .filter_by(sandbox_ontology_id=ontology.id, from_sandbox=True)
                 .order_by(OntologyFile.upload_date.desc())
                 .first())
@@ -2776,6 +3100,8 @@ def export_to_history(ontology_id):
         
         # Redirect to analyze the new file
         return redirect(url_for('analyze_owl', filename=unique_filename, original_name=f"{ontology.title}.owl", file_id=file_record.id))
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error exporting sandbox ontology to history: {str(e)}")
         flash(f"Error exporting sandbox ontology to history: {str(e)}", 'error')
@@ -2785,7 +3111,7 @@ def export_to_history(ontology_id):
 def sandbox_download(ontology_id):
     """Download a sandbox ontology as OWL/RDF."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         
         # Get the ontology's classes, properties, and individuals
         classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
@@ -2801,16 +3127,49 @@ def sandbox_download(ontology_id):
         response.headers['Content-Disposition'] = f'attachment; filename={ontology.title.replace(" ", "_")}.owl'
         
         return response
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error downloading sandbox ontology: {str(e)}")
         flash(f"Error downloading sandbox ontology: {str(e)}", 'error')
         return redirect(url_for('sandbox_view', ontology_id=ontology_id))
 
+@app.route('/sandbox/<int:ontology_id>/download.clif')
+def sandbox_download_clif(ontology_id):
+    """Download a sandbox ontology's subsumptions and disjointness as CLIF."""
+    try:
+        ontology = owned_sandbox_or_404(ontology_id)
+        classes = OntologyClass.query.filter_by(ontology_id=ontology_id).all()
+        properties = OntologyProperty.query.filter_by(ontology_id=ontology_id).all()
+        individuals = OntologyIndividual.query.filter_by(ontology_id=ontology_id).all()
+
+        from rdflib import Graph
+        from fol_export import generate_exports
+        from bfo.catalog import DEFAULT_OWL_PATH
+        graph = Graph()
+        graph.parse(data=generate_owl_xml(ontology, classes, properties, individuals),
+                    format='xml')
+        exports = generate_exports(graph=graph, bfo_path=DEFAULT_OWL_PATH)
+        if exports.get('error') or not exports.get('clif'):
+            raise ValueError(exports.get('error') or 'no axioms to export')
+
+        response = make_response(exports['clif'])
+        response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+        response.headers['Content-Disposition'] = f'attachment; filename={ontology.title.replace(" ", "_")}.clif'
+        return response
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
+    except Exception as e:
+        logger.error(f"Error exporting sandbox ontology as CLIF: {str(e)}")
+        flash(f"Error exporting CLIF: {str(e)}", 'error')
+        return redirect(url_for('sandbox_view', ontology_id=ontology_id))
+
 @app.route('/api/sandbox/<int:ontology_id>/classes', methods=['GET', 'POST'])
+@_sandbox_write_limit
 def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology classes."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         
         if request.method == 'GET':
             # Return all classes for this ontology
@@ -2839,7 +3198,12 @@ def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int
             
             if not data or 'name' not in data:
                 return jsonify({'error': 'Name is required'}), 400
-                
+
+            try:
+                check_sandbox_size_cap(ontology_id, add_classes=1)
+            except SandboxCapError as cap_error:
+                return jsonify({'error': str(cap_error)}), 409
+
             name = data.get('name')
             description = data.get('description', '')
             bfo_category = data.get('bfo_category')
@@ -2872,6 +3236,8 @@ def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int
                 'properties': cls.properties
             })
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error in API sandbox classes: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -2880,7 +3246,7 @@ def api_sandbox_classes(ontology_id: int) -> Union[Response, tuple[Response, int
 def api_sandbox_class(ontology_id, class_id):
     """API for a specific sandbox ontology class."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         cls = OntologyClass.query.filter_by(id=class_id, ontology_id=ontology_id).first_or_404()
         
         if request.method == 'GET':
@@ -2931,18 +3297,75 @@ def api_sandbox_class(ontology_id, class_id):
             if not current_user.is_authenticated or ontology.user_id != current_user.id:
                 return jsonify({'error': 'You do not have permission to edit this ontology'}), 403
                 
-            # Delete the class
-            db.session.delete(cls)
-            
+            # Delete the class together with its subclasses (and their
+            # individuals); properties that used them as domain/range survive
+            # with that slot cleared.
+            deleted_ids = _delete_sandbox_class_subtree(ontology_id, cls.id)
+
             # Update the ontology's last_modified timestamp
             ontology.last_modified = datetime.datetime.utcnow()
             db.session.commit()
-            
-            return jsonify({'success': True})
-            
+
+            return jsonify({'success': True, 'deleted_class_ids': deleted_ids})
+
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Error in API sandbox class: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+def _delete_sandbox_class_subtree(ontology_id, class_id):
+    """Delete a sandbox class, all its descendant subclasses and their individuals.
+
+    Properties whose domain or range was one of the deleted classes are kept,
+    with that domain/range cleared. Returns the deleted class ids. Does not commit.
+    """
+    ids, frontier = {class_id}, [class_id]
+    while frontier:
+        children = [c.id for c in OntologyClass.query.filter(
+            OntologyClass.ontology_id == ontology_id,
+            OntologyClass.parent_id.in_(frontier)).all() if c.id not in ids]
+        ids.update(children)
+        frontier = children
+    id_list = sorted(ids)
+    OntologyIndividual.query.filter(OntologyIndividual.class_id.in_(id_list)).delete(
+        synchronize_session=False)
+    OntologyProperty.query.filter(OntologyProperty.domain_class_id.in_(id_list)).update(
+        {OntologyProperty.domain_class_id: None}, synchronize_session=False)
+    OntologyProperty.query.filter(OntologyProperty.range_class_id.in_(id_list)).update(
+        {OntologyProperty.range_class_id: None}, synchronize_session=False)
+    # Break parent links inside the subtree first so row order cannot violate the FK.
+    OntologyClass.query.filter(OntologyClass.id.in_(id_list)).update(
+        {OntologyClass.parent_id: None}, synchronize_session=False)
+    OntologyClass.query.filter(OntologyClass.id.in_(id_list)).delete(synchronize_session=False)
+    db.session.expire_all()
+    return id_list
+
+# Sandbox BFO category names -> BFO 2020 numeric IDs, so exports point at real BFO IRIs
+SANDBOX_BFO_IDS = {
+    'Entity': '0000001',
+    'Continuant': '0000002',
+    'Occurrent': '0000003',
+    'IndependentContinuant': '0000004',
+    'MaterialEntity': '0000040',
+    'Object': '0000030',
+    'FiatObjectPart': '0000024',
+    'ObjectAggregate': '0000027',
+    'ImmaterialEntity': '0000141',
+    'Site': '0000029',
+    'SpecificallyDependentContinuant': '0000020',
+    'GenericallyDependentContinuant': '0000031',
+    'InformationEntity': '0000031',
+    'RealizableEntity': '0000017',
+    'Role': '0000023',
+    'Disposition': '0000016',
+    'Function': '0000034',
+    'Quality': '0000019',
+    'Process': '0000015',
+    'SpatiotemporalRegion': '0000011',
+}
 
 def generate_owl_xml(ontology, classes, properties, individuals):
     """Generate OWL/RDF XML for a sandbox ontology."""
@@ -2972,7 +3395,8 @@ def generate_owl_xml(ontology, classes, properties, individuals):
         
         # Add BFO category if defined
         if cls.bfo_category:
-            xml += f"""        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_{cls.bfo_category}"/>
+            bfo_id = SANDBOX_BFO_IDS.get(cls.bfo_category, cls.bfo_category)
+            xml += f"""        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_{bfo_id}"/>
 """
         
         # Add parent class if defined
@@ -3094,6 +3518,7 @@ def generate_owl_xml(ontology, classes, properties, individuals):
     return xml
 
 @app.route('/api/sandbox/ai/suggestions', methods=['GET', 'POST'])
+@_ai_limit
 def api_sandbox_ai_suggestions():
     """API endpoint to get AI-generated class and property suggestions for an ontology domain."""
     logger.info(f"AI suggestions endpoint called with method: {request.method}")
@@ -3133,6 +3558,7 @@ def api_sandbox_ai_suggestions():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sandbox/ai/bfo-category', methods=['POST'])
+@_ai_limit
 def api_sandbox_ai_bfo_category():
     """API endpoint to suggest a BFO category for a class."""
     try:
@@ -3154,10 +3580,11 @@ def api_sandbox_ai_bfo_category():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sandbox/<int:ontology_id>/properties', methods=['GET', 'POST'])
+@_sandbox_write_limit
 def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, int]]:
     """API for sandbox ontology properties."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         
         if request.method == 'GET':
             # Return all properties for this ontology
@@ -3187,7 +3614,12 @@ def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, 
             
             if not data or 'name' not in data or 'property_type' not in data:
                 return jsonify({'error': 'Name and property_type are required'}), 400
-                
+
+            try:
+                check_sandbox_size_cap(ontology_id, add_properties=1)
+            except SandboxCapError as cap_error:
+                return jsonify({'error': str(cap_error)}), 409
+
             name = data.get('name')
             description = data.get('description', '')
             property_type = data.get('property_type')
@@ -3222,6 +3654,8 @@ def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, 
                 'property_metadata': prop.property_metadata
             })
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error in API sandbox properties: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -3230,7 +3664,7 @@ def api_sandbox_properties(ontology_id: int) -> Union[Response, tuple[Response, 
 def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, tuple[Response, int]]:
     """API for a specific sandbox ontology property."""
     try:
-        ontology = SandboxOntology.query.get_or_404(ontology_id)
+        ontology = owned_sandbox_or_404(ontology_id)
         prop = OntologyProperty.query.filter_by(id=property_id, ontology_id=ontology_id).first_or_404()
         
         if request.method == 'GET':
@@ -3285,7 +3719,11 @@ def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, 
             if not current_user.is_authenticated or ontology.user_id != current_user.id:
                 return jsonify({'error': 'You do not have permission to edit this ontology'}), 403
                 
-            # Delete the property
+            # Delete the property, and drop its values from any individuals
+            for ind in OntologyIndividual.query.filter_by(ontology_id=ontology_id).all():
+                values = ind.property_values or {}
+                if str(prop.id) in values:
+                    ind.property_values = {k: v for k, v in values.items() if k != str(prop.id)}
             db.session.delete(prop)
             
             # Update the ontology's last_modified timestamp
@@ -3294,11 +3732,14 @@ def api_sandbox_property(ontology_id: int, property_id: int) -> Union[Response, 
             
             return jsonify({'success': True})
             
+    except HTTPException:
+        raise  # e.g. 404 for a file the visitor does not own
     except Exception as e:
         logger.error(f"Error in API sandbox property: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/sandbox/ai/description', methods=['POST'])
+@_ai_limit
 def api_sandbox_ai_description():
     """API endpoint to generate a description for a class."""
     try:

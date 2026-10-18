@@ -1,8 +1,22 @@
 """Shared pytest fixtures for the BFO coherence foundation tests."""
 
 import os
+import tempfile
 
 import pytest
+
+# The app module is a process-wide singleton that binds its database engine at
+# import time; every test file that imports `app` shares that one binding, and
+# whichever file imports it FIRST decides the database for the whole run.
+# Point the suite at a scratch database here — conftest imports before any test
+# module — so no collection order can bind the tests to the developer's real
+# owl_tester.db (whose schema may be stale) or to a per-test path that later
+# files silently miss.
+os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(
+    tempfile.mkdtemp(prefix="owltester-tests-"), "suite.db")
+# Rate limiting off for the suite; tests/test_abuse_limits.py re-enables it
+# per test through app.config["RATELIMIT_ENABLED"].
+os.environ["RATELIMIT_ENABLED"] = "0"
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -38,3 +52,29 @@ def _java_available():
 requires_java = pytest.mark.skipif(
     not _java_available(), reason="Pellet requires a Java runtime"
 )
+
+
+def grant_anon_files(client, *file_ids):
+    """Make ``file_ids`` the anonymous test client's own uploads.
+
+    Ontology files are private to their owner (see ``ownership.py``); an
+    anonymous visitor owns the files whose ids are in their session.
+    """
+    with client.session_transaction() as sess:
+        ids = list(sess.get("anon_file_ids", []))
+        sess["anon_file_ids"] = ids + [i for i in file_ids if i not in ids]
+
+
+def own_upload(flask_app, client, filename, path):
+    """Register ``filename`` (already in the upload folder) as the client's file."""
+    from models import db, OntologyFile
+
+    with flask_app.app_context():
+        record = OntologyFile(filename=filename, original_filename=filename,
+                              file_path=path, file_size=os.path.getsize(path),
+                              mime_type="application/rdf+xml")
+        db.session.add(record)
+        db.session.commit()
+        file_id = record.id
+    grant_anon_files(client, file_id)
+    return file_id

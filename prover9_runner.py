@@ -143,6 +143,232 @@ def check_class_unsat(assumptions_p9, sym, kind, timeout=5, background="",
     return stalled
 
 
+_MAX_PROOF_CORES = 10
+
+
+def _extract_proof_cores(theory, unsat_records, background, align, timeout,
+                         max_seconds=None, max_megs=None):
+    """Re-prove each unsatisfiable class over the label-annotated export and map
+    the proof's used assumption labels back to the source axioms.
+
+    Returns [{'class', 'axioms': [{'label','kind','text','iris'[,'origin']}],
+    'may_use_background': bool}]. With a background theory in play the proof may
+    also use unlabeled background axioms — the listed axioms are the ontology's
+    own contribution, and may_use_background flags the caveat for the UI.
+    """
+    from fol_export import axiom_table, render_prover9
+    labeled = render_prover9(theory, align_bfo=align, labels=True)
+    table = axiom_table(theory)
+    base = _limits_block(max_seconds, max_megs) + background + labeled
+    cores = []
+    for sym, kind, label in unsat_records:
+        if kind == "occurrent" and not align:
+            goal = f"all X (-instance_of_at(X,{sym}))."
+        else:
+            goal = f"all X all T (-instance_of(X,{sym},T))."
+        proof = prove_goal(base, goal, timeout=timeout)
+        if proof["status"] != "proved":
+            continue  # the labeled re-run can time out where the first didn't
+        axioms = [dict(table[l], label=l) for l in proof["used_labels"]
+                  if l in table]
+        cores.append({
+            "class": label,
+            "axioms": axioms,
+            "may_use_background": bool(background),
+        })
+    return cores
+
+
+_PROOF_SECTION_RE = re.compile(
+    r"={5,}\s*PROOF\s*={5,}(.*?)={5,}\s*end of proof\s*={5,}", re.S)
+_LABEL_RE = re.compile(r"# label\((\w+)\)")
+
+
+def prove_goal(assumptions_p9, goal_p9, timeout=5):
+    """Ask Prover9 to prove one goal, returning the proof's used labels.
+
+    `assumptions_p9` is a complete assumptions block whose formulas may carry
+    `# label(name)` attributes; `goal_p9` is a single goal formula (no block
+    wrapper). Returns {'status': 'proved'|'no_proof'|'unknown',
+    'used_labels': [names], 'proof_text': str} — used_labels are the labels of
+    the assumption formulas Prover9 actually used, i.e. the minimal clause set
+    behind the contradiction, which is what callers render as justification.
+    """
+    out = {"status": "unknown", "used_labels": [], "proof_text": ""}
+    if not prover9_available():
+        return out
+    p9_input = assumptions_p9 + f"\nformulas(goals).\n  {goal_p9}\nend_of_list.\n"
+    try:
+        proc = _run(["prover9"], p9_input, timeout)
+    except subprocess.TimeoutExpired:
+        return out
+    except Exception as e:  # noqa: BLE001
+        logger.warning("prover9 invocation failed: %s", e)
+        return out
+    if proc.returncode == _P9_PROVED or _PROOF_RE.search(proc.stdout or ""):
+        out["status"] = "proved"
+        m = _PROOF_SECTION_RE.search(proc.stdout or "")
+        if m:
+            out["proof_text"] = m.group(1).strip()
+            labels = set(_LABEL_RE.findall(m.group(1)))
+            labels.discard("non_clause")
+            labels.discard("goal")
+            out["used_labels"] = sorted(labels)
+    elif proc.returncode == _P9_EXHAUSTED:
+        out["status"] = "no_proof"
+    return out
+
+
+def find_model(assumptions_p9, timeout=5):
+    """Ask Mace4 for a finite model of the assumptions.
+
+    Returns {'found': bool|None, 'model_text': str}: True with the raw model
+    text when a model exists, False when the search space is exhausted, None
+    when Mace4 is unavailable or undecided within the timeout. Callers should
+    run Prover9 first — Mace4 does not terminate on unsatisfiable input.
+    """
+    out = {"found": None, "model_text": ""}
+    if not mace4_available():
+        return out
+    try:
+        m4 = _run(["mace4"], assumptions_p9, timeout)
+    except subprocess.TimeoutExpired:
+        return out
+    except Exception as e:  # noqa: BLE001
+        logger.warning("mace4 invocation failed: %s", e)
+        return out
+    if m4.returncode == 0 or _MODEL_RE.search(m4.stdout or ""):
+        out["found"] = True
+        out["model_text"] = (m4.stdout or "").strip()
+    elif m4.returncode == _P9_EXHAUSTED:
+        out["found"] = False
+    return out
+
+
+# -- satisfiability probes (SPEC-coverage-coherence-demo.md §11 Phase 2) --------
+
+_INTERP_SIZE_RE = re.compile(r"interpretation\(\s*(\d+)")
+_INTERP_CONST_RE = re.compile(r"function\((\w+),\s*\[\s*(\d+)\s*\]\)")
+_INTERP_REL_RE = re.compile(r"relation\((\w+)\(([_,]+)\),\s*\[([\d,\s]+)\]\)")
+
+
+def _parse_interpretation(model_text):
+    """Parse a Mace4 interpretation into (domain_size, constants, relations).
+
+    constants: {name: element}; relations: {name: (arity, flat row-major
+    0/1 table)}. Returns None when the text doesn't look like a model.
+    """
+    size = _INTERP_SIZE_RE.search(model_text or "")
+    if not size:
+        return None
+    consts = {m.group(1): int(m.group(2))
+              for m in _INTERP_CONST_RE.finditer(model_text)}
+    rels = {}
+    for m in _INTERP_REL_RE.finditer(model_text):
+        arity = m.group(2).count("_")
+        table = [int(v) for v in re.findall(r"\d", m.group(3))]
+        rels[m.group(1)] = (arity, table)
+    return int(size.group(1)), consts, rels
+
+
+def _witness_from_model(model_text, theory, target_sym, kind, align):
+    """Read the Mace4 model back as a witness: which classes the witness
+    individual instantiates. Returns {'memberships': [labels], 'domain_size': n}
+    or None when the model can't be decoded (the caller degrades to a bare
+    'a model exists' verdict)."""
+    parsed = _parse_interpretation(model_text)
+    if not parsed:
+        return None
+    dom, consts, rels = parsed
+    ternary = kind != "occurrent" or align
+
+    def member(x, class_val, t):
+        if ternary:
+            arity_table = rels.get("instance_of")
+            if not arity_table or arity_table[0] != 3:
+                return False
+            return bool(arity_table[1][x * dom * dom + class_val * dom + t])
+        arity_table = rels.get("instance_of_at")
+        if not arity_table or arity_table[0] != 2:
+            return False
+        return bool(arity_table[1][x * dom + class_val])
+
+    target_val = consts.get(target_sym)
+    if target_val is None:
+        return None
+    witness = next(((x, t) for x in range(dom) for t in range(dom)
+                    if member(x, target_val, t)), None)
+    if witness is None:
+        return None
+    x, t = witness
+    memberships = sorted({rec["label"] for rec in theory.classes.values()
+                          if rec["sym"] in consts
+                          and member(x, consts[rec["sym"]], t)})
+    return {"memberships": memberships, "domain_size": dom}
+
+
+def probe_class(theory, class_iri, timeout=10, bfo_background=False):
+    """Satisfiability probe: can this class have any instance at all?
+
+    Returns {'status': 'empty'|'inhabited'|'undetermined'|'unknown', 'class',
+    plus 'core' (the Phase-1 proof core) when empty and 'witness' (decoded
+    Mace4 model memberships) when inhabited}. Same engine ordering as the
+    coverage demo: Prover9 decides emptiness first; Mace4 only runs on the
+    no-proof side, because it does not terminate on unsatisfiable input.
+    """
+    rec = (theory.classes or {}).get(class_iri)
+    if rec is None:
+        return {"status": "unknown", "reason": "class not in the FOL export"}
+    sym, kind, label = rec["sym"], rec["kind"], rec["label"]
+    result = {"status": "unknown", "class": label}
+    if not prover9_available():
+        result["reason"] = "prover9 binary not available"
+        return result
+
+    from fol_export import axiom_table, render_prover9
+    background, max_secs, max_megs = "", None, None
+    if bfo_background:
+        from clif_theory import render_prover9_theory
+        background = render_prover9_theory()
+        max_secs, max_megs = 10, 500
+    labeled = render_prover9(theory, align_bfo=bfo_background, labels=True)
+    base = _limits_block(max_secs, max_megs) + background + labeled
+
+    started = time.perf_counter()
+    if kind == "occurrent" and not bfo_background:
+        goal = f"all X (-instance_of_at(X,{sym}))."
+    else:
+        goal = f"all X all T (-instance_of(X,{sym},T))."
+    proof = prove_goal(base, goal, timeout=timeout)
+    engine = "prover9"
+    if proof["status"] == "proved":
+        table = axiom_table(theory)
+        result["status"] = "empty"
+        result["core"] = {
+            "axioms": [dict(table[l], label=l) for l in proof["used_labels"]
+                       if l in table],
+            "may_use_background": bool(background),
+        }
+    else:
+        existence = _existence_block(sym, kind, align=bfo_background)
+        model = find_model(base + existence, timeout=timeout)
+        if model["found"]:
+            engine = "prover9+mace4"
+            result["status"] = "inhabited"
+            result["witness"] = _witness_from_model(
+                model["model_text"], theory, sym, kind, bfo_background)
+        elif proof["status"] == "no_proof":
+            # Prover9 exhausted its search without a proof: not provably empty.
+            # Without a decoded model we still can't show a witness.
+            result["status"] = "inhabited"
+            result["witness"] = None
+        else:
+            result["status"] = "undetermined"
+    result["engine"] = engine + ("+bfo" if bfo_background else "")
+    result["elapsed_ms"] = int((time.perf_counter() - started) * 1000)
+    return result
+
+
 def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
                 max_classes=60, per_class_timeout=5, bfo_background=False,
                 background_max_seconds=10, background_max_megs=500):
@@ -234,6 +460,7 @@ def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
         candidates = candidates[:max_classes]
 
     prover_unsat = []
+    unsat_records = []  # (sym, kind, label) of unsat classes, for proof cores
     undetermined = []
     for sym, kind, label in candidates:
         verdict = check_class_unsat(
@@ -243,6 +470,7 @@ def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
         result["tested"] += 1
         if verdict == "unsatisfiable":
             prover_unsat.append(label)
+            unsat_records.append((sym, kind, label))
         elif verdict == "undetermined":
             undetermined.append(label)
 
@@ -251,6 +479,17 @@ def cross_check(theory, reasoner_unsat_names=None, assumptions_p9=None,
     result["engine"] = engine + "+bfo" if bfo_background else engine
     result["prover_unsatisfiable"] = sorted(prover_unsat)
     result["undetermined"] = sorted(undetermined)
+
+    # For each unsatisfiable class, re-prove over the label-annotated export and
+    # record the minimal set of the ontology's own axioms the proof used — the
+    # "these N axioms cannot all hold" justification the UI renders.
+    if unsat_records and theory is not None:
+        result["proof_cores"] = _extract_proof_cores(
+            theory, unsat_records[:_MAX_PROOF_CORES], background,
+            align=bfo_background, timeout=per_class_timeout,
+            max_seconds=max_secs, max_megs=max_megs)
+        if len(unsat_records) > _MAX_PROOF_CORES:
+            result["proof_cores_capped"] = len(unsat_records)
 
     prover_set = set(prover_unsat)
     # Compare on the intersection of names we actually tested vs reasoner output.

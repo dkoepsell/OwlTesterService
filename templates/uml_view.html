@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+
+{% block title %}UML View - {{ file.original_filename }}{% endblock %}
+
+{% block head_scripts %}
+<script src="{{ url_for('static', filename='vendor/svg-pan-zoom.min.js') }}"></script>
+<style>
+    #uml-viewport { height: 75vh; background: #fff; border: 1px solid var(--bs-border-color); border-radius: .375rem; overflow: hidden; position: relative; }
+    #uml-viewport svg { display: block; }
+    #uml-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; }
+    .node--hit polygon, .node--hit path { stroke: #0d6efd !important; stroke-width: 3px !important; }
+    .node--current polygon:first-of-type { fill: #fff3a3 !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h4 class="mb-0 me-3"><i class="fas fa-th-list me-2"></i>UML View
+            <small class="text-muted">{{ file.original_filename }}</small></h4>
+        <div class="input-group input-group-sm" style="max-width: 320px;">
+            <input type="search" id="uml-search" class="form-control" placeholder="Find a class…" autocomplete="off">
+            <button class="btn btn-outline-secondary" id="uml-prev" title="Previous match">&#8249;</button>
+            <button class="btn btn-outline-secondary" id="uml-next" title="Next match">&#8250;</button>
+        </div>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" id="uml-zoom-out" title="Zoom out">&minus;</button>
+            <button class="btn btn-outline-secondary" id="uml-fit" title="Fit to view">Fit</button>
+            <button class="btn btn-outline-secondary" id="uml-zoom-in" title="Zoom in">&plus;</button>
+        </div>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('uml_view', filename=file.filename, format='svg') }}"
+           download="{{ file.original_filename }}.svg"><i class="fas fa-download me-1"></i>Download SVG</a>
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('analyze_owl', filename=file.filename) }}">
+            <i class="fas fa-arrow-left me-1"></i>Back to analysis</a>
+        <span id="uml-status" class="small text-muted ms-auto"></span>
+    </div>
+
+    <div id="uml-viewport">
+        <div id="uml-overlay"><span class="spinner-border spinner-border-sm me-2"></span>Parsing &amp; laying out…</div>
+    </div>
+    <p class="small text-muted mt-2">UML class diagram from OWL: subclass edges, object properties as
+        associations, data properties as attributes. Layout by Graphviz; scroll to zoom, drag to pan.</p>
+</div>
+
+<script>
+(function () {
+    const vp = document.getElementById('uml-viewport');
+    const status = document.getElementById('uml-status');
+    const search = document.getElementById('uml-search');
+    let svgEl = null, panZoom = null, matches = [], idx = -1;
+    const setStatus = (msg, err) => { status.textContent = msg; status.classList.toggle('text-danger', !!err); };
+
+    fetch("{{ url_for('uml_view', filename=file.filename, format='json') }}")
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { vp.innerHTML = ''; setStatus(data.error, true); return; }
+            vp.innerHTML = data.svg;
+            svgEl = vp.querySelector('svg');
+            if (!svgEl) { setStatus('No diagram produced', true); return; }
+            svgEl.setAttribute('width', '100%');
+            svgEl.setAttribute('height', '100%');
+            panZoom = svgPanZoom(svgEl, {zoomEnabled: true, controlIconsEnabled: false, fit: true,
+                                         center: true, minZoom: 0.05, maxZoom: 40, zoomScaleSensitivity: 0.4});
+            setStatus(`${data.classes} classes · ${data.edges} edges · ${data.engine}`);
+        })
+        .catch(e => setStatus(`Failed to load diagram: ${e}`, true));
+
+    function clear() {
+        vp.querySelectorAll('.node--hit, .node--current').forEach(n => n.classList.remove('node--hit', 'node--current'));
+    }
+    function focus() {
+        if (idx < 0 || !matches.length) return;
+        vp.querySelectorAll('.node--current').forEach(n => n.classList.remove('node--current'));
+        const el = matches[idx];
+        el.classList.add('node--current');
+        const r = el.getBoundingClientRect(), c = svgEl.getBoundingClientRect();
+        panZoom.panBy({x: (c.left + c.width / 2) - (r.left + r.width / 2),
+                       y: (c.top + c.height / 2) - (r.top + r.height / 2)});
+    }
+    function run(q) {
+        clear(); matches = []; idx = -1;
+        q = q.trim().toLowerCase();
+        if (!svgEl || !q) return;
+        svgEl.querySelectorAll('g.node').forEach(g => {
+            if ((g.textContent || '').toLowerCase().includes(q)) { g.classList.add('node--hit'); matches.push(g); }
+        });
+        if (matches.length) { idx = 0; focus(); }
+        setStatus(matches.length ? `${matches.length} match(es)` : 'No matches');
+    }
+    function step(d) {
+        if (!matches.length) return;
+        idx = (idx + d + matches.length) % matches.length;
+        focus();
+        setStatus(`Match ${idx + 1} / ${matches.length}`);
+    }
+    search.addEventListener('input', () => run(search.value));
+    search.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); } });
+    document.getElementById('uml-prev').onclick = () => step(-1);
+    document.getElementById('uml-next').onclick = () => step(1);
+    document.getElementById('uml-zoom-in').onclick = () => panZoom && panZoom.zoomIn();
+    document.getElementById('uml-zoom-out').onclick = () => panZoom && panZoom.zoomOut();
+    document.getElementById('uml-fit').onclick = () => panZoom && (panZoom.resize(), panZoom.fit(), panZoom.center());
+})();
+</script>
+{% endblock %}
