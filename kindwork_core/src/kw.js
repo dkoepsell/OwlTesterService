@@ -15,12 +15,14 @@ const KEYWORDS = ['thing', 'group', 'place', 'quality', 'tendency', 'function', 
 const REL_WORDS = {
   held_by: 'heldBy', issued_by: 'issuedBy', can_grant: 'scope', owed_by: 'owedBy', owed_to: 'owedTo',
   participant: 'participant', at: 'at', during: 'during', marks: 'marks', bearer: 'bearer',
-  about: 'about', designates: 'designates', member: 'member', is_a: 'isA'
+  about: 'about', designates: 'designates', member: 'member',
+  part_of: 'partOf', precedes: 'precedes', results_in: 'resultsIn', kept_on: 'keptOn', is_a: 'isA'
 };
 const REL_PLAIN = {
   heldBy: 'have a holder', issuedBy: 'have an issuer', scope: 'grant statuses', owedBy: 'have someone who owes it', owedTo: 'have someone who can claim it',
   participant: 'have participants', at: 'have a location', during: 'fall in a period', marks: 'mark a happening',
-  bearer: 'have a bearer', about: 'be about something', designates: 'label something', member: 'have members'
+  bearer: 'have a bearer', about: 'be about something', designates: 'label something', member: 'have members',
+  partOf: 'be part of something', precedes: 'come before something', resultsIn: 'result in something', keptOn: 'be kept on something'
 };
 const SIGNALS = ['held', 'startsEnds', 'unshown', 'extended', 'changes', 'assigned', 'measured'];
 const orList = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + (a.length > 2 ? ',' : '') + ' or ' + a[a.length - 1];

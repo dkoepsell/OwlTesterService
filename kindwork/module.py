@@ -88,11 +88,22 @@ def _payload(kind, terms, context, task):
                  if isinstance(t, dict) and t.get("name")]
         return {"kind": "terms", "terms": clean,
                 "context": context if isinstance(context, str) else ""}
-    raise sidecar.SidecarInputError('kind must be "task" or "terms".')
+    if kind == "relations":
+        clean = [{"name": str(t.get("name"))[:80], "kind": str(t.get("kind") or ""),
+                  "desc": str(t.get("desc") or "")[:300]}
+                 for t in (terms if isinstance(terms, list) else [])
+                 if isinstance(t, dict) and t.get("name")]
+        return {"kind": "relations", "terms": clean,
+                "context": context if isinstance(context, str) else ""}
+    raise sidecar.SidecarInputError('kind must be "task", "terms" or "relations".')
 
 
 def _page_prompt(payload):
     """The prompt the page itself would send, from kindwork_core's builders."""
+    return _prompt_bin(payload)["prompt"]
+
+
+def _prompt_bin(payload):
     node = sidecar.node_bin()
     if not node:
         raise sidecar.SidecarError("Node.js is not installed on this server.")
@@ -107,7 +118,7 @@ def _page_prompt(payload):
         raise sidecar.SidecarInputError(reply.get("error") or "The input was refused.")
     if proc.returncode != 0:
         raise sidecar.SidecarError(reply.get("error") or "prompt builder failed")
-    return reply["prompt"]
+    return reply
 
 
 def _parse_reply(text):
@@ -146,6 +157,13 @@ def _openai_propose(payload, key):
     except APIStatusError as e:
         raise sidecar.SidecarUpstreamError("The model could not be reached. Try again.") from e
     result = _parse_reply(resp.choices[0].message.content)
+    if payload["kind"] == "relations":  # only relations the interview allows
+        if not isinstance(result, dict) or not isinstance(result.get("relations"), list):
+            raise sidecar.SidecarUpstreamError(
+                "The model answered in the wrong shape. Try again, or send fewer terms.", "invalid_json")
+        kept = _prompt_bin({"op": "relations", "terms": payload["terms"],
+                            "relations": result["relations"]})["relations"]
+        return {"result": {"relations": kept}, "model": OPENAI_MODEL}
     if not isinstance(result, dict) or not isinstance(result.get("terms"), list):
         raise sidecar.SidecarUpstreamError(
             "The model answered in the wrong shape. Try again, or send fewer terms.", "invalid_json")

@@ -60,6 +60,7 @@ Kindwork, at `/kindwork`, guides people with no ontology training to a working B
 
 - **Bring Your Terms**: Paste a list, or upload a spreadsheet, data dictionary, JSON Schema, or SQL table definitions
 - **AI-proposed Answers**: With your own OpenAI or Anthropic (Claude) key, AI proposes an answer to each question; nothing counts until you confirm the term yourself
+- **Connect Your Terms**: A guided step that turns the sorted list (a taxonomy) into an ontology, by connecting terms: who holds a license, what an inspection is about, which step comes first, what is part of what. Each connection is shown as the rule it becomes ("Every Wheel is part of some Car"), only connections that make sense for the two kinds are offered, missing terms can be added on the spot, and AI can suggest connections that you keep or leave out
 - **Reasoner-checked Confirmation**: Every confirmation runs HermiT, cross-checked by Pellet, against BFO 2020; terms that cross or split a basic kind are held back with a card explaining why in plain words
 - **Downloads**: The classified list (CSV), the ontology (Turtle), SHACL shapes, keyword source, and a standalone tracker app
 - **Kindwork Workbench**: At `/kindwork/workbench`, lint keyword source, check a model or ontology, or check a Kindwork export with its shapes
@@ -116,7 +117,8 @@ Upload an OWL file through the web interface to receive:
 1. Open `/kindwork` and paste your terms, or upload a spreadsheet
 2. Optionally add your own AI key in the bar at the top, and press Propose answers
 3. Check each term's answers and press Confirm; the reasoner runs before the term counts
-4. Resolve any held-back terms, then download the results
+4. Connect the terms: read each connection as a rule and keep only the ones true of every case
+5. Resolve any held-back terms, then download the results
 
 ### Creating Ontologies
 

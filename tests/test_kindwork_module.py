@@ -75,14 +75,14 @@ def claims_terms():
 # --- reference tests ------------------------------------------------------------
 
 @needs_node
-def test_reference_acceptance_a1_to_a19():
+def test_reference_acceptance_a1_to_a22():
     proc = subprocess.run(["node", "--test", "--test-reporter=tap", "test/acceptance.test.js"],
                           cwd=CORE, capture_output=True, text=True, timeout=600)
     assert proc.returncode == 0, proc.stdout[-3000:] + proc.stderr[-2000:]
     assert "# fail 0" in proc.stdout
     passed = int(re.search(r"# pass (\d+)", proc.stdout).group(1))
     skipped = int(re.search(r"# skipped (\d+)", proc.stdout).group(1))
-    assert passed + skipped == 19 and skipped <= 1  # A11 skips only without ROBOT
+    assert passed + skipped == 22 and skipped <= 1  # A11 skips only without ROBOT
 
 
 # --- B1: the page ------------------------------------------------------------------
@@ -149,6 +149,36 @@ def test_propose_with_mock_filters_to_terms_asked(client, mock_llm):
     asked = {t["name"].lower() for t in terms}
     assert body["model"] == "mock"
     assert body["result"]["terms"] and all(t["name"].lower() in asked for t in body["result"]["terms"])
+
+
+SHOP_TERMS = [{"name": "Car", "kind": "thing"}, {"name": "Wheel", "kind": "thing"},
+              {"name": "Inspection", "kind": "happening"},
+              {"name": "Inspection report", "kind": "record"}]
+
+
+@needs_node
+def test_propose_relations_keeps_only_connections_the_kinds_allow(client, monkeypatch):
+    monkeypatch.setenv("KINDWORK_LLM_MOCK", str(INGEST / "mock-relations.json"))
+    resp = post(client, "propose", {"kind": "relations", "terms": SHOP_TERMS})
+    assert resp.status_code == 200
+    got = [(r["from"], r["rel"], r["to"]) for r in resp.get_json()["result"]["relations"]]
+    assert got == [("Wheel", "partOf", "Car"), ("Inspection", "resultsIn", "Inspection report"),
+                   ("Inspection", "participant", "Car")]
+
+
+@needs_node
+def test_propose_relations_needs_two_kinded_terms(client, monkeypatch):
+    monkeypatch.setenv("KINDWORK_LLM_MOCK", str(INGEST / "mock-relations.json"))
+    resp = post(client, "propose", {"kind": "relations", "terms": [{"name": "Car", "kind": "thing"}]})
+    assert resp.status_code == 422
+
+
+@needs_node
+def test_openai_relations_are_filtered_like_the_sidecar():
+    from kindwork import module
+    raw = json.loads((INGEST / "mock-relations.json").read_text())["relations"]
+    kept = module._prompt_bin({"op": "relations", "terms": SHOP_TERMS, "relations": raw})["relations"]
+    assert [r["rel"] for r in kept] == ["partOf", "resultsIn", "participant"]
 
 
 @needs_node

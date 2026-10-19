@@ -31,7 +31,13 @@ export function buildPrompt(req) {
     if (terms.length > 60) throw new InputError('Send at most 60 terms at a time.');
     return core.termsPrompt(terms, String(req.context || '').slice(0, 3000));
   }
-  throw new InputError('kind must be "task" or "terms".');
+  if (req.kind === 'relations') {
+    const terms = (Array.isArray(req.terms) ? req.terms : []).filter(t => t && t.name && core.KW[t.kind]).map(t => ({ name: String(t.name).slice(0, 80), kind: t.kind, desc: String(t.desc || '').slice(0, 300) }));
+    if (terms.length < 2) throw new InputError('Send at least two terms, each with its kind.');
+    if (terms.length > 60) throw new InputError('Send at most 60 terms at a time.');
+    return core.relationsPrompt(terms, String(req.context || '').slice(0, 3000));
+  }
+  throw new InputError('kind must be "task", "terms" or "relations".');
 }
 
 function parseJsonReply(text) {
@@ -39,6 +45,23 @@ function parseJsonReply(text) {
   const tries = [t, (/```(?:json)?\s*([\s\S]*?)```/.exec(t) || [])[1], t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)];
   for (const x of tries) { if (!x) continue; try { return JSON.parse(x); } catch (e) {} }
   throw new UpstreamError('The model answered in the wrong shape. Try again, or send fewer terms.', 'invalid_json');
+}
+
+// Keep only relations between the terms sent, of a kind the interview would offer.
+export function validRelations(terms, relations) {
+  const core = createCore();
+  const kindOf = new Map((terms || []).map(t => [String(t.name || '').toLowerCase(), t.kind]));
+  const name = new Map((terms || []).map(t => [String(t.name || '').toLowerCase(), String(t.name)]));
+  const out = [];
+  for (const r of relations || []) {
+    const f = String(r && r.from || '').toLowerCase(), t = String(r && r.to || '').toLowerCase();
+    if (!kindOf.has(f) || !kindOf.has(t) || f === t) continue;
+    const slot = (core.SLOTS[kindOf.get(f)] || []).find(s => s.r === r.rel);
+    if (!slot || (slot.to && !slot.to.includes(kindOf.get(t)))) continue;
+    if (out.some(x => x.from === name.get(f) && x.rel === r.rel && x.to === name.get(t))) continue;
+    out.push({ from: name.get(f), rel: r.rel, to: name.get(t), why: String(r.why || '').slice(0, 240) });
+  }
+  return out;
 }
 
 // Returns { result, model } where result is { appName, terms, relations } as the page expects.
@@ -65,6 +88,10 @@ export async function propose(req) {
     } finally { clearTimeout(timer); }
   }
   const result = parseJsonReply(text);
+  if (req.kind === 'relations') {
+    if (!result || !Array.isArray(result.relations)) throw new UpstreamError('The model answered in the wrong shape. Try again, or send fewer terms.', 'invalid_json');
+    return { result: { relations: validRelations(req.terms, result.relations) }, model: process.env.KINDWORK_LLM_MOCK ? 'mock' : MODEL() };
+  }
   if (!result || !Array.isArray(result.terms)) throw new UpstreamError('The model answered in the wrong shape. Try again, or send fewer terms.', 'invalid_json');
   if (req.kind === 'terms') {
     const asked = new Set(req.terms.map(t => String(t.name).toLowerCase()));

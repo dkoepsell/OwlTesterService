@@ -110,6 +110,12 @@ def record_ingest(mode, filename, n_terms):
 def record_propose(mode, request_body, reply):
     row, salt = _row(mode)
     c = row.counts
+    if request_body.get("kind") == "relations":
+        c["relations_proposed"] = c.get("relations_proposed", 0) + len(
+            (reply.get("result") or {}).get("relations") or [])
+        _bump(c.setdefault("calls", {}), "propose_relations")
+        _save(row)
+        return
     if request_body.get("kind") == "task":
         c["source"] = "task"
     else:

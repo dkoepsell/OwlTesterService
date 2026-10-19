@@ -143,6 +143,29 @@ input:focus,select:focus,textarea:focus{border-color:var(--ink-3)}
 .block h3{margin-bottom:2px}
 .slots{display:flex;flex-direction:column;gap:12px;margin-top:10px}
 .slab{display:block;font-weight:700;font-size:13.5px;margin-bottom:5px}
+.slab b{font-weight:800}
+.slot.wide{padding:12px 0;border-top:1px solid var(--line)}
+.slot.wide:first-child{border-top:0;padding-top:0}
+.slot.wide .qh{margin:0 0 8px}
+.slot select{max-width:100%}
+.relp{font-size:12px}
+.connect{display:flex;flex-direction:column;gap:16px}
+.connect .row{margin:0}
+.conn .kwrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.conn .kwrow h3{margin:0}
+.teach summary{cursor:pointer;list-style-position:inside}
+.teach summary h3{display:inline}
+.teach p{max-width:72ch}
+.addrel{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.addrel input:not([type=hidden]){flex:1 1 180px;min-width:0}
+.addrel select{flex:0 0 auto;width:auto}
+.addmore{margin-top:6px}
+.addmore summary{cursor:pointer;font-size:13.5px;color:var(--ink-2)}
+.relprops,.kwrules{margin:10px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:10px}
+.relprops{list-style:none;padding-left:0}
+.relprops li{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.rsent{margin:0;font-weight:700}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px}
 .check{display:inline-flex;gap:6px;align-items:center;font-size:14.5px}
 .sigs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px 18px;margin-top:10px}
@@ -568,20 +591,45 @@ const BEARERS = ['thing', 'group', 'place'];
 const SLOTS = {
   status:     [{ r: 'heldBy', l: 'Held by', to: ['thing', 'group', 'role'] }, { r: 'issuedBy', l: 'Issued by', to: ['authority'] }],
   obligation: [{ r: 'owedBy', l: 'Owed by', to: AGENTS }, { r: 'owedTo', l: 'Owed to', to: AGENTS }],
-  happening:  [{ r: 'participant', l: 'Who or what takes part', to: ['thing', 'group', 'role'], multi: true }, { r: 'at', l: 'Where', to: ['place'] }, { r: 'during', l: 'During', to: ['period'] }],
+  happening:  [{ r: 'participant', l: 'Who or what takes part', to: ['thing', 'group', 'role'], multi: true }, { r: 'at', l: 'Where', to: ['place'] }, { r: 'during', l: 'During', to: ['period'] }, { r: 'partOf', l: 'A step in', to: ['happening'] }, { r: 'precedes', l: 'Comes before', to: ['happening'], multi: true }, { r: 'resultsIn', l: 'Results in', to: ['thing', 'record', 'status', 'obligation'], multi: true }],
   moment:     [{ r: 'marks', l: 'Marks the start or end of', to: ['happening'] }],
   quality:    [{ r: 'bearer', l: 'Measured on', to: BEARERS }],
   tendency:   [{ r: 'bearer', l: 'Belongs to', to: BEARERS }],
   function:   [{ r: 'bearer', l: 'Belongs to', to: BEARERS }],
   role:       [{ r: 'bearer', l: 'Held by', to: ['thing', 'group'] }],
   authority:  [{ r: 'bearer', l: 'Held by', to: ['thing', 'group'] }, { r: 'scope', l: 'Can grant or revoke', to: ['status'], multi: true }],
-  record:     [{ r: 'about', l: 'About', to: null }],
+  record:     [{ r: 'about', l: 'About', to: null }, { r: 'partOf', l: 'A section of', to: ['record'] }, { r: 'keptOn', l: 'Written in or kept on', to: ['thing'] }],
   code:       [{ r: 'designates', l: 'Labels', to: null }],
-  thing:      [{ r: 'at', l: 'Usually located at', to: ['place'] }],
-  group:      [{ r: 'member', l: 'Members are', to: ['thing', 'role'], multi: true }],
-  place: [], period: []
+  thing:      [{ r: 'at', l: 'Usually located at', to: ['place'] }, { r: 'partOf', l: 'Part of', to: ['thing'] }],
+  group:      [{ r: 'member', l: 'Members are', to: ['thing', 'role'], multi: true }, { r: 'partOf', l: 'Part of', to: ['group'] }],
+  place:      [{ r: 'partOf', l: 'Lies within', to: ['place'] }],
+  period:     [{ r: 'partOf', l: 'Falls within', to: ['period'] }, { r: 'precedes', l: 'Comes before', to: ['period'], multi: true }]
 };
-const RELNAMES = ['heldBy', 'issuedBy', 'scope', 'owedBy', 'owedTo', 'participant', 'at', 'during', 'marks', 'bearer', 'about', 'designates', 'member'];
+const RELNAMES = ['heldBy', 'issuedBy', 'scope', 'owedBy', 'owedTo', 'participant', 'at', 'during', 'marks', 'bearer', 'about', 'designates', 'member', 'partOf', 'precedes', 'resultsIn', 'keptOn'];
+// Each connection read aloud as the rule it becomes: "Every <a> ... some <b>". The
+// sentence is what the OWL says (an existential restriction), so it is what we teach.
+const SAY = {
+  heldBy: ['is held by', 'A status means nothing until someone has it. This names who can have one.'],
+  issuedBy: ['is issued by', 'Names the authority that grants it, so the status can be traced to whoever can also revoke it.'],
+  scope: ['can grant', 'Lists the statuses this authority has the power to grant or take away.'],
+  owedBy: ['is owed by', 'Names who has to act. A duty that nobody owes binds no one.'],
+  owedTo: ['is owed to', 'Names who can insist on it, or complain when it is not done.'],
+  participant: ['has taking part', 'The people and things involved while it happens.'],
+  at: { thing: ['is located at', 'Where it is normally found.'], happening: ['happens at', 'Where it takes place.'], moment: ['happens at', 'Where it takes place.'] },
+  during: ['happens during', 'The period it falls in, such as a contract period or a shift.'],
+  marks: ['marks the start or end of', 'A moment has no length; it is the edge of something that does.'],
+  bearer: { quality: ['is measured on', 'A quality cannot exist on its own. This names what it is a quality of.'], role: ['is held by', 'A role is something a person or thing takes on. This names who.'], authority: ['is held by', 'The person or body that holds the power.'], _: ['belongs to', 'It cannot exist on its own. This names what has it.'] },
+  about: ['is about', 'What the record describes, reports, or decides.'],
+  designates: ['labels', 'What the code stands for.'],
+  member: ['has as a member', 'Who or what makes up the group.'],
+  partOf: { happening: ['is a step in', 'The larger happening it belongs to, such as an inspection step within an inspection.'], record: ['is a section of', 'The larger record or document it belongs to.'], place: ['lies within', 'The larger place that contains it, such as a room within a building.'], period: ['falls within', 'The longer period that contains it.'], _: ['is part of', 'The larger whole it belongs to, such as a wheel in a car or a team in a department.'] },
+  precedes: ['comes before', 'Puts happenings in order. Every one of the first is followed by one of the second.'],
+  resultsIn: ['results in', 'What it produces or brings into being: a report, a decision, a license, a product.'],
+  keptOn: ['is written in or kept on', 'The physical thing that carries it, such as a paper form, a sign, or a database server.']
+};
+function sayOf(r, kw) { const x = SAY[r]; return Array.isArray(x) ? x : (x[kw] || x._ || Object.values(x)[0]); }
+const sentence = (a, r, b, kw) => r === 'participant' ? `Every ${a} has some ${b} taking part.` : `Every ${a} ${sayOf(r, kw)[0]} some ${b}.`;
+const relAllowed = (fkw, r, tkw) => { const sl = (SLOTS[fkw] || []).find(s => s.r === r); return !!sl && (sl.to === null || sl.to.includes(tkw)); };
 const SIGS = [
   ['held', 'People hold, own, or have it in force'],
   ['startsEnds', 'It has a start and an end'],
@@ -902,6 +950,11 @@ function genSchema(forCheck) {
       case 'group': refs('members', 'Members', 'member'); f.push({ key: 'notes', label: 'Notes', type: 'textarea' }); excl = `Members can join or leave while the group stays the same.`; break;
       case 'place': f.push({ key: 'address', label: 'Address or description', type: 'text' }); excl = `Things are located here. It has no material parts.`; break;
     }
+    // Structure shared across kinds: parts, order, outputs, carriers.
+    { const p = ref('partOf', ((SLOTS[kw] || []).find(x => x.r === 'partOf') || { l: 'Part of' }).l, 'partOf', false); if (p) says.push(sentence(N, 'partOf', nameOf(p), kw)); }
+    { const k = ref('keptOn', 'Kept on', 'keptOn', false); if (k) says.push(sentence(N, 'keptOn', nameOf(k), kw)); }
+    refs('precedes', 'Comes before', 'precedes').forEach(id => says.push(sentence(N, 'precedes', nameOf(id), kw)));
+    refs('resultsIn', 'Results in', 'resultsIn').forEach(id => says.push(sentence(N, 'resultsIn', nameOf(id), kw)));
     conf.filter(c => c.tid === t.id).forEach(c => notes.push(`Open question in the model: ${c.title}`));
     const myIri = iriOf(t);
     openFindings().filter(fd => fd.classes.includes(myIri)).forEach(fd => notes.push(`OwlTester (${fd.verdict}): ${fd.title}`));
@@ -970,16 +1023,22 @@ function localNames() {
   return map;
 }
 const lit = str => '"' + String(str).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\s+/g, ' ').trim() + '"@en';
-const PROP = { participant: 'obo:BFO_0000057', bearer: 'obo:BFO_0000197', about: 'obo:IAO_0000136', designates: 'obo:IAO_0000219', during: 'obo:BFO_0000199', member: 'obo:RO_0002351', heldBy: 'kwv:heldBy', issuedBy: 'kwv:issuedBy', scope: 'kwv:canGrant', owedBy: 'kwv:owedBy', owedTo: 'kwv:owedTo', marks: 'kwv:marks' };
+const PROP = { participant: 'obo:BFO_0000057', bearer: 'obo:BFO_0000197', about: 'obo:IAO_0000136', designates: 'obo:IAO_0000219', during: 'obo:BFO_0000199', member: 'obo:RO_0002351', heldBy: 'kwv:heldBy', issuedBy: 'kwv:issuedBy', scope: 'kwv:canGrant', owedBy: 'kwv:owedBy', owedTo: 'kwv:owedTo', marks: 'kwv:marks', precedes: 'obo:BFO_0000063', resultsIn: 'obo:RO_0002234', keptOn: 'obo:BFO_0000084' };
+// BFO keeps parthood apart on each side of the divide: continuant part of, occurrent part of.
+const OCCURRENT_KW = ['happening', 'moment', 'period'];
 const expandProp = p => p.startsWith('obo:') ? OBO + p.slice(4) : p.startsWith('kwv:') ? KWV + p.slice(4) : p;
 function nsBase() { return (S.ns && S.ns.trim() ? S.ns.trim() : `https://example.org/kindwork/${slugify(S.appName)}`).replace(/[#\/]+$/, ''); }
 function iriOf(t, L) { return t.iri || nsBase() + '#' + (L || localNames())[t.id]; }
 function refOf(t, L) { return t.iri ? `<${t.iri}>` : `:${L[t.id]}`; }
 const openFindings = () => (S.findings || []).filter(f => !f.reviewed && f.verdict !== 'pass');
-function propFor(r, kw) { if (r === 'at') return (kw === 'happening' || kw === 'moment') ? 'obo:BFO_0000066' : 'obo:BFO_0000171'; return PROP[r]; }
+function propFor(r, kw) {
+  if (r === 'at') return (kw === 'happening' || kw === 'moment') ? 'obo:BFO_0000066' : 'obo:BFO_0000171';
+  if (r === 'partOf') return OCCURRENT_KW.includes(kw) ? 'obo:BFO_0000132' : 'obo:BFO_0000176';
+  return PROP[r];
+}
 const CUSTOM_PROPS = [['kwv:heldBy', 'held by', 'Links a status to whoever holds it.'], ['kwv:issuedBy', 'issued by', 'Links a status to the authority that granted it.'], ['kwv:canGrant', 'can grant', 'Links an authority to a kind of status it can grant or revoke.'], ['kwv:owedBy', 'owed by', 'Links an obligation to whoever must act.'], ['kwv:owedTo', 'owed to', 'Links an obligation to whoever can claim it.'], ['kwv:marks', 'marks', 'Links a moment to the happening it starts or ends.']];
 const DATA_PROPS = { granted: 'grantedOn', expires: 'expiresOn', standing: 'standing', due: 'dueOn', start: 'startsAt', end: 'endsAt', when: 'occursAt', starts: 'startsOn', ends: 'endsOn', value: 'hasValue', unit: 'unit', measured: 'measuredAt', from: 'validFrom', until: 'validUntil', filed: 'filedOn', docref: 'documentReference', meaning: 'meaning', jurisdiction: 'jurisdiction', address: 'address' };
-const FIELD_REL = { holder: 'heldBy', issuer: 'issuedBy', owedBy: 'owedBy', owedTo: 'owedTo', bearer: 'bearer', about: 'about', designates: 'designates', at: 'at', during: 'during', marks: 'marks', participants: 'participant', members: 'member' };
+const FIELD_REL = { holder: 'heldBy', issuer: 'issuedBy', owedBy: 'owedBy', owedTo: 'owedTo', bearer: 'bearer', about: 'about', designates: 'designates', at: 'at', during: 'during', marks: 'marks', participants: 'participant', members: 'member', partOf: 'partOf', precedes: 'precedes', resultsIn: 'resultsIn', keptOn: 'keptOn' };
 
 function genOWL(sch) {
   const L = localNames(), base = nsBase();
@@ -1042,7 +1101,7 @@ function genSHACL(sch) {
     const props = [];
     for (const f of c.fields) {
       if (f.key === 'name') { props.push(`[ sh:path rdfs:label ; sh:minCount 1 ; sh:message ${lit(`Every ${c.name} needs a name or reference.`)} ]`); continue; }
-      const relKey = Object.keys(FIELD_REL).find(k => f.key === k || (k === 'participants' && f.key.startsWith('participants')) || (k === 'members' && f.key.startsWith('members')));
+      const relKey = Object.keys(FIELD_REL).find(k => f.key === k || (['participants', 'members', 'precedes', 'resultsIn'].includes(k) && f.key.startsWith(k) && /^\d*$/.test(f.key.slice(k.length))));
       if ((f.type === 'ref' || f.type === 'refs') && relKey) {
         const parts = [`sh:path ${propFor(FIELD_REL[relKey], c.kw)}`, `sh:class ${refOf(termById(f.ref), L)}`];
         if (f.req) parts.push('sh:minCount 1');
@@ -1217,7 +1276,7 @@ function importTriples(T) {
     return { id: uid(), name: label(c).slice(0, 80), desc: pick(c, DEF).slice(0, 300), a, sig: {}, iri: c, imp, prov: prov.slice(0, 5) };
   });
   const idOf = new Map(terms.map(t => [t.iri, t.id]));
-  const REV = { [OBO + 'BFO_0000057']: 'participant', [OBO + 'BFO_0000066']: 'at', [OBO + 'BFO_0000171']: 'at', [OBO + 'BFO_0000197']: 'bearer', [OBO + 'IAO_0000136']: 'about', [OBO + 'IAO_0000219']: 'designates', [OBO + 'BFO_0000199']: 'during', [OBO + 'RO_0002351']: 'member' };
+  const REV = { [OBO + 'BFO_0000057']: 'participant', [OBO + 'BFO_0000066']: 'at', [OBO + 'BFO_0000171']: 'at', [OBO + 'BFO_0000197']: 'bearer', [OBO + 'IAO_0000136']: 'about', [OBO + 'IAO_0000219']: 'designates', [OBO + 'BFO_0000199']: 'during', [OBO + 'RO_0002351']: 'member', [OBO + 'BFO_0000176']: 'partOf', [OBO + 'BFO_0000132']: 'partOf', [OBO + 'BFO_0000063']: 'precedes', [OBO + 'RO_0002234']: 'resultsIn', [OBO + 'BFO_0000084']: 'keptOn' };
   const LOCALREL = { heldBy: 'heldBy', issuedBy: 'issuedBy', canGrant: 'scope', owedBy: 'owedBy', owedTo: 'owedTo', marks: 'marks' };
   const rels = [], push = (f, r, t) => { if (f && t && f !== t && !rels.some(x => x.f === f && x.r === r && x.t === t)) rels.push({ f, r, t }); };
   list.forEach(c => {
@@ -1325,7 +1384,7 @@ async function hostPost(path, body) {
 }
 async function aiPropose(kind, payload) {
   if (HOST) return (await hostPost('/propose', { kind, ...payload })).result;
-  const prompt = kind === 'task' ? extractionPrompt(payload.task) : termsPrompt(payload.terms, payload.context);
+  const prompt = kind === 'task' ? extractionPrompt(payload.task) : kind === 'relations' ? relationsPrompt(payload.terms, payload.context) : termsPrompt(payload.terms, payload.context);
   return sample.json(prompt, { modelTier: 'default', signal: ctl ? ctl.signal : undefined });
 }
 async function saveFile(filename, data) {
@@ -1358,9 +1417,32 @@ c6: Was the thing that has it designed or made to do this?  y = function; n = te
 A body such as a board or agency is a group; its power to grant licenses is a separate term (an authority). A person is a thing; a job title is a role.
 
 Also give "signals", true ONLY when the text says so about that term: held (people hold, own, or have it in force), startsEnds (it has a start and an end), unshown (someone can have it without it showing), extended (it can be extended, renewed, or cancelled), changes (it can worsen, improve, or change physically), assigned (someone assigns or removes it), measured (it is measured on something).`;
+// Built from SLOTS so the prompt and the interview can never disagree.
+const REL_TABLE = RELNAMES.map(r => {
+  const uses = Object.keys(SLOTS).flatMap(k => SLOTS[k].filter(s => s.r === r).map(s => `${k} -> ${s.to ? s.to.join('/') : 'any term'}`));
+  return `${r} (${uses.join('; ')})`;
+}).join(', ');
+const REL_MEANING = 'A relation from A to B means: every A stands in it to some B. partOf is "a part or step of", precedes is "comes before", resultsIn is "produces or brings about", keptOn is "is written in or stored on".';
 const RELATIONS_PROMPT = `Then list relations between the terms, using only these names, only when the text supports them:
-heldBy (status -> thing/group/role), issuedBy (status -> authority), scope (authority -> a status it can grant), owedBy and owedTo (obligation -> thing/group/role/authority), participant (happening -> thing/group/role), at (happening or thing -> place), during (happening -> period), marks (moment -> happening), bearer (quality/role/tendency/function/authority -> thing/group/place), about (record -> any term), designates (code -> any term), member (group -> thing/role).
+${REL_TABLE}.
+${REL_MEANING}
 Do not invent relations the text does not support; missing links are useful findings.`;
+// Connections only, for terms whose kinds are already settled.
+function relationsPrompt(terms, context) {
+  const list = terms.slice(0, 60).map(t => `- ${t.name} (${t.kind})${t.desc ? ': ' + String(t.desc).slice(0, 300) : ''}`).join('\n');
+  return `You help people who are not ontologists connect the terms of a Basic Formal Ontology (BFO 2020) model. Each term already has its kind, given in brackets.
+${context ? `\nWHAT THE TERMS ARE FOR:\n"""\n${String(context).slice(0, 3000)}\n"""\n` : ''}
+TERMS (use exactly these names; do not add or rename terms):
+${list}
+
+List the relations between these terms, using only these names, and only from a kind on the left of the arrow to a kind on the right:
+${REL_TABLE}.
+${REL_MEANING}
+Only propose a relation that holds for every member of the first term, not just some. Prefer fewer, surer relations. For each, give a short plain reason a layperson can check.
+
+Reply with only JSON in exactly this shape:
+{"relations":[{"from":"<name>","rel":"heldBy","to":"<name>","why":"One plain sentence."}]}`;
+}
 function extractionPrompt(task) {
   return `You help people who are not ontologists model a business task with Basic Formal Ontology (BFO 2020), using plain questions.
 
@@ -1431,6 +1513,28 @@ function applyProposals(res) {
   return n;
 }
 
+// Suggested connections wait in S.relProps until the person accepts each one.
+// Only connections the interview itself would offer are kept.
+function applyRelationProposals(res) {
+  if (!res || !Array.isArray(res.relations)) throw { code: 'invalid_json' };
+  const byName = new Map(S.terms.filter(kwOf).map(t => [t.name.toLowerCase(), t]));
+  const props = [];
+  res.relations.forEach(x => {
+    const f = byName.get(String(x && x.from || '').trim().toLowerCase()), t = byName.get(String(x && x.to || '').trim().toLowerCase());
+    if (!f || !t || f === t || !relAllowed(kwOf(f), x.rel, kwOf(t))) return;
+    if (relsOf(f.id, x.rel).includes(t.id) || props.some(p => p.f === f.id && p.r === x.rel && p.t === t.id)) return;
+    props.push({ f: f.id, r: x.rel, t: t.id, why: String(x.why || '').trim().slice(0, 240) });
+  });
+  S.relProps = props.slice(0, 60);
+  return S.relProps.length;
+}
+function acceptRelProp(i) {
+  const p = (S.relProps || [])[i]; if (!p) return;
+  const sl = (SLOTS[kwOf(termById(p.f))] || []).find(s => s.r === p.r);
+  if (sl && !sl.multi) setRel(p.f, p.r, p.t); else addRel(p.f, p.r, p.t);
+  S.relProps.splice(i, 1);
+}
+
 // A pasted or uploaded list of terms: one per line, "Name: meaning", tab-separated, or CSV.
 function splitCsvLine(line) {
   const out = []; let cur = '', q = false;
@@ -1493,8 +1597,8 @@ const isCommitted = (t, blocked) => !!kwOf(t) && t.state !== 'proposed' && !(blo
 
 /* ---------- The engineer's view: keyword source, parsed by the same page ---------- */
 const KEYWORD_WORDS = Object.keys(KW);
-const REL_WORDS = { held_by: 'heldBy', issued_by: 'issuedBy', can_grant: 'scope', owed_by: 'owedBy', owed_to: 'owedTo', participant: 'participant', at: 'at', during: 'during', marks: 'marks', bearer: 'bearer', about: 'about', designates: 'designates', member: 'member', is_a: 'isA' };
-const REL_PLAIN = { heldBy: 'have a holder', issuedBy: 'have an issuer', scope: 'grant statuses', owedBy: 'have someone who owes it', owedTo: 'have someone who can claim it', participant: 'have participants', at: 'have a location', during: 'fall in a period', marks: 'mark a happening', bearer: 'have a bearer', about: 'be about something', designates: 'label something', member: 'have members' };
+const REL_WORDS = { held_by: 'heldBy', issued_by: 'issuedBy', can_grant: 'scope', owed_by: 'owedBy', owed_to: 'owedTo', participant: 'participant', at: 'at', during: 'during', marks: 'marks', bearer: 'bearer', about: 'about', designates: 'designates', member: 'member', part_of: 'partOf', precedes: 'precedes', results_in: 'resultsIn', kept_on: 'keptOn', is_a: 'isA' };
+const REL_PLAIN = { heldBy: 'have a holder', issuedBy: 'have an issuer', scope: 'grant statuses', owedBy: 'have someone who owes it', owedTo: 'have someone who can claim it', participant: 'have participants', at: 'have a location', during: 'fall in a period', marks: 'mark a happening', bearer: 'have a bearer', about: 'be about something', designates: 'label something', member: 'have members', partOf: 'be part of something', precedes: 'come before something', resultsIn: 'result in something', keptOn: 'be kept on something' };
 const KIND_PLAIN = k => (/^[aeiou]/.test(k) ? 'an ' : 'a ') + k;
 const orList = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + (a.length > 2 ? ',' : '') + ' or ' + a[a.length - 1];
 function lev(a, b) {
@@ -1650,6 +1754,21 @@ async function proposeTerms(withAI) {
   }
   ctl = null; commit();
 }
+let CX = { busy: false, msg: '' };
+async function proposeRelations() {
+  const placed = S.terms.filter(kwOf);
+  if (placed.length < 2) { CX = { busy: false, msg: 'Place at least two terms in the interview first.' }; render(); return; }
+  if (!canAI()) { CX = { busy: false, msg: 'Suggestions need an AI key. You can make every connection yourself below.' }; render(); return; }
+  ctl = new AbortController();
+  CX = { busy: true, msg: 'Looking for connections between your terms. This usually takes 20 to 60 seconds.' }; render();
+  try {
+    const n = applyRelationProposals(await aiPropose('relations', { terms: placed.map(t => ({ name: t.name, kind: kwOf(t), desc: t.desc })), context: S.task || S.termctx || '' }));
+    CX = { busy: false, msg: n ? `${n} suggested connection${n > 1 ? 's' : ''}. Read each sentence and keep only the ones that are always true.` : 'No new connections were suggested. You can add your own below.' };
+  } catch (e) {
+    CX = { busy: false, msg: e && e.code === 'cancelled' ? 'Stopped.' : sampleMessage(e) };
+  }
+  ctl = null; commit();
+}
 // Confirm a term. On a server host, the reasoner runs before the term counts as committed.
 let GATE = { busy: false, msg: '' };
 async function confirmTerm(id) {
@@ -1687,9 +1806,10 @@ function renderSteps(conf) {
   const tabs = [
     ['describe', '1', 'Describe', ''],
     ['interview', '2', 'Interview', (() => { const prop = S.terms.filter(t => t.state === 'proposed').length; return `<span class="count${und || prop ? ' alert' : ''}">${prop ? prop + ' to confirm' : und ? und + ' open' : S.terms.length}</span>`; })()],
-    ['resolve', '3', 'Resolve', `<span class="count${conf.length + openFindings().length ? ' alert' : ''}">${conf.length + openFindings().length}</span>`],
-    ['build', '4', TRIAGE ? 'Results' : 'Build', ''],
-    ...(TRIAGE ? [] : [['source', '5', 'Source', '']])
+    ['connect', '3', 'Connect', `<span class="count${(S.relProps || []).length ? ' alert' : ''}">${(S.relProps || []).length ? (S.relProps.length + ' to review') : connections().length}</span>`],
+    ['resolve', '4', 'Resolve', `<span class="count${conf.length + openFindings().length ? ' alert' : ''}">${conf.length + openFindings().length}</span>`],
+    ['build', '5', TRIAGE ? 'Results' : 'Build', ''],
+    ...(TRIAGE ? [] : [['source', '6', 'Source', '']])
   ];
   stepsEl.innerHTML = tabs.map(([k, n, l, c]) => `<button type="button" class="step" role="tab" id="tab-${k}" aria-selected="${S.tab === k}" aria-controls="view" data-act="tab" data-tab="${k}"><span class="n">${n}</span>${l}${c}</button>`).join('');
 }
@@ -1788,12 +1908,52 @@ function renderTaskPanel() {
     </div>`;
 }
 
-function slotUI(t, sl) {
+// One connection slot, written as the rule it makes: "Every <term> <verb> some [choice]".
+// In the Connect tab (wide) it also says why the connection matters and offers to add a missing term.
+function slotUI(t, sl, wide) {
+  const kw = kwOf(t);
   const cands = S.terms.filter(x => x.id !== t.id && kwOf(x) && (sl.to === null || sl.to.includes(kwOf(x))));
   const cur = relsOf(t.id, sl.r);
-  const fid = `slot-${sl.r}`;
-  if (sl.multi) return `<fieldset class="slot" style="border:0;padding:0;margin:0"><legend class="slab">${esc(sl.l)}</legend>${cands.length ? `<div class="checks">${cands.map(x => `<label class="check"><input type="checkbox" data-ch="relm" data-r="${sl.r}" value="${x.id}"${cur.includes(x.id) ? ' checked' : ''}> ${esc(x.name)}</label>`).join('')}</div>` : `<p class="sub">No matching terms yet.</p>`}</fieldset>`;
-  return `<div class="slot"><label class="slab" for="${fid}">${esc(sl.l)}</label><select id="${fid}" data-ch="rel" data-r="${sl.r}"><option value="">Not set</option>${cands.map(x => `<option value="${x.id}"${cur[0] === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>`;
+  const fid = `slot-${t.id}-${sl.r}`;
+  const [verb, why] = sayOf(sl.r, kw);
+  const lead = sl.r === 'participant' ? `Every <b>${esc(t.name)}</b> has taking part:` : `Every <b>${esc(t.name)}</b> ${esc(verb)} some`;
+  const ont = S.ont ? ` <code class="relp">${esc(propFor(sl.r, kw))}</code>` : '';
+  const hint = wide ? `<p class="qh">${esc(why)}${ont}</p>` : '';
+  const kinds = sl.to || [];
+  const form = wide && kinds.length ? `<form class="inline addrel" data-form="addrel" data-id="${t.id}" data-r="${sl.r}"><label class="sr" for="${fid}-new">New ${esc(orList(kinds))} for this connection</label><input id="${fid}-new" placeholder="Add a new ${esc(kinds[0])}" autocomplete="off">${kinds.length > 1 ? `<select aria-label="Kind of the new term">${kinds.map(k => `<option value="${k}">${k}</option>`).join('')}</select>` : `<input type="hidden" value="${kinds[0]}">`}<button type="submit" class="btn">Add</button></form>` : '';
+  // With nothing to choose, offer to add the missing term outright; otherwise keep it one click away.
+  const add = !form ? '' : cands.length ? `<details class="addmore"><summary>Or add a new ${esc(orList(kinds))}</summary>${form}</details>` : form;
+  const plural = k => k === 'authority' ? 'authorities' : k.endsWith('s') ? k + 'es' : k + 's';
+  const none = `<p class="sub">No ${sl.to ? esc(orList(sl.to.map(plural))) : 'terms'} in your list yet.${wide ? '' : ' Add one in the Connect step.'}</p>`;
+  if (sl.multi) return `<fieldset class="slot${wide ? ' wide' : ''}" style="border:0;padding:0;margin:0"><legend class="slab">${lead}</legend>${hint}${cands.length ? `<div class="checks">${cands.map(x => `<label class="check"><input type="checkbox" data-ch="relm" data-id="${t.id}" data-r="${sl.r}" value="${x.id}"${cur.includes(x.id) ? ' checked' : ''}> ${esc(x.name)}</label>`).join('')}</div>` : none}${add}</fieldset>`;
+  return `<div class="slot${wide ? ' wide' : ''}"><label class="slab" for="${fid}">${lead}</label>${hint}${cands.length ? `<select id="${fid}" data-ch="rel" data-id="${t.id}" data-r="${sl.r}"><option value="">Not set: leave it open</option>${cands.map(x => `<option value="${x.id}"${cur[0] === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : none}${add}</div>`;
+}
+
+// Every connection in the model (not the is-a links of the taxonomy).
+function connections() { return S.rels.filter(x => x.r !== 'isA' && termById(x.f) && termById(x.t) && kwOf(termById(x.f)) && kwOf(termById(x.t))); }
+
+function renderConnect() {
+  const placed = S.terms.filter(kwOf);
+  if (placed.length < 2) return `<section class="empty-pane"><h2>Place some terms first</h2><p>Connections join two terms whose kinds are settled. Answer the interview questions for at least two terms, then come back.</p><button type="button" class="btn primary" data-act="tab" data-tab="interview">Go to the interview</button></section>`;
+  const cs = connections(), linked = new Set(cs.flatMap(x => [x.f, x.t]));
+  const loose = placed.filter(t => !linked.has(t.id));
+  const props = S.relProps || [];
+  const intro = `<details class="block teach"${cs.length ? '' : ' open'}><summary><h3>What a connection is, and why it matters</h3></summary>
+    <p>So far you have sorted your terms into kinds: a license is a status, a worker is a thing, an inspection is a happening. A list sorted into kinds is a <b>taxonomy</b>. It says what each thing is, but not how the things go together.</p>
+    <p>An <b>ontology</b> also says how the kinds connect: who holds a license, who issues it, what an inspection is about, which step comes first. These connections are what let a tool or a reasoner answer questions like "which licenses have no issuer?"</p>
+    <p>Each connection is a rule about <b>every</b> member of the kind. "Every Electrical license is held by some Worker" means there is no license without a holder. If that is only sometimes true, leave the connection open; a rule that is wrong in some cases does more harm than a missing one.</p>
+    <p>Kindwork only offers connections that make sense for the two kinds, so you cannot, for example, say a happening is held by someone. When you check, the reasoner tests the rest against BFO 2020.</p></details>`;
+  const ai = `<div class="row">${CX.busy ? `<button type="button" class="btn" data-act="stop">Stop</button>` : `<button type="button" class="btn${props.length ? '' : ' primary'}" data-act="suggestrels"${canAI() ? '' : ' disabled'}>Suggest connections</button>`}<span class="status${CX.busy ? ' busy' : ''}" role="status">${esc(CX.msg || (canAI() ? 'AI reads your terms and suggests connections. Nothing is added until you keep it.' : 'Suggestions need an AI key. You can make every connection yourself below.'))}</span></div>`;
+  const review = props.length ? `<div class="block"><h3>Suggested connections · ${props.length}</h3><p class="sub">Keep a suggestion only if the sentence is true of every one, not just most.</p><ul class="relprops">${props.map((p, i) => { const f = termById(p.f), t = termById(p.t); return f && t ? `<li><p class="rsent">${esc(sentence(f.name, p.r, t.name, kwOf(f)))}</p>${p.why ? `<p class="qh">${esc(p.why)}</p>` : ''}<div class="row"><button type="button" class="btn" data-act="keeprel" data-i="${i}">Keep</button><button type="button" class="btn ghost" data-act="droprel" data-i="${i}">Leave out</button></div></li>` : ''; }).join('')}</ul><div class="row"><button type="button" class="btn ghost" data-act="keepallrels">Keep all ${props.length}</button></div></div>` : '';
+  const ord = { things: 0, records: 1, time: 2 };
+  const cards = [...placed].filter(t => (SLOTS[kwOf(t)] || []).length).sort((a, b) => ord[KW[kwOf(a)].fam] - ord[KW[kwOf(b)].fam])
+    .map(t => `<div class="block conn" id="conn-${t.id}"><div class="kwrow"><h3>${esc(t.name)}</h3>${chip(kwOf(t))}${linked.has(t.id) ? '' : '<span class="pill warn">not connected yet</span>'}</div><div class="slots">${SLOTS[kwOf(t)].map(sl => slotUI(t, sl, true)).join('')}</div></div>`).join('');
+  const read = cs.length ? `<div class="block"><h3>Your ontology, read aloud</h3><p class="sub">These ${cs.length} rule${cs.length > 1 ? 's' : ''} go into the ontology along with the kinds. Read them as a check: each should be true of every one.</p><ul class="kwrules">${cs.map(x => { const f = termById(x.f); return `<li>${esc(sentence(f.name, x.r, termById(x.t).name, kwOf(f)))}</li>`; }).join('')}</ul></div>` : '';
+  const check = HOST ? `<div class="row">${cs.length ? `<button type="button" class="btn primary" data-act="recheck"${GATE.busy ? ' disabled' : ''}>Check the connections with the reasoner</button>` : ''}${GATE.msg ? `<span class="status${GATE.busy ? ' busy' : ''}" role="status">${esc(GATE.msg)}</span>` : ''}<button type="button" class="btn ghost" data-act="tab" data-tab="resolve">Next: resolve</button></div>` : `<div class="row"><button type="button" class="btn ghost" data-act="tab" data-tab="resolve">Next: resolve</button></div>`;
+  return `<section class="connect">
+    <div class="rhead"><div><h2>Connect your terms</h2><p class="sub">${cs.length} connection${cs.length === 1 ? '' : 's'} among ${placed.length} terms.${loose.length ? ` ${loose.length} term${loose.length > 1 ? 's are' : ' is'} not connected to anything yet: ${loose.slice(0, 6).map(t => `<a href="#conn-${t.id}">${esc(t.name)}</a>`).join(', ')}${loose.length > 6 ? ', and more' : ''}.` : ' Every term is connected.'}</p></div></div>
+    ${intro}${ai}${review}${cards}${read}${check}
+  </section>`;
 }
 
 function renderDetail(t, conf) {
@@ -1806,7 +1966,7 @@ function renderDetail(t, conf) {
     ? `<div class="result fam-${KW[kw].fam}"><div class="eyebrow">Keyword</div><div class="kwrow">${chip(kw, true)}</div><p>${esc(KW[kw].plain)}</p>${S.ont ? `<p class="ontline">BFO 2020: ${esc(KW[kw].bfo)} · <code>${KW[kw].iri}</code></p>` : ''}</div>`
     : `<div class="result pending"><div class="eyebrow">Keyword</div><p style="margin-top:8px">Answer question ${w.path.length} to place this term.</p></div>`;
   const slots = kw ? (SLOTS[kw] || []) : [];
-  const slotHtml = slots.length ? `<div class="block"><h3>Connections</h3><p class="sub">These become links in the tool and checks in the rules.</p><div class="slots">${slots.map(sl => slotUI(t, sl)).join('')}</div></div>` : '';
+  const slotHtml = slots.length ? `<div class="block"><h3>Connections</h3><p class="sub">Each one is a rule about every ${esc(t.name)}. <button type="button" class="link" data-act="tab" data-tab="connect">Learn about connections</button></p><div class="slots">${slots.map(sl => slotUI(t, sl)).join('')}</div></div>` : '';
   const tc = conf.filter(c => c.tid === t.id);
   const flag = tc.length ? `<div class="flag" role="status">${tc.length} open conflict${tc.length > 1 ? 's' : ''} on this term: ${tc.map(c => esc(c.title)).join(' · ')} <button type="button" class="link" data-act="tab" data-tab="resolve">Resolve</button></div>` : '';
   return `<div class="fields">
@@ -1990,9 +2150,11 @@ function mountPreview() {
 
 function render() {
   const conf = findConflicts();
+  S.relProps = (S.relProps || []).filter(p => termById(p.f) && termById(p.t));
   ontEl.checked = !!S.ont;
   renderSteps(conf);
   if (S.tab === 'describe') view.innerHTML = renderDescribe();
+  else if (S.tab === 'connect') view.innerHTML = renderConnect();
   else if (S.tab === 'resolve') view.innerHTML = renderResolve(conf);
   else if (S.tab === 'build') { view.innerHTML = renderBuild(conf); if (!TRIAGE) { mountPreview(); renderFileBody(); } }
   else if (S.tab === 'source' && !TRIAGE) view.innerHTML = renderSource();
@@ -2076,6 +2238,10 @@ document.addEventListener('click', ev => {
     case 'savekit': saveKit(); break;
     case 'confirm': confirmTerm(b.getAttribute('data-id')); break;
     case 'recheck': runCheck(null).then(commit); break;
+    case 'suggestrels': proposeRelations(); break;
+    case 'keeprel': acceptRelProp(+b.getAttribute('data-i')); commit(); break;
+    case 'droprel': (S.relProps || []).splice(+b.getAttribute('data-i'), 1); commit(); break;
+    case 'keepallrels': while ((S.relProps || []).length) acceptRelProp(0); commit(); break;
     case 'proposeterms': proposeTerms(true); break;
     case 'addterms': proposeTerms(false); break;
     case 'savecsv': { const sch = genSchema(); save(sch.slug + '-classified.csv', genClassified()); break; }
@@ -2117,6 +2283,17 @@ document.addEventListener('submit', ev => {
   const kind = form.getAttribute('data-form'), input = form.querySelector('input'), v = input ? input.value.trim() : '';
   if (!v) { if (input) input.focus(); return; }
   if (kind === 'addterm') { const n = addTerm(v, null, ''); S.sel = n.id; S.tab = 'interview'; commit(); }
+  if (kind === 'addrel') {
+    // A missing term found while connecting: add it with its kind already decided, and link it.
+    const from = termById(form.getAttribute('data-id')), r = form.getAttribute('data-r');
+    const kw = (form.querySelector('select') || form.querySelector('input[type=hidden]')).value;
+    if (!from || !KW[kw] || !relAllowed(kwOf(from), r, kw)) return;
+    const n = S.terms.find(x => x.name.toLowerCase() === v.toLowerCase() && kwOf(x) === kw) || addTerm(v, kw, '');
+    const sl = SLOTS[kwOf(from)].find(s => s.r === r);
+    if (sl.multi) addRel(from.id, r, n.id); else setRel(from.id, r, n.id);
+    CX = { busy: false, msg: `Added ${n.name} as a ${kw} and connected it. Its own connections are listed below.` };
+    commit();
+  }
   if (kind === 'opt') { const c = findConflicts().find(x => x.id === form.getAttribute('data-c')); const o = c && c.opts[+form.getAttribute('data-i')]; if (o) { o.a(v); commit(); } }
 });
 document.addEventListener('input', ev => {
@@ -2144,7 +2321,7 @@ document.addEventListener('change', ev => {
   if (di === 'appname') { commit(); return; }
   if (di === 'tname') { const t = termById(S.sel); if (t && !t.name.trim()) t.name = 'Untitled'; commit(); return; }
   if (!k) return;
-  const t = termById(S.sel); if (!t) return;
+  const t = termById(el.getAttribute('data-id') || S.sel); if (!t) return;
   if (k === 'sig') { t.sig[el.getAttribute('data-k')] = el.checked; if (!el.checked) delete t.sig[el.getAttribute('data-k')]; }
   else if (k === 'rel') setRel(t.id, el.getAttribute('data-r'), el.value || null);
   else if (k === 'relm') toggleRel(t.id, el.getAttribute('data-r'), el.value, el.checked);
@@ -2153,6 +2330,6 @@ document.addEventListener('change', ev => {
 
 render();
 /* Hook for the Kindwork build service, which runs this same code server-side. Inert in the browser. */
-if (window.__KINDWORK_EXPORT__) window.__KINDWORK_EXPORT__({ parseKw, applySource, extractionPrompt, termsPrompt, applyExtraction, applyProposals, parseTermList, addTermsFromList, startModel, blockers, isCommitted, genClassified, S, walk, kwOf, findConflicts, genSchema, genOWL, genSHACL, genKW, genManifest, genTracker, genReadme, genReadmeTail, parseTurtle, parseRdfXml, importTriples, applyImport, applyManifest, applyFindings, openFindings, iriOf, localNames, nsBase, termById, relsOf, KW, PATHS, Q, SLOTS, RELNAMES, BFO, KWV });
+if (window.__KINDWORK_EXPORT__) window.__KINDWORK_EXPORT__({ parseKw, applySource, extractionPrompt, termsPrompt, relationsPrompt, applyRelationProposals, sentence, connections, applyExtraction, applyProposals, parseTermList, addTermsFromList, startModel, blockers, isCommitted, genClassified, S, walk, kwOf, findConflicts, genSchema, genOWL, genSHACL, genKW, genManifest, genTracker, genReadme, genReadmeTail, parseTurtle, parseRdfXml, importTriples, applyImport, applyManifest, applyFindings, openFindings, iriOf, localNames, nsBase, termById, relsOf, KW, PATHS, Q, SLOTS, RELNAMES, BFO, KWV });
 })();
 </script>

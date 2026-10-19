@@ -111,15 +111,15 @@ def term_row(pg, name):
 
 # --- B1 -------------------------------------------------------------------------------
 
-def test_b1_four_steps_in_triage_five_in_full(page, server, monkeypatch):
+def test_b1_five_steps_in_triage_six_in_full(page, server, monkeypatch):
     _, base = server
     open_page(page, base)
-    assert len(steps(page)) == 4
+    assert len(steps(page)) == 5
     monkeypatch.setenv("KINDWORK_MODE", "full")
     monkeypatch.setenv("KINDWORK_TOKEN", "t")
     page.set_extra_http_headers({"Authorization": "Bearer t"})
     open_page(page, base)
-    assert len(steps(page)) == 5
+    assert len(steps(page)) == 6
 
 
 # --- B2 -------------------------------------------------------------------------------
@@ -245,3 +245,73 @@ def test_key_bar_rejects_a_bad_key(page, server):
     page.fill("#kw-keybar input[type=password]", "not-a-key")
     page.click("#kw-keybar button:has-text('Save')")
     page.wait_for_selector("#kw-keybar :text('does not look like an Anthropic API key')")
+
+
+# --- Connect: relations between terms, taught as rules ------------------------------------
+
+PATHS = {"thing": {"r1": "n", "r2": "n", "c1": "n", "c2": "n", "c3": "y"},
+         "happening": {"r1": "y", "a1": "n", "a2": "y"},
+         "record": {"r1": "n", "r2": "y", "b1": "n", "b2": "n", "b3": "n"}}
+
+
+def seed_shop(pg):
+    import json
+    terms = [{"id": f"t{i}", "name": n, "desc": "", "a": PATHS[k], "sig": {}}
+             for i, (n, k) in enumerate([("Car", "thing"), ("Wheel", "thing"),
+                                         ("Inspection", "happening"),
+                                         ("Inspection report", "record")])]
+    model = {"terms": terms, "rels": [], "findings": [], "tab": "connect", "appName": "Shop", "ont": False}
+    pg.add_init_script(f"localStorage.setItem('kindwork-v1', {json.dumps(json.dumps(model))})")
+
+
+def rules(pg):
+    return pg.locator("ul.kwrules li").all_inner_texts()
+
+
+def test_connect_teaches_and_builds_relations(page, server, monkeypatch):
+    _, base = server
+    seed_shop(page)
+    open_page(page, base)
+    teach = page.inner_text("details.teach")
+    assert "taxonomy" in teach and "ontology" in teach and "every" in teach
+    assert "Every Wheel is part of some" in page.inner_text("#conn-t1")
+
+    # A connection made by hand is read back as the rule it becomes.
+    page.select_option("#slot-t1-partOf", "t0")
+    page.wait_for_selector("ul.kwrules li")
+    assert rules(page) == ["Every Wheel is part of some Car."]
+
+    # Suggestions arrive pending, filtered to what the kinds allow, and count only once kept.
+    monkeypatch.setenv("KINDWORK_LLM_MOCK", str(INGEST / "mock-relations.json"))
+    with page.expect_response(lambda r: r.url.endswith("/kindwork/v1/propose")) as resp:
+        page.click('[data-act="suggestrels"]')
+    assert resp.value.status == 200
+    page.wait_for_selector("ul.relprops li")
+    suggested = page.locator("ul.relprops .rsent").all_inner_texts()
+    assert suggested == ["Every Inspection results in some Inspection report.",
+                         "Every Inspection has some Car taking part."]
+    assert len(rules(page)) == 1
+    page.click('[data-act="keepallrels"]')
+    assert len(rules(page)) == 3
+
+    # A missing term found while connecting is added with its kind and linked.
+    form = page.locator('form[data-form="addrel"][data-id="t3"][data-r="keptOn"]')
+    form.locator("xpath=..").locator("summary").click()
+    form.locator("input:not([type=hidden])").fill("Paper form")
+    form.locator("button").click()
+    page.wait_for_function("() => [...document.querySelectorAll('ul.kwrules li')].length === 4")
+    assert "Every Inspection report is written in or kept on some Paper form." in rules(page)
+
+    # The reasoner checks the connections against BFO 2020.
+    with page.expect_response(lambda r: r.url.endswith("/kindwork/v1/check")) as resp:
+        page.click('[data-act="recheck"]')
+    assert resp.value.status == 200
+    page.wait_for_function("() => !document.querySelector('.status.busy')")
+    assert "Checked. 0 open findings." in page.inner_text(".connect")
+
+    # And the downloaded ontology carries them.
+    page.click('[data-act="tab"][data-tab="build"] >> nth=0')
+    with page.expect_download() as dl:
+        page.click('[data-act="saveowl"]')
+    ttl = Path(dl.value.path()).read_text(encoding="utf-8")
+    assert "obo:BFO_0000176" in ttl and "obo:RO_0002234" in ttl and "obo:BFO_0000084" in ttl

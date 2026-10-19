@@ -1,0 +1,8 @@
+{"relations": [
+  {"from": "Wheel", "rel": "partOf", "to": "Car", "why": "Every wheel belongs to a car."},
+  {"from": "Inspection", "rel": "resultsIn", "to": "Inspection report", "why": "Each inspection produces a report."},
+  {"from": "Inspection", "rel": "participant", "to": "Car", "why": "A car is inspected."},
+  {"from": "Wheel", "rel": "partOf", "to": "Inspection", "why": "Not allowed: a thing cannot be part of a happening."},
+  {"from": "Car", "rel": "heldBy", "to": "Wheel", "why": "Not allowed: a thing has no holder."},
+  {"from": "Ghost", "rel": "partOf", "to": "Car", "why": "Not one of the terms sent."}
+]}
