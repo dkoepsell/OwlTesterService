@@ -212,7 +212,7 @@ def find_datatype_problems(tbox, other_graphs):
     return bad_props, expanded, nodes, literal_counts
 
 
-def _robot_profiles(tbox):
+def _robot_profiles(tbox, budget=120):
     from kindwork.module_reasoner import _robot_cmd
     cmd = _robot_cmd()
     if not cmd:
@@ -224,10 +224,10 @@ def _robot_profiles(tbox):
         for prof in ("DL", "EL", "QL", "RL"):
             try:
                 r = subprocess.run(cmd + ["validate-profile", "--profile", prof, "--input", path],
-                                   capture_output=True, text=True, timeout=120, check=False)
+                                   capture_output=True, text=True, timeout=budget, check=False)
                 out[prof] = r.returncode == 0
             except (OSError, subprocess.TimeoutExpired):
-                out[prof] = None
+                out[prof] = None   # not decided within its share of the budget
     return out
 
 
@@ -269,7 +269,7 @@ def run_r2(ctx):
     prof = None
     if ctx.options.get("profiles", True) and len(tbox):
         try:
-            prof = _robot_profiles(patch.apply(tbox))
+            prof = _robot_profiles(patch.apply(tbox), budget=ctx.budget.cap("reasoner"))
         except Exception as e:  # noqa: BLE001
             prof = {"error": str(e)[:200]}
     if prof is None:

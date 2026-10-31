@@ -80,14 +80,22 @@ def run_audit(source, profile="general", config_path=None, budget=None, max_expl
         prof = get_profile(art.config["profile"])
     if artifact_name:
         art.name = artifact_name
-    b = Budget(total=budget or art.config.get("budget"),
+    env_budget = os.environ.get("AUDIT_BUDGET")
+    b = Budget(total=budget or art.config.get("budget") or (float(env_budget) if env_budget else None),
                max_explanations=max_explanations if max_explanations is not None
                else art.config.get("max_explanations"))
     ctx = AuditContext(art, prof, b, options={"explain": explain}, progress=progress)
     try:
         ctx.progress("R0")
         run_r0(ctx)
-        for code, title, fn in STAGES:
+        # The report lists stages R0..R10; they run cheap first, so a budget that
+        # runs out can only cut short the expensive stages (reasoning and SHACL),
+        # never the quick ones. R3 needs R2's datatype patch, and R4 is linked to
+        # R5 afterwards, so this order changes no result.
+        expensive = ("R3", "R4")
+        ordered = [s for s in STAGES if s[0] not in expensive] + \
+            [s for s in STAGES if s[0] in expensive]
+        for code, title, fn in ordered:
             if code not in prof["stages"]:
                 ctx.skip(code, title, f"Not part of the '{prof['name']}' profile.")
                 continue

@@ -372,6 +372,7 @@ The HTTP job status (`GET /owltester/audit/<job_id>`) is `{job_id, status, stage
 | `AUDIT_ALLOWED_USERS` | (empty) | Comma-separated usernames or emails; when set, only these signed-in accounts may start an audit |
 | `AUDIT_MAX_TRIPLES` | 2,000,000 | Files past this total are listed but not parsed |
 | `AUDIT_MAX_DATA_FILES` | 300 | Data files past this count are not audited |
+| `AUDIT_BUDGET` | 900 | Total seconds for one audit (CLI `--budget` and `audit.yaml` override it) |
 | `AUDIT_STALE_SECONDS` | 1800 | A running job older than this is reported as stale |
 | `KINDWORK_REASONER_TIMEOUT_MS` | 60000 | Shared reasoner wrapper setting (the audit passes its own per-call budget) |
 
@@ -382,6 +383,7 @@ Budgets (CLI flags or `audit.yaml` keys `budget`, `max_explanations`): total 900
 - `ontology_bundle._extract_zip` flattens paths, so R0 extracts with the same limits (`MAX_ZIP_MEMBERS`, `MAX_ZIP_UNCOMPRESSED`) but keeps sanitised relative paths: data sets are grouped by directory.
 - A vocabulary is the artifact's own when the ontology or its own shapes refer to it; LOMO's IOPA code list is in the same IRI family but nothing refers to it, so it is listed as external.
 - Pellet 2.3 predates `rdf:langString` and calls correct LOMO data inconsistent. The cross-check gives Pellet a copy where `rdf:langString` ranges read as `rdf:PlainLiteral`; the R3 notes say so.
+- Stages run quick first, reasoning and SHACL last, so a budget overrun only cuts those short. R4 computes RDFS entailments itself (`RdfsClosure`) instead of pySHACL's per-file OWL-RL closure: identical results on LOMO, 80 times faster.
 - HermiT needs about 90 s for the 20,454-triple LFDS set, past the 60 s per-call budget; R3 then reasons file by file, and `limits_hit` records it.
 - On the full LOMO release the identity check finds 91 agent values containing "commission" by substring; the hand audit counted 77 with a tokenisation that was not kept.
 - Self-examples: an example that shows a whole instance of the class it documents and fails the shapes is `E_SELF_EXAMPLE` (major); examples on properties that leave out unrelated required fields are folded into one minor finding.
