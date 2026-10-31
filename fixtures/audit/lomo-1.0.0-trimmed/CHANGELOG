@@ -1,0 +1,566 @@
+# Changelog
+
+All notable changes to this project are recorded in this file.
+
+## 2026-07-10 — 1.0.0 (major)
+
+### First Stable Release
+
+LOMO reaches version 1.0.0 — the ontology, SHACL shapes, tooling, and documentation are considered stable for production use.
+
+#### SHACL Shapes
+
+- Rewrote SHACL shapes: per-scheme validation, instance data shapes, moved to `shapes/` folder
+- Fixed instance data to use correct vocabulary namespace URIs
+
+#### Interoperability Assessment (IOPA)
+
+- Added LFDS assessment serialisation and IOPA portal submission workflow
+- Interoperability binding via 'all' + article↔paragraph coverage
+- Project LOMO+IOPA assessments into IEP POST payloads
+- Added `scripts/submit.py` for POSTing assessment payloads to the Interoperable Europe Portal
+- Handle 'no barriers' assessments and PublicService description fallback
+- Extract 4.4 assessment subtables and serialise as IOPA assessments
+- Make LFDS assessments submission-shaped for the IOPA portal
+- Asset description = name alignment
+- Dropped `dctype:Software` → `adms:Asset` alignment axiom
+
+#### Extraction Improvements
+
+- Support the 'Policy domain' requirements-table variant
+- Robust table classification recovers dropped LFDS tables
+- Classify tables with a leading spanning/title row
+
+#### Documentation
+
+- Added project README
+
+#### Maintenance
+
+- Bumped ontology version to `1.0.0` and updated `dcterms:modified` to `2026-07-10`
+- Bumped `pyproject.toml` version to `1.0.0`
+- Removed outdated script
+
+#### Files Changed
+
+- `ontologies/lomo-ontology.ttl` — version bump
+- `shapes/lomo-shapes.ttl` — rewritten SHACL shapes
+- `scripts/submit.py` — new IEP submission script
+- `scripts/` — IOPA and extraction scripts updated
+- `data/**/*.ttl` — instance data namespace fixes
+- `pyproject.toml` — version bump
+- `README.md` — new file
+
+## 2026-07-09 — 0.8.2 (patch)
+
+### Patch Release
+
+This release migrates the ontology and vocabulary namespaces to their permanent URIs under `http://data.europa.eu/leg/`, fixes SHACL shapes consistency, and cleans up documentation and tooling.
+
+#### Namespace Changes
+
+- Updated ontology namespace from `http://data.europa.eu/lomo` to `http://data.europa.eu/leg/lomo`
+- Updated vocabulary namespaces from `http://data.europa.eu/lomo/ontologies/<name>` to `http://data.europa.eu/leg/<name>`:
+  - `http://data.europa.eu/leg/deontic-modality#`
+  - `http://data.europa.eu/leg/result-category#`
+  - `http://data.europa.eu/leg/temporal-function#`
+  - `http://data.europa.eu/leg/digital-dimensions#`
+- Updated all SPARQL queries, Python scripts, instance data, and SHACL shapes to use new URIs
+
+#### SHACL Shapes Fixes
+
+- Fixed `sh:hasValue` URIs for `DeonticModality_inScheme`, `ResultCategory_inScheme`, `TemporalFunction_inScheme` to point to correct vocabulary namespaces
+- Fixed `Concept_inScheme` `sh:in` list to use new vocabulary scheme URIs
+- Removed stale "Constitutive Rule" from deontic modality label/prefLabel/comment/scopeNote enumerations
+- Updated `DeonticModality_comment` values to match current `rdfs:comment` text
+- Added trigger to `TemporalFunction_comment` enumeration
+- Updated `ConceptScheme_comment` and `ConceptScheme_description` to include Digital Dimensions and correct counts
+- Removed stale `hasTopConcept_class_2` and `hasTopConcept_class_4` referencing non-existent classes
+
+#### Documentation & Tooling
+
+- Fixed `vann:usageExample` strings in `lomo-ontology.ttl` and `result-category.ttl` to use correct vocabulary IRIs instead of stale `lomo:` prefix references
+- Removed dead vocabulary import code from `run_queries.py`
+- Removed dead query-rewriting regex logic from `run_queries.py`
+- Simplified `controlled_vocabularies.rq` — removed obsolete `owl:intersectionOf` branch
+- Removed internal/external distinction from controlled vocabularies HTML template
+
+#### Maintenance
+
+- Bumped ontology version to `0.8.2` and updated `dcterms:modified` to `2026-07-09`
+- Bumped `pyproject.toml` version to `0.8.2`
+
+#### Files Changed
+
+- `ontologies/lomo-ontology.ttl` — namespace, version bump, usageExample fixes
+- `ontologies/deontic-modality.ttl` — namespace update
+- `ontologies/digital-dimensions.ttl` — namespace update
+- `ontologies/result-category.ttl` — namespace update, usageExample fix
+- `ontologies/temporal-function.ttl` — namespace update
+- `lomo-shapes.ttl` — namespace URIs fixed, stale enumerations corrected
+- `sparql/*.rq` — namespace updates
+- `scripts/queries/*.rq` — namespace updates
+- `scripts/run_queries.py` — namespace updates, dead code removed
+- `templates/partials/section-controlled-vocabularies.html` — removed internal/external labels
+- `templates/partials/head.html` — fixed version URI to use `http://data.europa.eu/leg/lomo/releases/`
+- `data/**/*.ttl` — namespace updates in instance data
+- `pyproject.toml` — version bump
+
+## 2026-07-02 — 0.8.1 (patch)
+
+### Patch Release
+
+This release adds two new ConstitutiveRule subclasses, three new rule-to-rule relationship properties, restricts the permitted values of `lomo:withRole`, and improves object property documentation.
+
+#### Ontology Enhancements
+
+- **Issue #106**: Added `lomo:InstitutionalRule` as a subclass of `lomo:ConstitutiveRule` for provisions that establish institutional entities, legal statuses, powers, or organ composition
+- **Issue #107**: Added `lomo:ScopeRule` as a subclass of `lomo:ConstitutiveRule` for provisions that define the material, personal, or territorial scope of application of a legal act
+- **Issue #34**: Added defeasibility and rule-to-rule relationship properties:
+  - `lomo:specifies` / `lomo:isSpecifiedBy` — for rules that determine underdetermined content of a more general rule without normative conflict
+  - `lomo:derogatesFrom` / `lomo:isDerogatedBy` — for rules that establish an incompatible normative qualification, supporting substitutive and blocking derogations
+  - `lomo:relatesTo` — super-property of both `specifies` and `derogatesFrom`, enabling generic querying across all rule-to-rule relationships
+- **Issue #112**: Restricted `lomo:withRole` to three permitted OP AT Role concepts:
+  - Added `owl:allValuesFrom` + `owl:oneOf` restriction on `lomo:AgentRole` enumerating `ADDRESSER`, `ADDRESSEE`, `BENEF`
+  - Added `skos:scopeNote` on `lomo:withRole` documenting the restriction and its rationale
+  - Added `:LomoPermittedRoles` `skos:Collection` grouping the three permitted concepts
+  - Updated `vann:usageExample` on `lomo:AgentRole` to reference canonical AT Role URIs
+
+#### Documentation & Query Improvements
+
+- Updated object property SPARQL query and HTML template to expose sub-property and inverse-of relationships in the generated documentation
+
+#### Maintenance
+
+- Bumped ontology version to `0.8.1` and updated `dcterms:modified` to `2026-07-02`
+- Updated `diagram-layout.json` with revised diagram layout
+- Updated `.gitignore`
+- Added `sh:in` constraint in `lomo-shapes.ttl` (`shapes:AgentRole_withRole`) enforcing the `withRole` restriction at SHACL validation level
+
+#### Files Changed
+
+- `ontologies/lomo-ontology.ttl` — InstitutionalRule, ScopeRule, defeasibility properties, withRole restriction, version bump
+- `lomo-shapes.ttl` — New `shapes:AgentRole` node shape with `sh:in` constraint on `lomo:withRole`
+- `sparql/object_properties.rq` — Added sub-property and inverse-of to query
+- `templates/partials/section-object-properties.html` — Display sub-property and inverse-of relationships
+- `diagram-layout.json` — Updated layout
+- `.gitignore` — Minor update
+
+## 2026-06-15 — 0.8.0 (minor)
+
+### Minor Release
+
+This release introduces the splitting of SKOS controlled vocabularies into separate files and treats them as external authority tables in the documentation. It also adds various examples to classes and properties.
+
+#### Ontology Enhancements
+
+- **Issue #79**: Updated ActionResult example from EU 2024/1350
+- **Issue #80**: Added examples for ActionResultType class
+- **Issue #110**: Added skos:example and vann:usageExample to LegalRule
+- **SKOS Vocabulary Splitting**:
+  - Split DeonticModalityScheme into separate file `ontologies/deontic-modality.ttl`
+  - Split TemporalFunctionScheme into separate file `ontologies/temporal-function.ttl`
+  - Split ResultCategoryScheme into separate file `ontologies/result-category.ttl`
+  - Split DigitalDimensionsScheme into separate file `ontologies/digital-dimensions.ttl`
+  - Each vocabulary file now uses its own namespace (e.g., `http://data.europa.eu/lomo/ontologies/deontic-modality#`)
+  - Updated properties to reference these external vocabularies via `rdfs:seeAlso` instead of `rdfs:range` with `owl:hasValue`
+  - Removed `owl:imports` statements for these local vocabularies
+- **Issue #109**: Replaced outdated Constitutive Rule examples and removed TFEU-based example
+
+#### Documentation & Query Improvements
+
+- **Controlled Vocabularies**: Split vocabularies now appear as external authority tables instead of internal concept schemes
+- **Concepts Section**: Removed empty Concepts section from documentation templates
+- Updated all template partials to use correct section indices after removing concepts section
+
+#### Maintenance
+
+- Bumped ontology version to `0.8.0` and updated `dcterms:modified` to `2026-06-15`
+- Updated version references in ontology metadata
+
+#### Files Changed
+
+- `ontologies/lomo-ontology.ttl` — Property updates, namespace changes, examples added
+- `ontologies/deontic-modality.ttl` — New file with DeonticModalityScheme
+- `ontologies/temporal-function.ttl` — New file with TemporalFunctionScheme
+- `ontologies/result-category.ttl` — New file with ResultCategoryScheme
+- `ontologies/digital-dimensions.ttl` — New file with DigitalDimensionsScheme
+- `sparql/concepts.rq` — Deleted (no longer needed)
+- `scripts/run_queries.py` — Updated query_map and section count
+- `templates/main.html` — Removed section-concepts reference
+- `templates/partials/section-concepts.html` — Deleted
+- `templates/partials/section-controlled-vocabularies.html` — Updated section index
+- `templates/partials/section-object-properties.html` — Updated section index
+- `templates/partials/section-datatype-properties.html` — Updated section index
+
+## 2026-04-28 — 0.7.0 (minor)
+
+### Minor Release
+
+This release introduces significant improvements to property documentation, examples, and query capabilities. The ontology has been enhanced with comprehensive usage notes, examples, and clarifications across multiple properties to improve usability and understanding.
+
+#### Ontology Enhancements
+
+- **Issue #78**: Added explicit reference to COM(2025) 860 final in Action Result example
+- **Issue #81**: Simplified Agent class definition by removing "that participates in an action"
+- **Issue #82**: Clarified distinction between ResultCategory and ActionResultType with enhanced definitions and examples
+- **Issue #83**: Enhanced atTime property with comprehensive scopeNote and examples
+- **Issue #84**: Added examples and scopeNote to finishedBy property
+- **Issue #85**: Added examples and scopeNote to finishes property
+- **Issue #86**: Enhanced forAgent property with scopeNote, example, and usage examples
+- **Issue #87**: Updated hasAgentRole examples to be more concrete and added second example
+- **Issue #88**: Added comprehensive scopeNote and examples to hasFunction property
+- **Issue #89**: Refined immediatelyAfter/immediatelyBefore property definitions
+- **Issue #90**: Enhanced hasResult usage examples with three detailed scenarios
+- **Issue #91**: Added extensive scopeNotes and examples to isManifestedIn and manifests properties
+- **Issue #92**: Added scopeNote and examples to overlaps property
+- **Issue #93**: Enhanced startedBy and starts properties with scopeNotes and examples
+- **Issue #94**: Removed hasAnnotation property completely
+- **Issue #95**: Added comprehensive scopeNote to instant property documenting all supported datatype values
+- **Issue #97**: Added example and usageExample to termLabel property using GDPR Art 4(1) example
+- **Issue #99**: Updated report definition to be more specific and added usage example
+
+#### Documentation & Query Improvements
+
+- **SPARQL Query Enhancement**: Modified `sparql/datatype_properties.rq` to include `skos:example` in query results
+- **Template Updates**: Updated `templates/partials/section-datatype-properties.html` to render examples
+- **Fixed Syntax Error**: Corrected FILTER statement in SPARQL query for proper skos:example extraction
+
+#### Maintenance
+
+- Bumped ontology version to `0.7.0` and updated `dcterms:modified` to `2026-04-28`
+- Updated version references in ontology metadata and documentation
+- Removed outdated file references
+
+#### Files Changed
+
+- `ontologies/lomo-ontology.ttl` — All property enhancements and clarifications
+- `sparql/datatype_properties.rq` — Added skos:example extraction capability
+- `templates/partials/section-datatype-properties.html` — Added example rendering support
+- `pyproject.toml` — Version bump to 0.7.0
+- `template-vocbench.html` — Minor template updates
+- `templates/partials/section-controlled-vocabularies.html` — Template improvements
+
+## 2026-03-30 — 0.6.10 (patch)
+
+### Patch
+
+- **Ontology & Documentation**
+  - Updated `:establishedInResource` to `:establishedIn` across the ontology and instances.
+  - Updated scope notes and examples to reflect the new property name.
+  - Fixed typos and improved clarity in comments and scope notes.
+  - Updated ELI references in examples to use the correct format.
+  - Added `rdfs:seeAlso` to the OP authority table.
+  - Removed the `LegalCondition` class from the model.
+  - Updated definitions and scope notes for `:SubstantiveRule` and `:ImplementationAndOversightRule`.
+  - Added `vann:usageExample` for various classes and properties.
+  - Updated SPARQL queries to fetch `vann:usageExample` values.
+  - Modified `template-vocbench.html` to render `skos:example` as plain text and `vann:usageExample` as Turtle code blocks.
+
+- **Maintenance**
+  - Bumped ontology version to `0.6.10` and updated `dcterms:modified` to `2026-03-19`.
+  - Updated version references in ontology metadata and documentation.
+
+- **Files changed**: `ontologies/lomo-ontology.ttl`, `data/financial-reporting-dir_2013_34-lomo-manual.ttl`, `sparql/classes.rq`, `sparql/object_properties.rq`, `sparql/concepts.rq`, `template-vocbench.html`, `CHANGELOG`.
+
+## 2026-03-19 — 0.6.9 (patch)
+
+### Patch
+
+- **Template & Styling**
+  - Removed card styling from entities in `template-vocbench.html` to simplify the visual presentation.
+  - Fixed duplicated newlines in Turtle code blocks by updating the regex in `scripts/run_queries.py` to handle line endings more robustly.
+
+- **Ontology & Documentation**
+  - Adjusted the example/turtle instantiation for properties to ensure consistency and correctness.
+
+- **Maintenance**
+  - Updated version references in ontology metadata and documentation.
+
+- **Files changed**: `template-vocbench.html`, `scripts/run_queries.py`, `ontologies/lomo-ontology.ttl`, `CHANGELOG`.
+
+## 2026-02-17 — 0.6.8 (patch)
+
+### Patch
+
+ - **Ontology & Documentation**
+   - Standardized all `skos:example` formatting by removing numbered prefixes ("1)", "2)", "3)", "Example 1:", etc.) for consistency across all classes and properties.
+   - Split concatenated multi-example blocks into individual `skos:example` entries for better organization and semantic structure.
+   - Updated SPARQL query in `sparql/classes.rq` to generate HTML list items (`<ul><li>...</li></ul>`) instead of `<br/>` separators.
+   - Modified `template-vocbench.html` to use triple mustaches `{{{ }}}` for proper HTML rendering without escaping.
+   - Examples now render as clean bulleted lists in documentation output.
+
+ - **Maintenance**
+   - Bumped ontology version to `0.6.8` and updated `dcterms:modified` to `2026-02-17`.
+   - Updated version references in ontology metadata and documentation.
+
+ - **Files changed**: `ontologies/lomo-ontology.ttl`, `sparql/classes.rq`, `template-vocbench.html`, `CHANGELOG`.
+
+## 2026-02-04 — 0.6.6 (patch)
+
+### Patch
+
+ - **Ontology**
+   - Clarified and expanded `:Right` definition and `skos:scopeNote`; added `skos:example` and `vann:usageExample` (GDPR examples such as Art.15 and Art.16) and additional right examples (rectification, access to health data, transmission of health data).
+   - Added bibliographic `rdfs:seeAlso` citations relevant to rights and permissive norms (Athan et al., Hohfeld, Lindahl, von Wright, Alchourrón & Bulygin, Raz, Hart, Sartor, Governatori et al.).
+   - Incorporated Permission and Prohibition examples and clarified distinctions between Permission and Right; minor formatting fixes to permission comments.
+
+ - **Maintenance**
+   - Bumped ontology version to `0.6.6` and updated `dcterms:modified` to `2026-02-04` (`ontologies/lomo-ontology.ttl`).
+   - Bumped packaging and documentation metadata to `0.6.6` (`pyproject.toml`, `index.html`, `output_queries.json`).
+
+ - **Files changed**: `ontologies/lomo-ontology.ttl`, `pyproject.toml`, `index.html`, `output_queries.json`, `CHANGELOG`.
+
+## 2026-02-02 — 0.6.5 (patch)
+
+### Patch
+
+ - **Ontology**
+   - Added `vann:usageExample` property and imported the `vann` namespace to store Turtle instantiations separately from `skos:example` (plain text examples).
+   - Updated various classes and properties to include `vann:usageExample` instantiations where appropriate.
+   - Bumped `owl:versionInfo` and `owl:versionIRI` to `0.6.5` in `ontologies/lomo-ontology.ttl`.
+
+ - **Documentation & Tooling**
+   - Updated SPARQL queries to fetch `vann:usageExample` values (`sparql/classes.rq`, `sparql/object_properties.rq`, `sparql/concepts.rq`).
+   - Modified `template-vocbench.html` to render `skos:example` as plain text and `vann:usageExample` as Turtle code blocks, and adjusted CSS to preserve newlines while reducing excessive vertical whitespace.
+
+ - **Maintenance**
+   - Bumped packaging and documentation metadata to `0.6.5` (`pyproject.toml`, `index.html`, `output_queries.json`).
+
+ - **Files changed**: `ontologies/lomo-ontology.ttl`, `sparql/classes.rq`, `sparql/object_properties.rq`, `sparql/concepts.rq`, `template-vocbench.html`, `pyproject.toml`, `index.html`, `output_queries.json`.
+
+## 2026-02-02 — 0.6.4 (patch)
+
+### Patch
+
+ - **Ontology**
+   - Updated `:Obligation` definition and refined its `skos:scopeNote` to clarify duty structure, foundational patterns (Hohfeld/Lindahl), and common linguistic markers.
+   - Consolidated example list into a single `skos:example` entry attached to `:Obligation` (preserves full multi-line examples and explanatory notes).
+   - Added multiple `rdfs:seeAlso` bibliographic references relevant to deontic logic and normative modelling.
+
+ - **Maintenance**
+   - Bumped version metadata to `0.6.4` (`ontologies/lomo-ontology.ttl`, `pyproject.toml`, `index.html`, `output_queries.json`).
+
+ - **Files changed**: `ontologies/lomo-ontology.ttl`, `pyproject.toml`, `index.html`, `output_queries.json`.
+
+## 2026-01-28 — 0.6.3 (patch)
+
+### Patch
+ - **Ontology**
+   - Updated definition and refined comments for `:PrescriptiveRule` to improve clarity and legal precision.
+   - Added functional subclasses of `:PrescriptiveRule` to represent distinct prescriptive rule types.
+   - Updated `rdfs:domain` of `:hasCategory` from `:PrescriptiveRule` to `:LegalRule` for broader applicability.
+   - Updated requirement-type references to use dataset URIs for consistency across instances.
+
+ - **Modelling**
+   - Clarified distinction between implementation/oversight norms vs substantive legal norms and updated modelling guidance accordingly.
+
+ - **Terminology**
+   - Replaced agent role term **"bearer"** with **"addresser"** to ensure consistent wording across instances and documentation.
+
+ - **Documentation**
+   - Improved LOMO use cases and documentation; clarified usage of `:ConstitutiveRule` in relation to `:PrescriptiveRule`, and updated examples.
+
+ - **Files changed**: `ontologies/lomo-ontology.ttl`, documentation and instance files (various commits).
+
+## 2026-01-19 — 0.6.2 (patch)
+
+### Patch
+
+- **Version bump:** Updated packaging and ontology version to `0.6.2` (`pyproject.toml`, `ontologies/lomo-ontology.ttl`).
+- **Diagram fixes** Moved to use cytoscape.js v3.4.0 to resolve layout saving issues in the ontology diagram in `template-vocbench.html`.
+
+## 2026-01-19 — 0.6.1 (patch)
+
+### Patch
+
+- **LFDS properties relocation:** Placed LFDS-specific properties and related LFDS vocabulary blocks at the bottom of `ontologies/lomo-ontology.ttl` to improve separation between core LOMO content and LFDS-specific extensions.
+- **Version bump:** Updated packaging and ontology version to `0.6.1` (`pyproject.toml`, `ontologies/lomo-ontology.ttl`).
+
+## 2026-01-16 — 0.6.0 (minor)
+
+### Modelling changes
+
+- **Renames:** Renamed core ontology classes:
+  - `:LegalInformationObject` → `:LegalRule` (root class for legal fragments)
+  - `:LegalRequirement` → `:PrescriptiveRule` (prescriptive norms that carry deontic modalities)
+
+- **Property domain/range adjustments:** Properties whose domain previously referenced `:LegalRequirement` or `:LegalInformationObject` were updated to use `:PrescriptiveRule` or `:LegalRule` respectively (examples include `:hasDeonticModality`, `:produces`, `:hasRequirementType`, `:hasCategory`, `:references`, and domain/range clarifications for `:establishedInResource`).
+
+### Changes since 0.5.4
+
+ - `ontologies/lomo-ontology.ttl` — renames and modelling refactor described above (class renames, domain/range updates, scope note clarifications).
+ - `pyproject.toml` — packaging version bump to `0.6.0`.
+
+If you want, I can add a more detailed, per-commit list or paste the git diff showing the exact lines changed in `ontologies/lomo-ontology.ttl`.
+
+## 2026-01-16 — 0.5.4 (patch)
+
+### Ontology Editorial Fixes
+
+- **Metadata bump:** `ontologies/lomo-ontology.ttl` version updated to `0.6.4` and `dcterms:modified` set to `2026-01-16`.
+- **Editorial & reorganisation changes:** The file contains a number of editorial corrections, wording clarifications, and a reorganisation of the controlled-vocabulary individuals and SKOS concept-scheme blocks (several scheme/individual blocks were moved toward the end of the file under a consolidated "Individuals - Controlled vocabularies" section).
+- **IRI adjustments:** The `cdm:` prefix declaration was removed and CDM IRIs are now used inline (replaced with the full CDM IRI `<http://publications.europa.eu/ontology/cdm#...>` where required).
+- **Property and wording refinements:** Small refinements to property comments and scope notes (examples: `:atTime`, `:hasFrequency`, `:overlaps`, `:hasResult` and `:Frequency` wording changes).
+
+### Documentation & Tooling
+
+- **SPARQL & Documentation queries:** Added a controlled-vocabularies query and more comprehensive ontology metadata extraction to support richer generated documentation (`sparql/controlled_vocabularies.rq`, `sparql/ontology_metadata.rq`). Updated `summary.md` to include generated summaries.
+- **Documentation generator enhancements:** Improved `scripts/run_queries.py` to implement HTML annotation and citation features, simplify and refactor annotation helpers (including `annotate_see_also_html`), and make the output more robust for the template renderer.
+- **Template improvements:** Multiple updates to `template-vocbench.html` to improve structure and rendering compatibility with the enhanced query outputs and annotations.
+- **Packaging / build config:** Updated project packaging and build metadata (`pyproject.toml`, `poetry.toml`, `poetry.lock`) to support the documentation build and new dependencies.
+- **Tests:** Updated `tests/test_references.py` to reflect changes in annotation output and template rendering.
+
+## 2026-01-15 — 0.5.3 (patch)
+
+### Ontology Maintenance
+
+- **Rename root fragment class:** Renamed the LOMO-native root class `:LegalFragment` to `:LegalInformationObject` (symbol `:LegalInformationObject`), and updated labels, comments and scope notes accordingly to use the new human-readable name "Legal Information Object".
+- **Established resource mapping:** Removed the `owl:equivalentClass cdm:fragment_resource_legal` statement from the root class and instead added the CDM fragment class (`cdm:fragment_resource_legal`) as part of the `:establishedInResource` property's range (union with `<http://data.europa.eu/eli/ontology#LegalResource>`). This keeps the ontology's internal class name cleaner while preserving CDM mapping on provenance links.
+- **Subclass updates:** Updated `:LegalRequirement` and `:ConstitutiveRule` to be `rdfs:subClassOf :LegalInformationObject` and adjusted related scope notes and examples.
+- **Removed `:setDefinition`:** Deleted the `:setDefinition` property (used previously to link fragments to their internal Definition instances). Replaced with guidance that `:Definition` instances are modeled as a subclass of `:ConstitutiveRule` and that applications should use `:usesDefinition` or project-specific containment patterns where appropriate.
+- **Documentation updates:** Updated `skos:scopeNote` and other explanatory text throughout `ontologies/lomo-ontology.ttl` to reflect the rename and the `:setDefinition` removal.
+
+### Files Modified
+- `ontologies/lomo-ontology.ttl` — renamed root class, adjusted `:establishedInResource` range, removed `:setDefinition`, updated scope notes and subclass references.
+
+
+## 2026-01-14 — 0.5.2 (patch)
+
+### Ontology Enhancements
+
+- **Digital Dimensions Integration**: Integrated LFDS Digital Dimensions classification into main ontology
+  - Added `DigitalDimension` class as a subclass of `skos:Concept` with owl:equivalentClass restriction
+  - Added `DigitalDimensionsScheme` SKOS concept scheme for digital dimension categories
+  - Added four digital dimension concepts:
+    - `Data`: Requirements related to data collection, transmission, storage, quality, and reuse
+    - `Observation`: Discrete data points, measurements, rates, and thresholds (narrower concept of Data)
+    - `DigitalPublicService`: Requirements related to digital public services
+    - `DigitalSolutions`: Requirements related to digital infrastructure and software systems
+  - Updated `:hasCategory` property with proper domain (`LegalRequirement`) and range (`DigitalDimension`)
+  - Removed separate `lomo-digital-dimensions.ttl` file (now integrated into main ontology)
+
+### Metadata & Documentation
+
+- **Ontology Metadata**: Added `dcterms:editor` property to ontology metadata
+- **ReSpec Configuration**: Fixed W3C ReSpec validation errors in documentation template
+  - Changed `specStatus` from "WD" to "base"
+  - Added `group: "base"` configuration option
+  - Ensures proper W3C group association for documentation
+
+### Files Modified
+- `ontologies/lomo-ontology.ttl`: Version bumped to 0.5.2, digital dimensions integrated
+- `template-vocbench.html`: ReSpec configuration updated
+
+### Files Removed
+- `ontologies/lomo-digital-dimensions.ttl`: Content integrated into main ontology
+
+## 2026-01-14 — 0.5.1 (patch)
+
+### Infrastructure & Documentation
+
+- **CI/CD Pipeline**: Added automated documentation generation to `.gitlab-ci.yml`
+  - New `build` stage that installs dependencies from `requirements.txt`
+  - Automatically runs `scripts/run_queries.py` to generate fresh documentation
+  - Deploys generated `lomo-docs.html` to GitLab Pages
+  
+- **Documentation Generation System**: Implemented automated SPARQL-based documentation generation
+  - Added `scripts/run_queries.py`: Python script that queries the ontology and generates HTML documentation
+  - Added `template-vocbench.html`: VocBench-compatible Mustache template for documentation rendering
+  - Added 7 SPARQL query files in `sparql/` directory:
+    - `ontology_metadata.rq`: Extracts ontology metadata
+    - `authors.rq` & `editors.rq`: Extracts contributor information
+    - `classes.rq`: Extracts class definitions and descriptions
+    - `concepts.rq`: Extracts SKOS concept scheme information
+    - `object_properties.rq` & `datatype_properties.rq`: Extracts property definitions
+  - Added `requirements.txt`: Python dependencies (rdflib, chevron, pyparsing)
+
+- **Ontology Updates**:
+  - Declared controlled vocabulary classes as subclasses of `skos:Concept`
+  - Added SKOS ontology import for proper vocabulary management
+  - Declared formal equivalence between `DeonticModality` class and `DeonticModalityScheme`
+  - Removed `owl:imports` of ELI ontology (resolving technical issues)
+
+- **Repository Maintenance**:
+  - Updated `.gitignore` to exclude generated files (`output_queries.json`, `lomo-docs.html`)
+  - Code structure refactored for improved readability and maintainability
+
+### Files Modified
+- `.gitlab-ci.yml`, `.gitignore`, `ontologies/lomo-ontology.ttl`, `lomo-docs.html` (regenerated)
+
+### Files Added
+- `scripts/run_queries.py`, `template-vocbench.html`, `requirements.txt`
+- `sparql/*.rq` (7 query files)
+
+## 2026-01-14 — 0.5.0 (minor)
+
+### Breaking Changes — Class Hierarchy Restructuring
+
+This release introduces a significant restructuring of the ontology to resolve conceptual conflicts where `LegalRequirement` was too broad, `ConstitutiveRule` was mis-classified as a deontic modality, and `Definition` was incorrectly positioned in the hierarchy.
+
+#### New Class: `LegalFragment`
+- Added `:LegalFragment` as the LOMO-native root class for all legal fragments.
+- Declared `owl:equivalentClass` to both `cdm:fragment_resource_legal` (Common Data Model) and `eli:LegalInformationObject` (ELI-LO), ensuring interoperability while allowing LOMO to be used independently.
+- Added `cdm:` prefix for `http://publications.europa.eu/ontology/cdm#`.
+
+#### Restructured Class Hierarchy
+```
+:LegalFragment (root - any legal fragment)
+├── :LegalRequirement (prescriptive rules with deontic modalities)
+└── :ConstitutiveRule (constitutive facts and definitions)
+    └── :Definition (specialized constitutive rule)
+```
+
+#### `LegalRequirement` Restricted to Prescriptive Rules
+- Now `rdfs:subClassOf :LegalFragment` (previously `owl:Thing`).
+- Updated definition to clarify it only covers norms that prescribe actions (obligation, permission, prohibition, right).
+- Aligned with ELI-LO's `LegalNorm` concept.
+
+#### `ConstitutiveRule` Converted from Modality to Class
+- Changed from `owl:NamedIndividual, :DeonticModality, skos:Concept` to `owl:Class`.
+- Now `rdfs:subClassOf :LegalFragment`.
+- Added `owl:disjointWith :LegalRequirement`.
+- **Removed from `DeonticModalityScheme`** — constitutive rules are NOT deontic modalities.
+
+#### `Definition` Repositioned
+- Now `rdfs:subClassOf :ConstitutiveRule` (previously `owl:Thing`).
+- Correctly positioned as a specialized kind of constitutive rule.
+
+#### `DeonticModalityScheme` Updated
+- Removed `ConstitutiveRule` from top concepts.
+- Now only includes: `Obligation`, `Permission`, `Prohibition`, `Right`.
+
+#### Property Updates
+- `:hasDeonticModality`: Clarified it only applies to `LegalRequirement`.
+- `:produces`: Clarified it only applies to prescriptive rules.
+- `:setDefinition`: Changed domain from `LegalRequirement` to `:LegalFragment`.
+- `:establishedInResource`, `:legalText`: Added scope notes for all fragment types.
+
+### Other Changes
+- Bumped version to **0.5.0**. 
+- Updated `owl:versionIRI` to `<http://data.europa.eu/lomo/ontology/0.5.0>`.
+- Files modified: `ontologies/lomo-ontology.ttl`, `lomo-docs.html`.
+
+## 2026-01-08 — 0.4.1 (patch)
+
+- Bumped patch version to **0.4.1**. 
+- Fixed incorrect `xml:` prefix mapping (now correctly points to `http://www.w3.org/XML/1998/namespace`) in the ontology and instance files.
+- Standardised temporal class name usage in LOMO to `:TemporalSpecification` and removed stray references to deprecated names.
+- Corrected `:setDefinition` label (now "sets definition") and added `rdfs:domain :LegalRequirement`.
+- Added machine-readable metadata to the ontology header: `owl:versionIRI` and `dcterms:license` (EUPL v1.2 reference).
+- Files modified: `ontologies/lomo-ontology.ttl`, `data/antidumping-microdisks-lrmo-instances.ttl`, `data/financial-reporting-lrmo-instances.ttl`, `data/vehicle-registration-lrmo-instances.ttl`, `data/fisheries-lrmo-instances.ttl`.
+
+## 2026-01-08 — 0.4.0 LOMO rename
+
+- Renamed ontology from **LRMO** to **LOMO** (Legal Obligation Metadata Ontology).
+- Updated ontology IRI/base to `http://data.europa.eu/lomo` and prefix to `lomo:`.
+- Replaced occurrences of `lrmo:` with `lomo:` in `ontologies/lomo-ontology.ttl` (examples and metadata).
+- Updated ontology metadata: title changed to "Legal Obligation Metadata Ontology (LOMO)" and creator updated accordingly.
+- File modified: `ontologies/lomo-ontology.ttl`.
+
+## 2026-07-16 1.0.0 fix/license-cc-by-4-0
+
+### Changed
+- Updated `dcterms:license` in `lomo-ontology.ttl` from EUPL to CC BY 4.0
+  (http://publications.europa.eu/resource/authority/licence/CC_BY_4_0),
+  as requested by the EU Vocabularies team for the ontology publication.

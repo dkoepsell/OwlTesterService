@@ -54,6 +54,20 @@ requires_java = pytest.mark.skipif(
 )
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "java: needs a Java runtime (HermiT/Pellet); "
+                                       "skipped cleanly without one")
+
+
+def pytest_collection_modifyitems(config, items):
+    if _java_available():
+        return
+    skip = pytest.mark.skip(reason="needs a Java runtime for the reasoner")
+    for item in items:
+        if "java" in item.keywords:
+            item.add_marker(skip)
+
+
 def grant_anon_files(client, *file_ids):
     """Make ``file_ids`` the anonymous test client's own uploads.
 

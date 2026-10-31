@@ -3,7 +3,7 @@
 **Target repo:** `OwlTesterService` (dkoepsell)
 **Role of this feature:** audit a *released ontology artifact* (ontology, controlled vocabularies, SHACL shapes and instance data, usually shipped as a zip) the way a careful reviewer would, and produce one report with a scorecard, located findings and suggested fixes.
 **Goal:** what was done by hand for LOMO 1.0.0 on 31 Oct 2026 (see "Reference case") becomes one upload and one report.
-**Status:** plan only. No code in this change.
+**Status:** built. Code in `owltester/audit/` (engine), `owltester/audit_service.py` (HTTP), `templates/audit_*.html`; tests in `tests/test_audit.py`; fixtures in `fixtures/audit/`. The JSON report is documented in the appendix.
 
 Do not introduce em-dashes into any user-facing copy, docstrings, or report templates in this project.
 
@@ -339,3 +339,48 @@ Ship lenses after R0 to R10 are stable. The SOoL kernel and the LOF ODPs are the
 2. **Depth:** R3 explanation, R6, R7, R8, R10, R2b.
 3. **Surface:** async job, HTTP endpoints, HTML page, Markdown export, upload option.
 4. **Alignment and lenses:** R9 profiles, then section 9.
+
+---
+
+## Appendix: the JSON report (`AuditReport.to_dict()`)
+
+Keys are stable; new keys may be added, existing keys keep their meaning.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `artifact` | string | Archive name (top folder of the zip, or the directory or file name) |
+| `audited_at` | string | ISO 8601 time, UTC |
+| `tool_version` | string | Git short hash of OwlTester (or `OWLTESTER_VERSION`) |
+| `profile` | string | `general`, `bfo` or `sool` |
+| `verdict` | string | `fail` if any critical finding, `warn` if any major, else `pass` |
+| `severity_counts` | object | `{critical, major, minor, info}` counts |
+| `scorecard` | list | One row per stage: `{stage, check, status, worst, findings, summary}` |
+| `manifest` | object | R0: `name`, `files_total`, `rdf_files`, `triples`, `roles` (role, or `role (external)`, to paths), `data_sets` (name to `{files, legacy, paths}`), `owned_namespaces`, `imports` (`resolved`, `unresolved`), `config`, `config_unknown_keys`, `files` (per file: `path, kind, role, scope, triples, data_set, error, ontology_iri, version_iri, role_source, notes`) |
+| `stages` | object | Stage code (`R0`..`R10`, `R2b`) to `{title, status, summary, notes}`; `status` is `pass`, `warn`, `fail`, `skipped` or `error`; `notes` holds stage detail (R3: verdicts per TBox, data set and file; R4: `{files, failing, violations}` per data set) |
+| `findings` | list | Sorted by severity, then stage. Each: `id` (`R5-1`), `stage`, `code`, `severity` (`critical`, `major`, `minor`, `info`), `title`, `message`, `files`, `count` (occurrences folded into the finding), `iri`, `evidence` (code-specific; R3 inconsistencies carry `minimal_triples` in Turtle, `minimal`, `causes`, `labels`), `related` (ids of findings that explain this one), `fix`, `suggested_rewrite` |
+| `patches` | list | `{name, detail, ...}`, for example the datatype patch |
+| `limits_hit` | list | `{stage, limit, detail}` for every budget or size limit that cut work short |
+| `lenses` | list | Section 9 coverage tables: `{lens, title, about, rows: [{id, group, node, question, candidates: [{iri, term, label, evidence}], more, status, note, source}]}`; `status` is `proposed`, `confirmed`, `rejected` or `no candidates` |
+
+The HTTP job status (`GET /owltester/audit/<job_id>`) is `{job_id, status, stage, progress, artifact, profile, started_at, finished_at, error}`, plus `report` (the object above) when `status` is `done`. `status` is `queued`, `running`, `done`, `error` or `stale`.
+
+### Configuration
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `AUDIT_MODE` | `signed-in` | `public` lets anonymous visitors run audits |
+| `AUDIT_MAX_TRIPLES` | 2,000,000 | Files past this total are listed but not parsed |
+| `AUDIT_MAX_DATA_FILES` | 300 | Data files past this count are not audited |
+| `AUDIT_STALE_SECONDS` | 1800 | A running job older than this is reported as stale |
+| `KINDWORK_REASONER_TIMEOUT_MS` | 60000 | Shared reasoner wrapper setting (the audit passes its own per-call budget) |
+
+Budgets (CLI flags or `audit.yaml` keys `budget`, `max_explanations`): total 900 s, each reasoner call 60 s, explanation 120 s per file for 3 files, SHACL 60 s per file.
+
+### Notes from building it
+
+- `ontology_bundle._extract_zip` flattens paths, so R0 extracts with the same limits (`MAX_ZIP_MEMBERS`, `MAX_ZIP_UNCOMPRESSED`) but keeps sanitised relative paths: data sets are grouped by directory.
+- A vocabulary is the artifact's own when the ontology or its own shapes refer to it; LOMO's IOPA code list is in the same IRI family but nothing refers to it, so it is listed as external.
+- Pellet 2.3 predates `rdf:langString` and calls correct LOMO data inconsistent. The cross-check gives Pellet a copy where `rdf:langString` ranges read as `rdf:PlainLiteral`; the R3 notes say so.
+- HermiT needs about 90 s for the 20,454-triple LFDS set, past the 60 s per-call budget; R3 then reasons file by file, and `limits_hit` records it.
+- On the full LOMO release the identity check finds 91 agent values containing "commission" by substring; the hand audit counted 77 with a tokenisation that was not kept.
+- Self-examples: an example that shows a whole instance of the class it documents and fails the shapes is `E_SELF_EXAMPLE` (major); examples on properties that leave out unrelated required fields are folded into one minor finding.

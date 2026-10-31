@@ -1,0 +1,11 @@
+@prefix :      <https://w3id.org/audit-mini/shapes#> .
+@prefix onto:  <https://w3id.org/audit-mini/onto#> .
+@prefix mod:   <https://w3id.org/audit-mini/modality/> .
+@prefix sh:    <http://www.w3.org/ns/shacl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+:RuleShape a sh:NodeShape ;
+    sh:targetClass onto:Rule ;
+    sh:property [ sh:path onto:requires ; sh:minCount 1 ; sh:maxCount 1 ; sh:class onto:Action ] ;
+    sh:property [ sh:path onto:hasModality ; sh:minCount 1 ; sh:in ( mod:Must mod:May ) ] ;
+    sh:property [ sh:path onto:title ; sh:minCount 1 ; sh:datatype xsd:string ] .

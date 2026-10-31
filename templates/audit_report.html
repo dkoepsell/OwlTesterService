@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block title %}Audit: {{ report.artifact }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  {% include "audit_report_body.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const lensUrl = {{ url_for('owltester.audit_lens_review', job_id=job_id)|tojson }};
+    const draftBase = {{ url_for('owltester.audit_status', job_id=job_id)|tojson }} + '/lens/';
+
+    document.querySelectorAll('.lens-review').forEach(btn => btn.addEventListener('click', async () => {
+        const tr = btn.closest('tr');
+        const res = await fetch(lensUrl, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({lens: tr.dataset.lens, row: tr.dataset.row, status: btn.dataset.status})
+        });
+        const body = await res.json();
+        const badge = tr.querySelector('.lens-status');
+        if (!res.ok) { alert(body.error || 'Could not save the review.'); return; }
+        badge.textContent = body.status;
+        badge.className = 'badge lens-status bg-' + (body.status === 'confirmed' ? 'success' : 'secondary');
+    }));
+
+    document.querySelectorAll('.lens-ai').forEach(btn => btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Drafting...';
+        const res = await fetch(draftBase + encodeURIComponent(btn.dataset.lens) + '/draft', {method: 'POST'});
+        const body = await res.json();
+        if (!res.ok) { alert(body.error || 'The AI draft failed.'); btn.disabled = false; btn.textContent = 'Draft with AI (your own key)'; return; }
+        window.location.reload();
+    }));
+})();
+</script>
+{% endblock %}
