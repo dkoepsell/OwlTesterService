@@ -104,11 +104,11 @@ try:
     # The full artifact audit adds its routes to the same blueprint (POST
     # /owltester/audit, GET /owltester/audit/<job_id>...) plus the /audit/<job_id> page.
     from owltester.audit_service import audit_pages_bp as _audit_pages_bp
-    from owltester.audit_service import audit_mode as _audit_mode
+    from owltester.audit_service import may_start_audit as _may_start_audit
     _owltester_configure()
     app.register_blueprint(_owltester_bp)
     app.register_blueprint(_audit_pages_bp)
-    app.config['AUDIT_MODE_PUBLIC'] = _audit_mode() == 'public'
+    app.context_processor(lambda: {'may_start_audit': _may_start_audit})
     logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)

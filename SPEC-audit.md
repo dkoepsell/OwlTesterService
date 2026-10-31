@@ -369,6 +369,7 @@ The HTTP job status (`GET /owltester/audit/<job_id>`) is `{job_id, status, stage
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `AUDIT_MODE` | `signed-in` | `public` lets anonymous visitors run audits |
+| `AUDIT_ALLOWED_USERS` | (empty) | Comma-separated usernames or emails; when set, only these signed-in accounts may start an audit |
 | `AUDIT_MAX_TRIPLES` | 2,000,000 | Files past this total are listed but not parsed |
 | `AUDIT_MAX_DATA_FILES` | 300 | Data files past this count are not audited |
 | `AUDIT_STALE_SECONDS` | 1800 | A running job older than this is reported as stale |

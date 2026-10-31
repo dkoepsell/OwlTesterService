@@ -341,6 +341,35 @@ def test_audit_needs_sign_in_by_default(flask_app, monkeypatch, tmp_path):
     assert res.status_code == 401
 
 
+def _signed_in_client(flask_app, username):
+    from models import User, db
+    with flask_app.app_context():
+        user = User.query.filter_by(username=username).first()
+        if user is None:
+            user = User(username=username, email=f"{username}@example.test", password_hash="x")
+            db.session.add(user)
+            db.session.commit()
+        uid = user.id
+    client = flask_app.test_client()
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(uid)
+        sess["_fresh"] = True
+    return client
+
+
+def test_allowlist_limits_who_may_start_an_audit(flask_app, monkeypatch, tmp_path):
+    monkeypatch.delenv("AUDIT_MODE", raising=False)
+    monkeypatch.setenv("AUDIT_ALLOWED_USERS", "owner@example.test")
+    other = _signed_in_client(flask_app, "someone")
+    res = other.post("/owltester/audit", data={}, headers={"Accept": "application/json"})
+    assert res.status_code == 403
+    assert b"Full audits are not open" in other.get("/upload").data
+    owner = _signed_in_client(flask_app, "owner")
+    res = owner.post("/owltester/audit", data={}, headers={"Accept": "application/json"})
+    assert res.status_code == 400          # allowed through; rejected only for the empty upload
+    assert b"Start the audit" in owner.get("/upload").data
+
+
 @pytest.mark.java
 def test_audit_http_flow(flask_app, monkeypatch, tmp_path):
     monkeypatch.setenv("AUDIT_MODE", "public")

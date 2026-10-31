@@ -105,8 +105,7 @@
                         data and reads the CI setup. You get one report with a scorecard, located findings
                         and suggested fixes. Nothing in the archive is executed, and nothing is downloaded.
                     </p>
-                    {% set audit_public = config.get('AUDIT_MODE_PUBLIC') %}
-                    {% if current_user.is_authenticated or audit_public %}
+                    {% if may_start_audit is defined and may_start_audit() %}
                     <form action="{{ url_for('owltester.audit_start') }}" method="post" enctype="multipart/form-data">
                         <div class="mb-3">
                             <input type="file" class="form-control" name="files" multiple required
@@ -129,6 +128,8 @@
                         </button>
                         <span class="small text-muted ms-2">A large release takes several minutes.</span>
                     </form>
+                    {% elif current_user.is_authenticated %}
+                    <p class="small mb-0">Full audits are not open to all accounts yet.</p>
                     {% else %}
                     <p class="small mb-0">An audit is much heavier than a check, so it needs an account.
                         <a href="{{ url_for('login', next=request.path ~ '#audit') }}">Sign in</a> to run one.</p>

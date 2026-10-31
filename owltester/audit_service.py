@@ -10,7 +10,7 @@ Routes on the ``owltester`` blueprint:
 
 and the page ``GET /audit/<job_id>`` (``audit_pages_bp``), which polls and then
 renders the report. Who may run an audit is set by AUDIT_MODE (signed-in by
-default). A job belongs to the user who started it, or, for an anonymous
+default), narrowed to named accounts by AUDIT_ALLOWED_USERS when it is set. A job belongs to the user who started it, or, for an anonymous
 visitor, to their session, the way uploads do.
 """
 
@@ -34,6 +34,27 @@ SESSION_KEY = "audit_job_ids"
 
 def audit_mode():
     return "public" if os.environ.get("AUDIT_MODE", "signed-in").lower() == "public" else "signed-in"
+
+
+def allowed_users():
+    """AUDIT_ALLOWED_USERS: comma-separated usernames or emails who may start an
+    audit. Empty means anyone AUDIT_MODE lets in."""
+    raw = os.environ.get("AUDIT_ALLOWED_USERS", "")
+    return {u.strip().lower() for u in raw.split(",") if u.strip()}
+
+
+def may_start_audit():
+    """True if the current visitor may start an audit (for the upload page and the route)."""
+    allow = allowed_users()
+    try:
+        from flask_login import current_user
+        signed_in = current_user.is_authenticated
+    except Exception:  # noqa: BLE001 - served without flask-login
+        current_user, signed_in = None, False
+    if allow:
+        return signed_in and bool({str(getattr(current_user, "username", "")).lower(),
+                                   str(getattr(current_user, "email", "")).lower()} & allow)
+    return signed_in or audit_mode() == "public"
 
 
 def _upload_dir():
@@ -80,6 +101,8 @@ def audit_start():
             return redirect(url_for("login", next=request.path)) if "login" in current_app.view_functions \
                 else abort(401)
         return jsonify({"error": "Sign in to run an audit (AUDIT_MODE is signed-in)."}), 401
+    if not may_start_audit():
+        return jsonify({"error": "Full audits are not open to this account yet."}), 403
     uploads = [f for f in request.files.getlist("files") or request.files.getlist("file")
                or list(request.files.values()) if f and f.filename]
     if not uploads:
