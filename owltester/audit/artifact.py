@@ -18,7 +18,7 @@ from rdflib import OWL, RDF, RDFS, BNode, URIRef
 from rdflib.namespace import SKOS
 
 from ontology_bundle import BFO_IRI_PREFIX, CATALOG_NAMES, _norm, _resolve, read_catalog
-from .config import find_config, load_config
+from .config import ConfigError, find_config, load_config
 from .files import (ArtifactError, _file_kind, _glob_match, _parse, _walk,  # noqa: F401
                     extract_zip, parse_text_snippet)
 
@@ -145,7 +145,8 @@ class Artifact:
         roles = {}
         for f in self.files:
             if f.kind == "rdf":
-                key = f.role if f.scope == "primary" else f"{f.role} (external)"
+                role = f.role or ("unparsed" if f.error else "other")
+                key = role if f.scope == "primary" else f"{role} (external)"
                 roles.setdefault(key, []).append(f.path)
         return {
             "name": self.name,
@@ -402,7 +403,12 @@ def load_artifact(source, config_path=None, profile=None):
         entries = [(os.path.basename(s), os.path.abspath(s)) for s in sources]
 
     cfg_path = config_path or find_config(root)
-    config = load_config(cfg_path) if cfg_path else {}
+    try:
+        config = load_config(cfg_path) if cfg_path else {}
+    except ConfigError as e:
+        # A broken optional config must not cost the whole audit: carry on with
+        # the detected roles and report the problem in R0.
+        config = {"_config_error": f"{os.path.basename(cfg_path)}: {e}"}
     from .profiles import LEGACY_NAMES
     config["_legacy_names"] = list((profile or {}).get("legacy_names") or LEGACY_NAMES)
     ignore = config.get("ignore") or ()

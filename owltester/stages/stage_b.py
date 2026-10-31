@@ -51,7 +51,7 @@ def run(ctx):
                               f"BFO 2020.", iri=cls)
 
     # B3 — kernel node typing.
-    if not ctx.kernel.categories:
+    if ctx.kernel is None or not ctx.kernel.categories:
         r.notes["B3"] = "skipped: kernel declares no SOoL typing"
     elif catalog is None:
         r.notes["B3"] = "skipped: BFO catalog unavailable"

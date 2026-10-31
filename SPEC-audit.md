@@ -92,7 +92,13 @@ data_sets:
   lfds: [data/lfds/ttl/*.ttl]
 ignore: [data/lfds/tables/**]
 profile: general
+expected:                    # designed outcomes: reported, marked expected, not counted
+  - finding: E_ABOX_INCONSISTENT
+    file: data/tests/assignment-test.ttl
+    reason: a test that fails by design
 ```
+
+An `expected` entry names a finding code and optionally a `file` glob and a `stage`. Matching findings stay in the report with the release's reason, do not count toward the verdict or a stage's status, and are left out of the issues export. An entry that matches nothing is reported (`W_CONFIG`, info) so stale declarations surface. A config file that cannot be read is reported (`W_CONFIG`, major) and the audit continues with the detected roles.
 
 **Acceptance.** On the LOMO fixture: 1 ontology, 4 vocabularies, 1 shapes file (plus `iopa-shapes.ttl`, assigned `shapes` but outside the LOMO namespace and reported separately), 3 data sets, owned namespaces `http://data.europa.eu/leg/lomo#` and the four `http://data.europa.eu/leg/<vocab>/` namespaces.
 
@@ -122,7 +128,7 @@ Cheap graph checks that point at missing logical structure. Each is a suggestion
 - Name-paired properties not declared inverse: `before`/`after`, `hasX`/`isXOf`, `X`/`isXBy`, `starts`/`startedBy`, `precedes`/`follows`, `hasNext`/`hasPrevious`.
 - Likely-transitive properties not declared transitive (`before`, `after`, `partOf`, `isComposedOf`, `ancestorOf`, local names ending in `Of` used in self-chains in the data).
 - Class pairs `X` and `XType` (or `X` and `XCategory`) with no disjointness; sibling classes under one parent with no disjointness at all.
-- Domain or range axioms placed on another vocabulary's classes (for example `dcterms:Software`), which retype every subject that uses the property.
+- Domain or range axioms added to another vocabulary's properties, which retype everyone's data that uses the property. A property of your own whose domain or range is another vocabulary's class (a BFO category, `dcterms:Software`) is alignment and is not flagged, nor are the other vocabulary's own axioms shipped in an import extract.
 - `allValuesFrom` over a `oneOf` with no `owl:AllDifferent` or `differentFrom`: under the open world a reasoner infers equality instead of reporting a wrong value.
 
 Acceptance: L12 is reported.

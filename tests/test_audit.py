@@ -111,6 +111,175 @@ def test_simple_yaml_reader():
                    "data_sets": {"ex": ["d/*.ttl", "e/*.ttl"], "lf": "x.ttl"}, "profile": "general"}
 
 
+LOF_STYLE = """profile: bfo
+ontology:
+  - patterns/p4/p4.owl
+data_sets:
+  examples:
+    - a.ttl
+  tests:
+    - b.ttl
+expected:
+  - file: b.ttl
+    finding: E_ABOX_INCONSISTENT
+    reason: by design
+  - finding: W_PLACEHOLDER_IRI
+    reason: examples
+shacl:
+  inference: reasoned   # comment
+ignore:
+  - x/**
+"""
+
+
+def test_simple_yaml_reader_lists_of_mappings():
+    cfg = parse_simple_yaml(LOF_STYLE)
+    assert cfg["expected"] == [
+        {"file": "b.ttl", "finding": "E_ABOX_INCONSISTENT", "reason": "by design"},
+        {"finding": "W_PLACEHOLDER_IRI", "reason": "examples"}]
+    assert cfg["shacl"] == {"inference": "reasoned"}
+    yaml = pytest.importorskip("yaml")
+    assert cfg == yaml.safe_load(LOF_STYLE)
+
+
+def _without_pyyaml(monkeypatch):
+    import sys
+    monkeypatch.setitem(sys.modules, "yaml", None)   # import yaml -> ImportError
+
+
+def test_lof_style_config_loads_without_pyyaml(tmp_path, monkeypatch):
+    _without_pyyaml(monkeypatch)
+    src = materialize("clean", tmp_path)
+    with open(os.path.join(src, "audit.yaml"), "w") as fh:
+        fh.write(LOF_STYLE)
+    art = load_artifact(src)
+    try:
+        assert "_config_error" not in art.config
+        assert [e["code"] for e in art.config["expected"]] == ["E_ABOX_INCONSISTENT", "W_PLACEHOLDER_IRI"]
+        assert "shacl" in art.config["_unknown_keys"]
+    finally:
+        art.cleanup()
+
+
+def test_broken_config_is_reported_not_fatal(tmp_path, monkeypatch):
+    _without_pyyaml(monkeypatch)
+    src = materialize("clean", tmp_path)
+    with open(os.path.join(src, "audit.yaml"), "w") as fh:
+        fh.write("ontology:\n  - a.ttl\n    nested: oops\n")
+    art = load_artifact(src)
+    try:
+        assert art.config["_config_error"].startswith("audit.yaml")
+        assert art.data_sets            # roles still detected from content
+    finally:
+        art.cleanup()
+
+
+@pytest.mark.java
+def test_expected_outcome_does_not_count(tmp_path):
+    src = materialize("inconsistent", tmp_path)
+    plain = audit(src, budget=300)
+    assert "E_ABOX_INCONSISTENT" in above_info(plain) and plain.verdict == "fail"
+    with open(os.path.join(src, "audit.yaml"), "w") as fh:
+        fh.write("expected:\n  - finding: E_ABOX_INCONSISTENT\n    file: data/**\n"
+                 "    reason: a designed test case.\n  - finding: E_NEVER_HAPPENS\n")
+    report = audit(src, budget=300)
+    hit = [f for f in report.findings if f.code == "E_ABOX_INCONSISTENT"]
+    assert hit and all(f.expected == "a designed test case." for f in hit)
+    assert report.severity_counts()["expected"] == len(hit)
+    assert any(f.code == "W_CONFIG" and f.evidence.get("unmatched") for f in report.findings)
+    rest = {f.severity for f in report.findings if not f.expected}
+    assert report.verdict == ("fail" if "critical" in rest else "warn" if "major" in rest else "pass")
+    assert "expected by the release" in to_markdown(report)
+    assert "expected" in to_html(report)
+
+
+OFN_SAMPLE = """Prefix(:=<https://w3id.org/audit-mini/ofn#>)
+Prefix(owl:=<http://www.w3.org/2002/07/owl#>)
+Prefix(rdfs:=<http://www.w3.org/2000/01/rdf-schema#>)
+Ontology(<https://w3id.org/audit-mini/ofn>
+Import(<https://w3id.org/audit-mini/onto>)
+Declaration(Class(:Thing2))
+AnnotationAssertion(rdfs:label :Thing2 "thing two"@en)
+)
+"""
+
+
+def test_owl_functional_syntax_without_robot_is_listed_not_failed(tmp_path, monkeypatch):
+    import external_reasoner
+    from owltester.audit.files import _parse
+    monkeypatch.setattr(external_reasoner, "robot_available", lambda: False)
+    path = tmp_path / "edit.owl"
+    path.write_text(OFN_SAMPLE)
+    graph, err = _parse(str(path), "owl")
+    assert graph is None and err.startswith("not parsed: OWL Functional Syntax needs ROBOT")
+
+
+@pytest.mark.skipif(shutil.which("robot") is None, reason="ROBOT not installed")
+def test_owl_functional_syntax_is_read_through_robot(tmp_path):
+    from rdflib import OWL, URIRef
+    from owltester.audit.files import _parse
+    path = tmp_path / "edit.owl"
+    path.write_text(OFN_SAMPLE)
+    graph, err = _parse(str(path), "owl")
+    assert err == "" and (URIRef("https://w3id.org/audit-mini/ofn#Thing2"), None, None) in graph
+    assert list(graph.objects(None, OWL.imports)) == [URIRef("https://w3id.org/audit-mini/onto")]
+
+
+def test_ci_credit_follows_the_make_targets_ci_runs(tmp_path):
+    from owltester.audit.hygiene import _ci
+    src = materialize("clean", tmp_path)
+    os.remove(os.path.join(src, ".github", "workflows", "ci.yml"))
+    os.makedirs(os.path.join(src, "pat", ".github", "workflows"))
+    os.makedirs(os.path.join(src, "pat", "src", "ontology"))
+    with open(os.path.join(src, "pat", ".github", "workflows", "qc.yml"), "w") as fh:
+        fh.write("jobs:\n  qc:\n    steps:\n      - name: QC\n"
+                 "        working-directory: src/ontology\n        run: make test\n")
+    with open(os.path.join(src, "pat", "src", "ontology", "Makefile"), "w") as fh:
+        fh.write("ROBOT := java -jar ../../bin/robot.jar\nTMP := tmp\n.PHONY: test shacl\n"
+                 "test: verify\n\n$(TMP)/r.owl: in.owl\n\t$(ROBOT) reason --input $< --output $@\n\n"
+                 "verify: $(TMP)/r.owl\n\t$(ROBOT) verify --input $<\n\n"
+                 "shacl:\n\tpyshacl -s shapes.ttl data.ttl\n")
+    art = load_artifact(src)
+    try:
+        configs, kinds, sources = _ci(art)
+        assert "reasoning" in kinds
+        assert "shacl" not in kinds          # the target exists, but CI never runs it
+        assert any("targets run by CI" in w for w in sources["reasoning"])
+    finally:
+        art.cleanup()
+
+
+@pytest.mark.java
+def test_data_set_inconsistent_only_when_combined(tmp_path):
+    src = materialize("clean", tmp_path)
+    with open(os.path.join(src, "data", "main", "extra.ttl"), "w") as fh:
+        fh.write("@prefix d: <https://data.audit-mini.test/id/> .\n"
+                 "@prefix onto: <https://w3id.org/audit-mini/onto#> .\n"
+                 "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+                 "d:r1 a onto:Action ; rdfs:label \"the rule, typed as an action\"@en .\n")
+    report = audit(src, budget=300)
+    hits = [f for f in report.findings if f.code == "E_ABOX_INCONSISTENT"]
+    assert len(hits) == 1 and hits[0].evidence.get("combined") is True
+    assert set(hits[0].files) == {"data/main/rules.ttl", "data/main/extra.ttl"}
+    assert "only when combined" in report.stages["R3"]["summary"]
+
+
+@pytest.mark.java
+def test_bfo_profile_without_kernel_and_alignment_lint(tmp_path):
+    src = materialize("clean", tmp_path)
+    with open(os.path.join(src, "ontology", "mini.ttl"), "a") as fh:
+        fh.write("\n@prefix obo: <http://purl.obolibrary.org/obo/> .\n"
+                 ":about a owl:ObjectProperty ; rdfs:range obo:BFO_0000001 .\n"
+                 "obo:BFO_0000050 a owl:ObjectProperty ; rdfs:domain obo:BFO_0000001 .\n"
+                 "dcterms:subject rdfs:domain :Rule .\n")
+    report = audit(src, budget=300, profile="bfo")
+    assert report.stages["R9"]["status"] != "error"
+    lint = [f for f in report.findings if f.code == "W_LINT_FOREIGN_AXIOM"]
+    assert len(lint) == 1
+    flagged = {a["property"] for a in lint[0].evidence["axioms"]}
+    assert flagged == {"dcterms:subject"}
+
+
 # -- one test per mini fixture --------------------------------------------------------
 
 @pytest.mark.java

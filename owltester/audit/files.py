@@ -6,9 +6,12 @@ import fnmatch
 import os
 import re
 import shutil
+import subprocess
+import tempfile
 import zipfile
 
 import rdflib
+from rdflib import OWL, RDF, URIRef
 
 from ontology_bundle import MAX_ZIP_MEMBERS, MAX_ZIP_UNCOMPRESSED
 
@@ -94,6 +97,71 @@ def _sniff_xml(head):
     return None
 
 
+OWL_SYNTAX_NAMES = {"ofn": "OWL Functional Syntax", "omn": "Manchester Syntax", "owx": "OWL/XML"}
+ROBOT_CONVERT_SECONDS = 120
+
+
+def _owl_syntax(ext, fmt, head):
+    """'ofn', 'omn' or 'owx' for the OWL syntaxes rdflib cannot read, else None."""
+    start = head.lstrip()
+    if ext == "ofn" or start.startswith(("Prefix(", "Ontology(")):
+        return "ofn"
+    if ext == "omn" or start.startswith(("Prefix:", "Ontology:")):
+        return "omn"
+    if ext == "owx" or fmt == "owx":
+        return "owx"
+    return None
+
+
+_IMPORT_RES = {
+    "ofn": re.compile(r"^[ \t]*Import\(\s*<([^>]+)>\s*\)[ \t]*$", re.M),
+    "omn": re.compile(r"^[ \t]*Import:\s*<([^>]+)>[ \t]*$", re.M),
+    "owx": re.compile(r"<(?:owl:)?Import>\s*([^<\s]+)\s*</(?:owl:)?Import>"),
+}
+
+
+def _parse_owl_syntax(path, syntax):
+    """Read an OWL Functional, Manchester or OWL/XML file through ROBOT.
+
+    Import declarations are removed before conversion, so ROBOT never fetches
+    anything, and are put back as owl:imports triples so R0 reports them like
+    any other import. Without ROBOT the file is listed, not parsed, at info level.
+    """
+    name = OWL_SYNTAX_NAMES[syntax]
+    from external_reasoner import robot_available
+    if not robot_available():
+        return None, (f"not parsed: {name} needs ROBOT, which is not installed here; "
+                      "the release's RDF files were audited instead")
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    imports = _IMPORT_RES[syntax].findall(text)
+    stripped = _IMPORT_RES[syntax].sub("", text)
+    work = tempfile.mkdtemp(prefix="owltester-owl-")
+    src = os.path.join(work, "in." + syntax)
+    out = os.path.join(work, "out.ttl")
+    try:
+        with open(src, "w", encoding="utf-8") as fh:
+            fh.write(stripped)
+        proc = subprocess.run(["robot", "convert", "--input", src, "--format", "ttl", "--output", out],
+                              capture_output=True, text=True, timeout=ROBOT_CONVERT_SECONDS, check=False)
+        if proc.returncode != 0 or not os.path.isfile(out):
+            detail = (proc.stderr or proc.stdout or "").strip().splitlines()[-1:] or ["no output"]
+            return None, f"{name} could not be read by ROBOT: {detail[0][:300]}"
+        g = rdflib.Graph()
+        g.parse(out, format="turtle")
+        header = next(iter(g.subjects(RDF.type, OWL.Ontology)), None)
+        if header is not None:
+            for iri in imports:
+                g.add((header, OWL.imports, URIRef(iri)))
+        return g, ""
+    except subprocess.TimeoutExpired:
+        return None, f"not parsed: ROBOT took longer than {ROBOT_CONVERT_SECONDS} s to read this {name} file"
+    except Exception as e:  # noqa: BLE001 - rdflib or OS errors
+        return None, f"{type(e).__name__}: {str(e)[:400]}"
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 def _parse(path, ext):
     """(graph, error). Formats are chosen by extension, then by sniffing."""
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -103,12 +171,9 @@ def _parse(path, ext):
         fmt = _sniff_xml(head) or ("turtle" if ext == "owl" else None)
         if fmt is None:
             return None, "not RDF"
-    if ext in ("ofn", "omn", "owx") or fmt == "owx" or head.lstrip().startswith(("Prefix(", "Ontology(")):
-        from owl_format_detector import parse_rdf_file
-        try:
-            return parse_rdf_file(path), ""
-        except Exception as e:  # noqa: BLE001
-            return None, f"{type(e).__name__}: {str(e)[:400]}"
+    syntax = _owl_syntax(ext, fmt, head)
+    if syntax:
+        return _parse_owl_syntax(path, syntax)
     if fmt == "json-ld":
         with open(path, encoding="utf-8", errors="replace") as fh:
             text = fh.read()

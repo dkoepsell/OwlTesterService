@@ -15,7 +15,7 @@
   </div>
   <div class="alert alert-{{ status_class.get(report.verdict, 'secondary') }} py-2">
     <strong>{{ verdict_words }}</strong>.
-    {{ counts.critical }} critical, {{ counts.major }} major, {{ counts.minor }} minor, {{ counts.info }} info.
+    {{ counts.critical }} critical, {{ counts.major }} major, {{ counts.minor }} minor, {{ counts.info }} info{% if counts.expected %}; {{ counts.expected }} expected by the release, not counted{% endif %}.
     <span class="small d-block">Profile <code>{{ report.profile }}</code>, audited {{ report.audited_at }},
       tool version <code>{{ report.tool_version }}</code>.</span>
   </div>
@@ -72,13 +72,15 @@
       {% if group.info.status %}<span class="badge bg-{{ status_class.get(group.info.status, 'secondary') }}">{{ group.info.status }}</span>{% endif %}</h3>
     {% if group.info.summary %}<p class="small text-muted mb-2">{{ group.info.summary }}</p>{% endif %}
     {% for f in group.findings %}
-    <details class="card mb-2" id="{{ f.id }}" {% if f.severity == 'critical' %}open{% endif %}>
+    <details class="card mb-2" id="{{ f.id }}" {% if f.severity == 'critical' and not f.expected %}open{% endif %}>
       <summary class="card-header py-2">
         <span class="badge bg-{{ sev_class[f.severity] }}">{{ f.severity }}</span>
+        {% if f.expected %}<span class="badge bg-secondary">expected</span>{% endif %}
         <code class="small">{{ f.id }} {{ f.code }}</code> {{ f.title }}
         {% if f.count > 1 %}<span class="text-muted small">({{ '{:,}'.format(f.count) }})</span>{% endif %}
       </summary>
       <div class="card-body small">
+        {% if f.expected %}<p class="mb-2"><strong>Expected by the release:</strong> {{ f.expected }} Not counted toward the verdict.</p>{% endif %}
         <p class="mb-2">{{ f.message }}</p>
         {% if f.related %}<p class="mb-1">Explained by {% for r in f.related %}<a href="#{{ r }}">{{ r }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
         {% if f.files %}<p class="mb-1">Files ({{ f.files|length }}): {% for p in f.files[:12] %}<code>{{ p }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% if f.files|length > 12 %} ...{% endif %}</p>{% endif %}

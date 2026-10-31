@@ -51,7 +51,11 @@ def _evidence_md(ev):
 
 
 def finding_md(f, heading="###"):
-    lines = [f"{heading} [{f.severity}] {f.id} {f.code}: {_text(f.title)}", "", _text(f.message), ""]
+    tag = f"[{f.severity}, expected]" if f.expected else f"[{f.severity}]"
+    lines = [f"{heading} {tag} {f.id} {f.code}: {_text(f.title)}", ""]
+    if f.expected:
+        lines += [f"*Expected by the release: {_text(f.expected)} Not counted toward the verdict.*", ""]
+    lines += [_text(f.message), ""]
     if f.files:
         shown = ", ".join(f"`{p}`" for p in f.files[:12])
         lines.append(f"- **Files ({len(f.files)}):** {shown}" + (" ..." if len(f.files) > 12 else ""))
@@ -74,7 +78,9 @@ def to_markdown(report: AuditReport):
     out = [f"# Audit report: {report.artifact}", "",
            f"**Verdict:** {VERDICT_WORDS[report.verdict]}  ",
            f"**Findings:** {counts['critical']} critical, {counts['major']} major, "
-           f"{counts['minor']} minor, {counts['info']} info  ",
+           f"{counts['minor']} minor, {counts['info']} info"
+           + (f"; {counts['expected']} expected by the release, not counted" if counts.get("expected") else "")
+           + "  ",
            f"**Profile:** {report.profile} | **Audited:** {report.audited_at} | "
            f"**Tool version:** {report.tool_version}", "",
            "## Scorecard", "", "| Stage | Check | Status | Worst | Findings | Summary |",
@@ -135,7 +141,7 @@ def issues_zip(report: AuditReport, include=("critical", "major", "minor")):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         index = [f"# Issues from the audit of {report.artifact}", ""]
         for f in report.sorted_findings():
-            if f.severity not in include:
+            if f.severity not in include or f.expected:
                 continue
             name = f"{f.id}-{_slug(f.code + ' ' + f.title)}.md"
             body = (f"{finding_md(f, '#')}\n---\nFound by the OwlTester full artifact audit "

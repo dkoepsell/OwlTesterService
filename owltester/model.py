@@ -110,18 +110,21 @@ class AuditFinding(Finding):
     related: list = field(default_factory=list)
     fix: str = ""
     id: str = ""
+    expected: str = ""      # reason, when the release declares this outcome expected
 
     def to_dict(self):
         d = super().to_dict()
         d.update({"id": self.id, "stage": self.stage, "severity": self.severity,
                   "title": self.title, "files": list(self.files), "count": self.count,
                   "evidence": self.evidence, "related": list(self.related), "fix": self.fix})
+        if self.expected:
+            d["expected"] = self.expected
         return d
 
     @classmethod
     def from_dict(cls, d):
         keys = ("code", "message", "iri", "suggested_rewrite", "stage", "severity", "title",
-                "files", "count", "evidence", "related", "fix", "id")
+                "files", "count", "evidence", "related", "fix", "id", "expected")
         return cls(**{k: d[k] for k in keys if k in d})
 
 
@@ -144,8 +147,9 @@ class AuditReport:
 
     @property
     def verdict(self):
-        """"fail" if any critical, "warn" if any major, else "pass"."""
-        sev = {f.severity for f in self.findings}
+        """"fail" if any critical, "warn" if any major, else "pass". Findings the
+        release declares expected (audit config ``expected``) do not count."""
+        sev = {f.severity for f in self.findings if not f.expected}
         if "critical" in sev:
             return "fail"
         if "major" in sev:
@@ -155,7 +159,11 @@ class AuditReport:
     def severity_counts(self):
         out = {s: 0 for s in SEVERITIES}
         for f in self.findings:
-            out[f.severity] = out.get(f.severity, 0) + 1
+            if not f.expected:
+                out[f.severity] = out.get(f.severity, 0) + 1
+        expected = sum(1 for f in self.findings if f.expected)
+        if expected:
+            out["expected"] = expected
         return out
 
     def scorecard(self):
@@ -166,7 +174,8 @@ class AuditReport:
             if st is None:
                 continue
             mine = [f for f in self.findings if f.stage == stage]
-            worst = next((s for s in SEVERITIES if any(f.severity == s for f in mine)), "")
+            worst = next((s for s in SEVERITIES
+                          if any(f.severity == s and not f.expected for f in mine)), "")
             rows.append({"stage": stage, "check": st.get("title", stage),
                          "status": st.get("status", ""), "worst": worst,
                          "findings": len(mine), "summary": st.get("summary", "")})
