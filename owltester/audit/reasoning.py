@@ -48,8 +48,14 @@ def _check(ctx, graph, cross_check=False, budget=None):
             pellet_path = _write_nt(variant)
             paths.append(pellet_path)
             ctx.cache["pellet_note"] = PELLET_NOTE
-        return consistency(paths[0], budget, with_bfo=ctx.profile.get("reason_with_bfo", False),
-                           cross_check=cross_check, pellet_path=pellet_path)
+        args = dict(with_bfo=ctx.profile.get("reason_with_bfo", False),
+                    cross_check=cross_check, pellet_path=pellet_path)
+        res = consistency(paths[0], budget, **args)
+        if res["status"] == "error" and not ctx.budget.expired():
+            # a Java start can fail transiently (seen once on a freshly
+            # restarted container); one retry before reporting it
+            res = consistency(paths[0], ctx.budget.cap("reasoner"), **args)
+        return res
     finally:
         for p in paths:
             os.remove(p)
