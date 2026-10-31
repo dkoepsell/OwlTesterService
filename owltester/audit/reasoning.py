@@ -28,32 +28,37 @@ PELLET_NOTE = ("Pellet 2.3 predates rdf:langString, so its cross-check reads rdf
                "ranges as rdf:PlainLiteral.")
 
 
-def _write_nt(graph):
-    fd, path = tempfile.mkstemp(suffix=".nt", prefix="audit-")
+def _write_owl(graph):
+    """Write the graph for owlready2 as RDF/XML.
+
+    owlready2 guesses the format from the first 1,000 bytes and takes an
+    N-Triples file whose first line is longer than that (a long literal, and
+    triple order changes with each process) for RDF/XML, so N-Triples failed
+    to load at random. RDF/XML is always recognised."""
+    fd, path = tempfile.mkstemp(suffix=".owl", prefix="audit-")
     os.close(fd)
-    graph.serialize(destination=path, format="nt", encoding="utf-8")
+    graph.serialize(destination=path, format="xml")
     return path
 
 
 def _check(ctx, graph, cross_check=False, budget=None):
     from kindwork.module_reasoner import consistency
     budget = budget or ctx.budget.cap("reasoner")
-    paths = [_write_nt(graph)]
+    paths = [_write_owl(graph)]
     try:
         pellet_path = None
         if cross_check and (None, RDFS.range, RDF.langString) in graph:
             variant = rdflib.Graph()
             for s, p, o in graph:
                 variant.add((s, p, RDF.PlainLiteral if p == RDFS.range and o == RDF.langString else o))
-            pellet_path = _write_nt(variant)
+            pellet_path = _write_owl(variant)
             paths.append(pellet_path)
             ctx.cache["pellet_note"] = PELLET_NOTE
         args = dict(with_bfo=ctx.profile.get("reason_with_bfo", False),
                     cross_check=cross_check, pellet_path=pellet_path)
         res = consistency(paths[0], budget, **args)
         if res["status"] == "error" and not ctx.budget.expired():
-            # a Java start can fail transiently (seen once on a freshly
-            # restarted container); one retry before reporting it
+            # one retry before reporting a reasoner that stopped with an error
             res = consistency(paths[0], ctx.budget.cap("reasoner"), **args)
         return res
     finally:

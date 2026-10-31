@@ -146,6 +146,21 @@ def test_shacl_violation_is_linked_to_the_namespace_mismatch(tmp_path):
 
 
 @pytest.mark.java
+def test_reasoner_input_loads_whatever_triple_comes_first():
+    """owlready2 sniffs only 1,000 bytes; a long first triple once broke R3 at random."""
+    import rdflib
+    from owltester.audit.reasoning import _check
+    g = rdflib.Graph()
+    s = rdflib.URIRef("urn:x:a")
+    g.add((s, rdflib.RDF.type, rdflib.OWL.Class))
+    g.add((s, rdflib.RDFS.comment, rdflib.Literal("x" * 5000)))
+    ctx = AuditContext(load_artifact(LOMO), get_profile("general"))
+    for _ in range(3):
+        with contextlib.redirect_stdout(io.StringIO()):
+            assert _check(ctx, g)["status"] == "ok"
+
+
+@pytest.mark.java
 def test_inconsistency_is_explained_by_a_minimal_set(tmp_path):
     report = audit(materialize("inconsistent", tmp_path), budget=300)
     f = next(f for f in report.findings if f.code == "E_ABOX_INCONSISTENT")
