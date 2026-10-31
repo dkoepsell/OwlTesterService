@@ -1,0 +1,58 @@
+@prefix :        <https://w3id.org/audit-mini/onto#> .
+@prefix mod:     <https://w3id.org/audit-mini/modality/> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix vann:    <http://purl.org/vocab/vann/> .
+
+<https://w3id.org/audit-mini/onto> a owl:Ontology ;
+    rdfs:label "Audit mini ontology"@en ;
+    owl:versionIRI <https://w3id.org/audit-mini/onto/1.0.0> ;
+    owl:versionInfo "1.0.0" ;
+    dcterms:license <https://creativecommons.org/licenses/by/4.0/> ;
+    dcterms:creator "Audit test suite" ;
+    dcterms:modified "2026-10-31" .
+
+:Rule a owl:Class ;
+    rdfs:label "rule"@en ;
+    owl:disjointWith :Action ;
+    rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :requires ; owl:minCardinality "1"^^xsd:nonNegativeInteger ] ;
+    vann:usageExample """ex:rule1 a :Obligation ;
+    :requires ex:act1 ;
+    :hasModality mod:Must ;
+    :title "File a tax return" .
+ex:act1 a :Action ."""@en .
+
+:Obligation a owl:Class ;
+    rdfs:label "obligation"@en ;
+    rdfs:subClassOf :Rule .
+
+:Permission a owl:Class ;
+    rdfs:label "permission"@en ;
+    rdfs:subClassOf :Rule ;
+    owl:disjointWith :Obligation .
+
+:Action a owl:Class ;
+    rdfs:label "action"@en .
+
+:requires a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:label "requires"@en ;
+    rdfs:comment "Every rule MUST require at least one action."@en ;
+    rdfs:domain :Rule ;
+    rdfs:range :Action .
+
+:hasModality a owl:ObjectProperty ;
+    rdfs:label "has modality"@en ;
+    rdfs:domain :Rule ;
+    rdfs:range skos:Concept .
+
+:dueWithin a owl:DatatypeProperty ;
+    rdfs:label "due within"@en ;
+    rdfs:range xsd:duration .
+
+:title a owl:DatatypeProperty ;
+    rdfs:label "title"@en ;
+    rdfs:range xsd:string .

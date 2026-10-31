@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+
+{% block title %}Audit in progress{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 760px">
+  {% if job %}
+  <h1 class="h3">Auditing {{ job.artifact }}</h1>
+  <p class="text-muted">A full audit parses every file, reasons over the ontology and each data set,
+    validates the data against the release's own shapes and checks references, documentation and
+    release hygiene. A large release takes several minutes. This page updates by itself.</p>
+  <div class="card">
+    <div class="card-body">
+      <p class="mb-2">Status: <strong id="audit-status">{{ job.status }}</strong></p>
+      <p class="mb-2">Current stage: <strong id="audit-stage">{{ job.stage or 'waiting to start' }}</strong>
+        <span id="audit-progress" class="text-muted">{{ job.progress }}</span></p>
+      <div class="progress" role="progressbar" aria-label="Audit progress">
+        <div id="audit-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 5%"></div>
+      </div>
+      <p id="audit-error" class="text-danger mt-3 d-none"></p>
+    </div>
+  </div>
+  {% else %}
+  <h1 class="h3">Audit a release</h1>
+  <p>Upload a released artifact (a zip of the ontology, vocabularies, shapes and data) from the
+    <a href="/upload#audit">upload page</a>.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if job %}
+<script>
+(function () {
+    const order = ['R0', 'R1', 'R2', 'R2b', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10'];
+    const statusUrl = {{ url_for('owltester.audit_status', job_id=job_id)|tojson }};
+    async function poll() {
+        let body;
+        try {
+            const res = await fetch(statusUrl, {headers: {'Accept': 'application/json'}});
+            body = await res.json();
+        } catch (e) { setTimeout(poll, 5000); return; }
+        document.getElementById('audit-status').textContent = body.status;
+        document.getElementById('audit-stage').textContent = body.stage || '';
+        document.getElementById('audit-progress').textContent = body.progress || '';
+        const i = order.indexOf(body.stage);
+        if (i >= 0) document.getElementById('audit-bar').style.width = Math.round(100 * (i + 1) / order.length) + '%';
+        if (body.status === 'done') { window.location.reload(); return; }
+        if (body.status === 'error' || body.status === 'stale') {
+            const el = document.getElementById('audit-error');
+            el.textContent = body.status === 'stale'
+                ? 'The audit stopped without finishing (the server may have restarted). Please run it again.'
+                : 'The audit failed: ' + (body.error || 'unknown error');
+            el.classList.remove('d-none');
+            return;
+        }
+        setTimeout(poll, 3000);
+    }
+    poll();
+})();
+</script>
+{% endif %}
+{% endblock %}

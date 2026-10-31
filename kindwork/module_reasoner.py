@@ -138,14 +138,15 @@ def _kill_java():
         logger.warning("could not kill stray reasoner: %s", e)
 
 
-def _run(which, owl_path, budget):
+def _run(which, owl_path, budget, with_bfo=True):
     """('ok', set(unsat IRIs)) | ('inconsistent', None) | ('timeout'|'error', detail)."""
     world = owlready2.World()
     try:
         onto = world.get_ontology("file://" + owl_path).load()
-        bfo = world.get_ontology("file://" + os.path.abspath(
-            os.environ.get("BFO_PATH") or DEFAULT_OWL_PATH)).load()
-        onto.imported_ontologies.append(bfo)
+        if with_bfo:
+            bfo = world.get_ontology("file://" + os.path.abspath(
+                os.environ.get("BFO_PATH") or DEFAULT_OWL_PATH)).load()
+            onto.imported_ontologies.append(bfo)
     except Exception as e:  # noqa: BLE001
         return "error", f"The ontology could not be loaded for reasoning ({type(e).__name__})."
     sync = owlready2.sync_reasoner_hermit if which == "hermit" else owlready2.sync_reasoner_pellet
@@ -169,6 +170,35 @@ def _run(which, owl_path, budget):
         executor.shutdown(wait=False)
     return "ok", {c.iri for c in world.inconsistent_classes()
                   if c is not owlready2.Nothing and getattr(c, "iri", None)}
+
+
+def consistency(owl_path, budget, with_bfo=True, cross_check=True, pellet_path=None):
+    """HermiT verdict on an RDF file, with a Pellet cross-check.
+
+    Returns {status: ok|inconsistent|timeout|error, unsatisfiable: set, detail,
+    disagreement}. ``ok`` means consistent. Used by the full artifact audit,
+    which reasons over artifacts that need not import BFO. ``pellet_path`` is an
+    optional variant of the input for Pellet, for constructs Pellet 2.3 lacks."""
+    if not _SLOTS.acquire(timeout=budget):
+        return {"status": "timeout", "unsatisfiable": set(), "disagreement": "",
+                "detail": "The reasoner is busy with other checks."}
+    try:
+        h_status, h = _run("hermit", owl_path, budget, with_bfo)
+        out = {"status": h_status, "unsatisfiable": h if h_status == "ok" else set(),
+               "detail": h if isinstance(h, str) else "", "disagreement": ""}
+        if not cross_check or h_status in ("timeout", "error"):
+            return out
+        p_status, p = _run("pellet", pellet_path or owl_path, budget, with_bfo)
+    finally:
+        _SLOTS.release()
+    if p_status in ("ok", "inconsistent") and p_status != h_status:
+        out["disagreement"] = (f"HermiT says the input is {'consistent' if h_status == 'ok' else 'inconsistent'}"
+                               f", Pellet says it is {'consistent' if p_status == 'ok' else 'inconsistent'}.")
+    elif p_status == "ok" and h_status == "ok" and p != h:
+        out["disagreement"] = ("HermiT and Pellet disagree on which classes are unsatisfiable: "
+                               + ", ".join(sorted(h ^ p)[:10]))
+        out["unsatisfiable"] = h & p
+    return out
 
 
 def _robot_cmd():

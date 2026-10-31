@@ -3,13 +3,15 @@
     owltester check  <artifact> --kernel sool-kernel.ttl [--all] [--json report.json]
     owltester repair <artifact> --kernel ... --out repaired.ttl --quarantine q.ttl
     owltester serve  --port 8080 --kernel ...
+    owltester audit  <zip|dir|files...> [--profile general|bfo|sool] [--json f] [--html f] [--md f]
 
-Exit 0 == pass, non-zero == fail. The non-zero exit on a hollowed-out artifact is
+Exit 0 == pass, non-zero == fail (for audit: 0 on pass or warn, 1 on fail). The non-zero exit on a hollowed-out artifact is
 the whole point: CI and the corpus export pipeline abort before any FTP upload.
 """
 
 import argparse
 import json
+import os
 import sys
 
 from . import errors
@@ -75,12 +77,47 @@ def cmd_repair(args):
     return errors.EXIT_PASS if status in ("unchanged", "repaired") else errors.EXIT_FAIL
 
 
+def cmd_audit(args):
+    from .audit.render import to_html, to_markdown
+    from .audit.runner import run_audit
+
+    def progress(stage, note=""):
+        if not args.quiet:
+            print(f"  {stage} {note}".rstrip(), file=sys.stderr)
+
+    source = args.artifact if len(args.artifact) > 1 else args.artifact[0]
+    report = run_audit(source, profile=args.profile, config_path=args.config, budget=args.budget,
+                       max_explanations=args.max_explanations, explain=not args.no_explain,
+                       progress=progress)
+    d = report.to_dict()
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as fh:
+            json.dump(d, fh, indent=2)
+    if args.md:
+        with open(args.md, "w", encoding="utf-8") as fh:
+            fh.write(to_markdown(report))
+    if args.html:
+        with open(args.html, "w", encoding="utf-8") as fh:
+            fh.write(to_html(report))
+    if not (args.json or args.md or args.html):
+        print(json.dumps(d, indent=2))
+    counts = d["severity_counts"]
+    print(f"verdict: {d['verdict']} ({counts['critical']} critical, {counts['major']} major, "
+          f"{counts['minor']} minor, {counts['info']} info)", file=sys.stderr)
+    for row in d["scorecard"]:
+        print(f"  [{row['stage']}] {row['status']}: {row['summary']}", file=sys.stderr)
+    return errors.EXIT_FAIL if d["verdict"] == "fail" else errors.EXIT_PASS
+
+
 def cmd_serve(args):
     from flask import Flask
     from .service import bp, configure
+    from .audit_service import audit_pages_bp
     configure(kernel_path=args.kernel)
     app = Flask("owltester")
+    app.secret_key = os.environ.get("SESSION_SECRET") or os.urandom(32)
     app.register_blueprint(bp)
+    app.register_blueprint(audit_pages_bp)
     app.run(host=args.host, port=args.port)
     return 0
 
@@ -104,6 +141,22 @@ def build_parser():
     pr.add_argument("--quarantine", help="path for the quarantine log")
     pr.add_argument("--max-removed", type=float, default=0.02, dest="max_removed")
     pr.set_defaults(func=cmd_repair)
+
+    pa = sub.add_parser("audit", help="full audit of a released artifact "
+                                      "(exit 0 on pass or warn, 1 on fail)")
+    pa.add_argument("artifact", nargs="+", help="a zip, a directory, or several files")
+    pa.add_argument("--profile", default="general", choices=("general", "bfo", "sool"))
+    pa.add_argument("--json", help="write the JSON report here")
+    pa.add_argument("--html", help="write the HTML report here")
+    pa.add_argument("--md", help="write the Markdown report here")
+    pa.add_argument("--budget", type=float, default=None, help="total seconds (default 900)")
+    pa.add_argument("--max-explanations", type=int, default=None, dest="max_explanations",
+                    help="inconsistent files to explain (default 3)")
+    pa.add_argument("--no-explain", action="store_true", dest="no_explain",
+                    help="skip minimal-cause search for inconsistent files")
+    pa.add_argument("--config", help="audit.yaml or audit.json (default: the one at the archive root)")
+    pa.add_argument("--quiet", action="store_true", help="no progress lines on stderr")
+    pa.set_defaults(func=cmd_audit)
 
     ps = sub.add_parser("serve", help="run the HTTP service")
     ps.add_argument("--host", default="0.0.0.0")

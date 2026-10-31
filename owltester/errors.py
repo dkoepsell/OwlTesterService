@@ -32,6 +32,44 @@ E_OVER_RELAXED = "E_OVER_RELAXED"  # repair removed more than the configured bou
 # Operational (not a conformance failure of the artifact itself)
 E_PARSE = "E_PARSE"                # artifact could not be parsed at all
 
+# Full artifact audit (SPEC-audit.md, stages R0..R10)
+E_DATATYPE_PROFILE = "E_DATATYPE_PROFILE"    # R2: datatype outside the OWL 2 datatype map
+E_UNSAT = "E_UNSAT"                          # R3: named unsatisfiable class
+E_ABOX_INCONSISTENT = "E_ABOX_INCONSISTENT"  # R3: data file inconsistent with the TBox
+E_SHACL = "E_SHACL"                          # R4: data violates the artifact's own shapes
+E_UNDECLARED_TERM = "E_UNDECLARED_TERM"      # R5: owned-namespace IRI never declared
+E_NS_MISMATCH = "E_NS_MISMATCH"              # R5: references use a variant of a declared namespace
+E_LAYER_CONFLICT = "E_LAYER_CONFLICT"        # R6: OWL, SHACL and documentation disagree
+E_SELF_EXAMPLE = "E_SELF_EXAMPLE"            # R7: the artifact's own example fails its shapes
+E_REASONER_DISAGREE = "E_REASONER_DISAGREE"  # R3: HermiT and Pellet disagree (tool finding)
+W_RANGE = "W_RANGE"                          # R5: value does not fit the declared range
+W_UNENFORCED = "W_UNENFORCED"                # R6: documented MUST with no axiom or shape
+W_TODO = "W_TODO"                            # R6: TODO/FIXME next to an axiom
+W_DOC_TERM = "W_DOC_TERM"                    # R7: documentation names an undeclared term
+W_SUBCLASS_COLLAPSE = "W_SUBCLASS_COLLAPSE"  # R8: data uses a superclass, never its subclasses
+W_UNUSED_TERM = "W_UNUSED_TERM"              # R8: declared, never used in any data set
+W_PLACEHOLDER_IRI = "W_PLACEHOLDER_IRI"      # R8: example.org and similar hosts
+W_IDENTITY = "W_IDENTITY"                    # R8: one entity under several IRIs or labels
+W_DUPLICATE_NODE = "W_DUPLICATE_NODE"        # R8: identical blank nodes on one subject
+W_DOMAIN_RETYPING = "W_DOMAIN_RETYPING"      # R8: class membership only through a domain
+W_NO_BFO = "W_NO_BFO"                        # R9: no BFO alignment (advisory)
+W_HEADER = "W_HEADER"                        # R10: ontology header incomplete
+W_VERSION = "W_VERSION"                      # R10: version numbers disagree
+W_CI_NO_SHACL = "W_CI_NO_SHACL"              # R10: shapes ship, CI never runs SHACL
+W_CI_NO_REASONER = "W_CI_NO_REASONER"        # R10: CI never runs a reasoner
+W_CHANGELOG = "W_CHANGELOG"                  # R10: changelog names files that are absent
+W_IMPORT = "W_IMPORT"                        # R0: import could not be resolved locally
+W_LINT_NO_CHARACTERISTICS = "W_LINT_NO_CHARACTERISTICS"   # R2b
+W_LINT_INVERSE = "W_LINT_INVERSE"                         # R2b
+W_LINT_TRANSITIVE = "W_LINT_TRANSITIVE"                   # R2b
+W_LINT_DISJOINT = "W_LINT_DISJOINT"                       # R2b
+W_LINT_FOREIGN_AXIOM = "W_LINT_FOREIGN_AXIOM"             # R2b
+W_LINT_ONEOF_UNA = "W_LINT_ONEOF_UNA"                     # R2b
+I_PROFILE = "I_PROFILE"                      # R2: OWL 2 profile membership
+I_SHAPES_LINT = "I_SHAPES_LINT"              # R4: problems in the shapes themselves
+I_EXTERNAL_REFS = "I_EXTERNAL_REFS"          # R5: references to other namespaces
+I_FEATURE_USE = "I_FEATURE_USE"              # R8: feature use matrix
+
 DESCRIPTIONS = {
     E_NO_AXIOMS: "artifact has no logical axioms",
     E_FLAT: "no subClassOf / no object-property axioms",
@@ -47,6 +85,42 @@ DESCRIPTIONS = {
     E_TRIVIALIZED: "input had axioms, output has none",
     E_OVER_RELAXED: "repair removed more than the bound",
     E_PARSE: "artifact could not be parsed",
+    E_DATATYPE_PROFILE: "datatype outside the OWL 2 datatype map",
+    E_UNSAT: "named class can have no instances",
+    E_ABOX_INCONSISTENT: "data file contradicts the ontology",
+    E_SHACL: "data violates the artifact's own shapes",
+    E_UNDECLARED_TERM: "term in an owned namespace is never declared",
+    E_NS_MISMATCH: "references use a variant of a declared namespace",
+    E_LAYER_CONFLICT: "OWL, SHACL and documentation disagree",
+    E_SELF_EXAMPLE: "the artifact's own example fails its shapes",
+    E_REASONER_DISAGREE: "HermiT and Pellet disagree",
+    W_RANGE: "value does not fit the declared range",
+    W_UNENFORCED: "documented requirement with no axiom or shape",
+    W_TODO: "open TODO or FIXME next to an axiom",
+    W_DOC_TERM: "documentation names an undeclared term",
+    W_SUBCLASS_COLLAPSE: "data uses a superclass but none of its subclasses",
+    W_UNUSED_TERM: "declared but never used in the data",
+    W_PLACEHOLDER_IRI: "placeholder IRIs in the data",
+    W_IDENTITY: "one entity appears under several IRIs or labels",
+    W_DUPLICATE_NODE: "identical blank nodes repeated on one subject",
+    W_DOMAIN_RETYPING: "class membership comes only from a property domain",
+    W_NO_BFO: "no BFO alignment",
+    W_HEADER: "ontology header incomplete",
+    W_VERSION: "version numbers disagree",
+    W_CI_NO_SHACL: "shapes ship but CI never runs SHACL",
+    W_CI_NO_REASONER: "CI never runs a reasoner",
+    W_CHANGELOG: "changelog names files that are not in the release",
+    W_IMPORT: "import could not be resolved locally",
+    W_LINT_NO_CHARACTERISTICS: "no property declares any characteristic",
+    W_LINT_INVERSE: "name-paired properties not declared inverse",
+    W_LINT_TRANSITIVE: "likely-transitive property not declared transitive",
+    W_LINT_DISJOINT: "classes that look disjoint are not declared so",
+    W_LINT_FOREIGN_AXIOM: "domain or range placed on another vocabulary's class",
+    W_LINT_ONEOF_UNA: "value list without distinctness axioms",
+    I_PROFILE: "OWL 2 profile membership",
+    I_SHAPES_LINT: "problems in the shapes themselves",
+    I_EXTERNAL_REFS: "references to other namespaces",
+    I_FEATURE_USE: "how the data uses the ontology",
 }
 
 # Which stage each code belongs to (for the report's stage grouping).

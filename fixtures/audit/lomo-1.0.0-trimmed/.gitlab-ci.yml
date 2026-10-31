@@ -1,0 +1,35 @@
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  image: python:3.11
+  tags:
+    - shared-docker
+  script:
+    - pip install --no-cache-dir -r requirements.txt
+    - python scripts/validate_ttl.py -r
+    - python scripts/run_queries.py
+  artifacts:
+    paths:
+      - index.html
+      - output_queries.json
+    expire_in: 1 hour
+  only:
+    - main
+
+pages:
+  stage: deploy
+  tags:
+    - shared-docker
+  dependencies:
+    - build
+  script:
+    - mkdir -p public
+    - cp index.html public/index.html
+  artifacts:
+    paths:
+      - public
+  only:
+    - main

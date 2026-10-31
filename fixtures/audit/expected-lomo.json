@@ -1,0 +1,58 @@
+{
+  "fixture": "fixtures/audit/lomo-1.0.0-trimmed",
+  "about": "What the full audit must find in the trimmed LOMO 1.0.0 release (profile 'general'). Counts are for the trimmed subset; the hand audit's numbers for the full release are in SPEC-audit.md (L1 to L13).",
+  "verdict": "fail",
+  "datatype_profile_names": [":duration", ":frequency", ":instant", "xsd:date", "xsd:duration", "xsd:gDay",
+                             "xsd:gMonth", "xsd:gMonthDay", "xsd:gYear", "xsd:gYearMonth", "xsd:time"],
+  "inconsistent_files": [
+    "data/other/antidumping-microdisks-lomo-instances.ttl",
+    "data/other/financial-reporting-lomo-instances.ttl"
+  ],
+  "minimal_causes": {
+    "data/other/antidumping-microdisks-lomo-instances.ttl": {
+      "turtle_contains": [":countryOfOrigin \"Taiwan\"@en", "rdfs:range xsd:string"],
+      "cause_contains": "is language-tagged, but :countryOfOrigin has range xsd:string"
+    },
+    "data/other/financial-reporting-lomo-instances.ttl": {
+      "turtle_contains": ["lomo:defines", "lomo:hasRequirementType"],
+      "cause_contains": "lomo:ConstitutiveRule and lomo:PrescriptiveRule are declared disjoint"
+    }
+  },
+  "shacl": {
+    "data/examples": {"files": 2, "failing": 2, "violations": 8},
+    "data/lfds/ttl": {"files": 3, "failing": 2, "violations": 14},
+    "data/other": {"files": 3, "failing": 3, "violations": 249},
+    "vocabularies": {"files": 4, "failing": 0, "violations": 0}
+  },
+  "findings": [
+    {"L": "L1", "code": "E_NS_MISMATCH", "title_contains": "deontic-modality#", "severity": "critical", "count": 25},
+    {"L": "L1", "code": "E_NS_MISMATCH", "title_contains": "digital-dimensions#", "severity": "critical", "count": 16},
+    {"L": "L1", "code": "E_NS_MISMATCH", "title_contains": "result-category#", "severity": "critical", "count": 3},
+    {"L": "L1", "code": "E_NS_MISMATCH", "title_contains": "temporal-function#", "severity": "critical", "count": 20},
+    {"L": "L2", "code": "E_DATATYPE_PROFILE", "severity": "critical", "count": 11},
+    {"L": "L3", "code": "W_CI_NO_SHACL", "severity": "major"},
+    {"L": "L3", "code": "W_CI_NO_REASONER", "severity": "major"},
+    {"L": "L5", "code": "E_ABOX_INCONSISTENT", "findings": 2, "severity": "major"},
+    {"L": "L6", "code": "E_SHACL", "title_contains": "data set data/examples", "severity": "critical", "count": 8},
+    {"L": "L6", "code": "E_SHACL", "title_contains": "data set data/lfds/ttl", "severity": "major", "count": 14},
+    {"L": "L6", "code": "E_SHACL", "title_contains": "data set data/other", "severity": "major", "count": 249},
+    {"L": "L7", "code": "E_LAYER_CONFLICT", "title_contains": ":PrescriptiveRule / :hasDeonticModality", "severity": "major"},
+    {"L": "L8", "code": "E_UNDECLARED_TERM", "title_contains": ":establishedInResource", "count": 78},
+    {"L": "L8", "code": "E_UNDECLARED_TERM", "title_contains": ":isSemanticDefinition", "count": 29},
+    {"L": "L8", "code": "E_UNDECLARED_TERM", "title_contains": ":usesDefinition", "count": 16},
+    {"L": "L8", "code": "E_UNDECLARED_TERM", "title_contains": ":hasCondition", "count": 5},
+    {"L": "L8", "code": "W_DOC_TERM", "title_contains": "names hasCondition"},
+    {"L": "L8", "code": "W_DOC_TERM", "title_contains": "names usesDefinition"},
+    {"L": "L8", "code": "W_DOC_TERM", "title_contains": "names hasReferent"},
+    {"L": "L8", "code": "W_DOC_TERM", "title_contains": "names TemporalRule"},
+    {"L": "L8", "code": "W_DOC_TERM", "title_contains": "names lomo:isSemanticDefinition"},
+    {"L": "L9", "code": "E_SELF_EXAMPLE", "title_contains": "example for :PrescriptiveRule", "severity": "major"},
+    {"L": "L10", "code": "W_SUBCLASS_COLLAPSE", "title_contains": "data/lfds/ttl: uses :LegalRule", "count": 4},
+    {"L": "L11", "code": "W_PLACEHOLDER_IRI", "title_contains": "data/lfds/ttl", "severity": "major", "count": 47},
+    {"L": "L11", "code": "W_DUPLICATE_NODE", "title_contains": "via lomo:atTime", "count": 2},
+    {"L": "L12", "code": "W_LINT_NO_CHARACTERISTICS"},
+    {"L": "L12", "code": "W_LINT_INVERSE", "evidence": {"pairs": [[":before", ":after"]]}},
+    {"L": "L13", "code": "W_RANGE", "title_contains": ":hasCapability", "count": 2},
+    {"L": "R9", "code": "W_NO_BFO", "severity": "info", "count": 17}
+  ]
+}

@@ -1,0 +1,49 @@
+@prefix : <http://data.europa.eu/leg/temporal-function/> .
+@prefix lomo: <http://data.europa.eu/leg/lomo#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@base <http://data.europa.eu/leg/temporal-function> .
+
+#################################################################
+#    Temporal Function Scheme
+#################################################################
+
+:TemporalFunctionScheme rdf:type skos:ConceptScheme ;
+    rdfs:label "Temporal Function Scheme"@en ;
+    rdfs:comment "A controlled vocabulary of temporal functions for classifying the role of temporal specifications."@en ;
+    skos:prefLabel "Temporal Function Scheme"@en ;
+    dcterms:title "Temporal Function Controlled Vocabulary"@en ;
+    dcterms:description "Defines the types of temporal functions: deadline (latest completion time), validity (effective period), starting point (commencement time), and trigger (a conditional event that activates a rule or action)."@en ;
+    skos:hasTopConcept :deadline ,
+                       :validity ,
+                       :startingPoint ,
+                       :trigger .
+
+:deadline rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "deadline"@en ;
+    rdfs:comment "A temporal function indicating the latest time by which an action must be completed."@en ;
+    skos:prefLabel "deadline"@en ;
+    skos:inScheme :TemporalFunctionScheme .
+
+:validity rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "validity"@en ;
+    rdfs:comment "A temporal function indicating the period during which a requirement is effective."@en ;
+    skos:prefLabel "validity"@en ;
+    skos:inScheme :TemporalFunctionScheme .
+
+:startingPoint rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "starting point"@en ;
+    rdfs:comment "A temporal function indicating when an action may or must begin."@en ;
+    skos:prefLabel "starting point"@en ;
+    skos:inScheme :TemporalFunctionScheme .
+
+:trigger rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "trigger"@en ;
+    rdfs:comment "A temporal function indicating that a event starts/triggers the application of a rule or an action."@en ;
+    skos:prefLabel "trigger"@en ;
+    skos:inScheme :TemporalFunctionScheme .

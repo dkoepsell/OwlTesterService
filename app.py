@@ -101,8 +101,14 @@ if not os.path.exists(app.config['UPLOADED_OWLS_DEST']):
 # must not stop the rest of the app from starting.
 try:
     from owltester.service import bp as _owltester_bp, configure as _owltester_configure
+    # The full artifact audit adds its routes to the same blueprint (POST
+    # /owltester/audit, GET /owltester/audit/<job_id>...) plus the /audit/<job_id> page.
+    from owltester.audit_service import audit_pages_bp as _audit_pages_bp
+    from owltester.audit_service import audit_mode as _audit_mode
     _owltester_configure()
     app.register_blueprint(_owltester_bp)
+    app.register_blueprint(_audit_pages_bp)
+    app.config['AUDIT_MODE_PUBLIC'] = _audit_mode() == 'public'
     logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)
@@ -152,6 +158,8 @@ except Exception as _e:  # noqa: BLE001
 # The gate accepts uploaded artifacts and runs the reasoner on them.
 limit_endpoint(app, 'owltester.http_check', UPLOAD_LIMIT)
 limit_endpoint(app, 'owltester.http_repair', UPLOAD_LIMIT)
+limit_endpoint(app, 'owltester.audit_start', UPLOAD_LIMIT)
+limit_endpoint(app, 'owltester.audit_lens_draft', AI_LIMIT)
 limit_endpoint(app, 'kindwork.check', UPLOAD_LIMIT)
 for _kw_endpoint in ('build', 'import_model', 'lint', 'ingest', 'mcp'):
     limit_endpoint(app, f'kindwork_module.{_kw_endpoint}', ANALYSIS_LIMIT)

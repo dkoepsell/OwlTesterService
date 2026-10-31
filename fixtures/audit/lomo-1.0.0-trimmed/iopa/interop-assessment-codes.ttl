@@ -1,0 +1,147 @@
+@prefix : <http://data.europa.eu/leg/interop-assessment#> .
+@prefix lomo: <http://data.europa.eu/leg/lomo#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix cav: <http://data.europa.eu/2sa/cav#> .
+
+@base <http://data.europa.eu/leg/interop-assessment> .
+
+#################################################################
+#    Interoperability Assessment Codes
+#
+#    Shared SKOS code lists for the IOPA layer (cav:Assessment /
+#    cav:Statement) used across LFDS instance files: assessment
+#    types (the four LFDS section 4.4 headings), statement types
+#    (measure vs. remaining barrier per assessment dimension) and
+#    interpretation codes (favourability perception).
+#
+#    See also: IOPA 1.0.0 (https://semiceu.github.io/IOPA/releases/1.0.0/)
+#################################################################
+
+:InteropAssessmentScheme rdf:type skos:ConceptScheme ;
+    rdfs:label "Interoperability Assessment Codes"@en ;
+    skos:prefLabel "Interoperability Assessment Codes"@en ;
+    dcterms:title "Interoperability Assessment Controlled Vocabulary"@en ;
+    dcterms:description "Code lists for interoperability assessments of legislative proposals: assessment types matching the LFDS interoperability assessment headings, statement types distinguishing measures from remaining barriers, and interpretation codes expressing the favourability perception of a statement."@en ;
+    dcterms:source "LFDS (Legislative Financial and Digital Statement), section 4.4; IOPA (Interoperability Assessment data model) 1.0.0"@en ;
+    rdfs:seeAlso <http://data.europa.eu/2qy/iopa> ;
+    skos:hasTopConcept :AssessmentTypeAlignmentPolicies ,
+                       :AssessmentTypeOrganisationalMeasures ,
+                       :AssessmentTypeSharedDataUnderstanding ,
+                       :AssessmentTypeStandardsSpecifications ,
+                       :InterpretationPositive ,
+                       :InterpretationNegative ,
+                       :InterpretationNeutral .
+
+#################################################################
+#    Assessment types (LFDS section 4.4 headings)
+#################################################################
+
+:AssessmentTypeAlignmentPolicies rdf:type owl:NamedIndividual , skos:Concept , cav:AssessmentType ;
+    rdfs:label "Alignment with existing digital and sectorial policies"@en ;
+    skos:prefLabel "Alignment with existing digital and sectorial policies"@en ;
+    skos:definition "Assessment of the alignment of the proposal with existing digital and sectorial policies."@en ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:AssessmentTypeOrganisationalMeasures rdf:type owl:NamedIndividual , skos:Concept , cav:AssessmentType ;
+    rdfs:label "Organisational measures for cross-border digital public service delivery"@en ;
+    skos:prefLabel "Organisational measures for cross-border digital public service delivery"@en ;
+    skos:definition "Assessment of the organisational measures taken to ensure a smooth cross-border digital public services delivery."@en ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:AssessmentTypeSharedDataUnderstanding rdf:type owl:NamedIndividual , skos:Concept , cav:AssessmentType ;
+    rdfs:label "Shared understanding of the data"@en ;
+    skos:prefLabel "Shared understanding of the data"@en ;
+    skos:definition "Assessment of the measures taken to ensure a shared understanding of the data."@en ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:AssessmentTypeStandardsSpecifications rdf:type owl:NamedIndividual , skos:Concept , cav:AssessmentType ;
+    rdfs:label "Use of open technical specifications and standards"@en ;
+    skos:prefLabel "Use of open technical specifications and standards"@en ;
+    skos:definition "Assessment of the use of commonly agreed open technical specifications and standards."@en ;
+    skos:inScheme :InteropAssessmentScheme .
+
+#################################################################
+#    Statement types (measure vs. remaining barrier, per dimension)
+#################################################################
+
+:StatementTypeAlignmentMeasure rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Policy alignment measure"@en ;
+    skos:prefLabel "Policy alignment measure"@en ;
+    skos:definition "A measure ensuring alignment with existing digital and sectorial policies."@en ;
+    skos:broader :AssessmentTypeAlignmentPolicies ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:StatementTypeAlignmentBarrier rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Policy alignment barrier"@en ;
+    skos:prefLabel "Policy alignment barrier"@en ;
+    skos:definition "A potential remaining barrier concerning alignment with existing digital and sectorial policies."@en ;
+    skos:broader :AssessmentTypeAlignmentPolicies ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:StatementTypeOrganisationMeasure rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Organisational measure"@en ;
+    skos:prefLabel "Organisational measure"@en ;
+    skos:definition "An organisational measure supporting cross-border digital public service delivery."@en ;
+    skos:broader :AssessmentTypeOrganisationalMeasures ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:StatementTypeOrganisationBarrier rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Organisational barrier"@en ;
+    skos:prefLabel "Organisational barrier"@en ;
+    skos:definition "A potential remaining organisational barrier to cross-border digital public service delivery."@en ;
+    skos:broader :AssessmentTypeOrganisationalMeasures ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:StatementTypeSharedMeasure rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Shared data understanding measure"@en ;
+    skos:prefLabel "Shared data understanding measure"@en ;
+    skos:definition "A measure ensuring a shared understanding of the data."@en ;
+    skos:broader :AssessmentTypeSharedDataUnderstanding ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:StatementTypeSharedBarrier rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Shared data understanding barrier"@en ;
+    skos:prefLabel "Shared data understanding barrier"@en ;
+    skos:definition "A potential remaining barrier to a shared understanding of the data."@en ;
+    skos:broader :AssessmentTypeSharedDataUnderstanding ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:StatementTypeStandardsMeasure rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Standards and specifications measure"@en ;
+    skos:prefLabel "Standards and specifications measure"@en ;
+    skos:definition "A measure ensuring the use of commonly agreed open technical specifications and standards."@en ;
+    skos:broader :AssessmentTypeStandardsSpecifications ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:StatementTypeStandardsBarrier rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Standards and specifications barrier"@en ;
+    skos:prefLabel "Standards and specifications barrier"@en ;
+    skos:definition "A potential remaining barrier to the use of commonly agreed open technical specifications and standards."@en ;
+    skos:broader :AssessmentTypeStandardsSpecifications ;
+    skos:inScheme :InteropAssessmentScheme .
+
+#################################################################
+#    Interpretation codes (favourability perception, IOPA)
+#################################################################
+
+:InterpretationPositive rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Positive"@en ;
+    skos:prefLabel "Positive"@en ;
+    skos:definition "The statement expresses a favourable judgement for interoperability."@en ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:InterpretationNegative rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Negative"@en ;
+    skos:prefLabel "Negative"@en ;
+    skos:definition "The statement expresses an unfavourable judgement for interoperability, e.g. a remaining barrier."@en ;
+    skos:inScheme :InteropAssessmentScheme .
+
+:InterpretationNeutral rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "Neutral"@en ;
+    skos:prefLabel "Neutral"@en ;
+    skos:definition "The statement expresses a neutral judgement for interoperability."@en ;
+    skos:inScheme :InteropAssessmentScheme .

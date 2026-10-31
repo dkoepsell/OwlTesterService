@@ -90,7 +90,52 @@
                     </form>
                 </div>
             </div>
-            
+
+            <div class="card mt-4 shadow-sm" id="audit">
+                <div class="card-header">
+                    <h2 class="h5 mb-0"><i class="fas fa-clipboard-check me-2"></i>Audit a release (zip)</h2>
+                </div>
+                <div class="card-body">
+                    <p class="small">
+                        Audit a released artifact the way a careful reviewer would: the ontology, its
+                        controlled vocabularies, SHACL shapes and instance data, shipped as one
+                        <code>.zip</code>. The audit works out what each file is, reasons over the ontology
+                        and each data set, validates the data against the release's own shapes, checks that
+                        every reference resolves, compares OWL, SHACL and the documentation, profiles the
+                        data and reads the CI setup. You get one report with a scorecard, located findings
+                        and suggested fixes. Nothing in the archive is executed, and nothing is downloaded.
+                    </p>
+                    {% set audit_public = config.get('AUDIT_MODE_PUBLIC') %}
+                    {% if current_user.is_authenticated or audit_public %}
+                    <form action="{{ url_for('owltester.audit_start') }}" method="post" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <input type="file" class="form-control" name="files" multiple required
+                                   accept=".zip,.ttl,.owl,.rdf,.xml,.n3,.nt,.trig,.jsonld,.ofn,.owx,.yaml,.yml">
+                            <div class="form-text">One zip of the release, or its files. An optional
+                                <code>audit.yaml</code> at the archive root overrides what the audit detects.</div>
+                        </div>
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-sm-6">
+                                <label for="audit-profile" class="form-label small mb-1">Profile</label>
+                                <select class="form-select form-select-sm" id="audit-profile" name="profile">
+                                    <option value="general">General (any ontology; BFO alignment advisory)</option>
+                                    <option value="bfo">BFO (the artifact claims BFO alignment)</option>
+                                    <option value="sool">SOoL (kernel artifacts; the full gate too)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-clipboard-check me-2"></i>Start the audit
+                        </button>
+                        <span class="small text-muted ms-2">A large release takes several minutes.</span>
+                    </form>
+                    {% else %}
+                    <p class="small mb-0">An audit is much heavier than a check, so it needs an account.
+                        <a href="{{ url_for('login', next=request.path ~ '#audit') }}">Sign in</a> to run one.</p>
+                    {% endif %}
+                </div>
+            </div>
+
             {% if current_user.is_authenticated %}
             <div class="card mt-4 shadow-sm">
                 <div class="card-header bg-info text-white">

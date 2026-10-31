@@ -56,6 +56,8 @@ Uploads go to `uploads/` directory. Allowed extensions: `owl`, `rdf`, `xml`, `tt
 
 **Multi-file (modular) uploads:** several files or a `.zip` (optionally with `catalog-v001.xml`) go through `ontology_bundle.py`, which resolves `owl:imports` locally (IRI / version IRI / catalog / file name; BFO → vendored), merges the top-level module's import closure into the single stored file, and writes `<file>.bundle.json` (manifest, per-entity module) plus a `<stem>_modules/` dir. `bundle_layers.py` + `/api/bundle/<filename>/layers` reason over each module's closure bottom-up to find the first breaking layer.
 
+**Full artifact audit (`SPEC-audit.md`):** `owltester/audit/` audits a released artifact (ontology, vocabularies, SHACL shapes, data; usually a zip) in stages R0 (roles, data sets, owned namespaces; `artifact.py`, `files.py`, optional `audit.yaml`) to R10, plus conceptual lenses (`lenses.py`, `lens_files/`). No stage halts the audit; findings are folded (`AuditFinding`/`AuditReport` in `owltester/model.py`, codes in `errors.py`). Reasoning goes through `kindwork.module_reasoner.consistency` (HermiT, Pellet cross-check) on a datatype-patched copy. CLI: `python -m owltester.cli audit <zip|dir> [--json|--html|--md]` (exit 1 only on `fail`). Web: `POST /owltester/audit` starts a background job (`audit/jobs.py`, sidecar under `uploads/audits/<job_id>/`), `/audit/<job_id>` polls and renders; `AUDIT_MODE=public|signed-in` (default signed-in). Golden fixture `fixtures/audit/lomo-1.0.0-trimmed/` with `expected-lomo.json`; mini fixtures are overlays on `fixtures/audit/mini/clean/`.
+
 ## Kindwork
 
 Guided ontology building for laypeople, specified in `kindwork_core/docs/` (module spec 0.2.0 and the ecosystem spec).

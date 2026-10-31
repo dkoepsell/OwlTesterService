@@ -1,0 +1,10 @@
+name: release checks
+on: [push]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyshacl
+      - run: pyshacl -s shapes/mini-shapes.ttl -e ontology/mini.ttl -i rdfs data/main/rules.ttl
+      - run: robot reason --reasoner HermiT --input ontology/mini.ttl

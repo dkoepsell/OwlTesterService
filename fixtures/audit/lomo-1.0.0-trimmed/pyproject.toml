@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "lomo"
+version = "1.0.0"
+description = ""
+authors = ["narales <alessio.nardin@ec.europa.eu>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+chevron = "0.14.0"
+pyparsing = "3.3.1"
+rdflib = "7.5.0"
+markdown = "^3.7"
+tulit = "^0.4.6"
+lxml = "^5.1.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^9.0.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

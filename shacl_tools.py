@@ -399,6 +399,7 @@ def validate(data_graph, shapes_graph, ont_graph=None, inference="rdfs"):
             "path": str(path) if isinstance(path, URIRef) else None,
             "path_label": display(path, labels) if path is not None else None,
             "value": display(val(r, SH.value), labels),
+            "value_iri": str(val(r, SH.value)) if isinstance(val(r, SH.value), URIRef) else None,
             "message": str(val(r, SH.resultMessage) or ""),
             "constraint": local_name(component).replace("ConstraintComponent", "") if component else None,
             "source_shape": display(val(r, SH.sourceShape), labels),

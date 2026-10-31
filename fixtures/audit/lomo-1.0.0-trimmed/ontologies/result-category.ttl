@@ -1,0 +1,44 @@
+@prefix : <http://data.europa.eu/leg/result-category/> .
+@prefix lomo: <http://data.europa.eu/leg/lomo#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix vann: <http://purl.org/vocab/vann/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@base <http://data.europa.eu/leg/result-category> .
+
+#################################################################
+#    Result Category Scheme
+#################################################################
+
+:ResultCategoryScheme rdf:type skos:ConceptScheme ;
+    rdfs:label "Result Category Scheme"@en ;
+    rdfs:comment "A controlled vocabulary of result categories for classifying action outputs."@en ;
+    skos:prefLabel "Result Category Scheme"@en ;
+    dcterms:title "Result Category Controlled Vocabulary"@en ;
+    dcterms:description "Defines common categories of outputs produced by actions. Currently includes: report (structured information document) and certificate (official certification document). Additional categories can be added as domain-specific instances."@en ;
+    skos:hasTopConcept :report ,
+                       :certificate .
+
+:report rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "report"@en ;
+    rdfs:comment "A result category representing an account given of a particular matter, in the form of an official document, after thorough investigation or consideration by an appointed person or body."@en ;
+    skos:prefLabel "report"@en ;
+    skos:inScheme :ResultCategoryScheme ;
+    skos:example "Art. 9 of Regulation (EU) 2018/974 on statistics of goods transport by inland waterways (Reports on implementation)."@en ;
+    vann:usageExample """
+# Example: Report on implementation of statistics of goods transport by inland waterways
+ex:Report_Implementation_2024 rdf:type lomo:ActionResult ;
+    rdfs:label "Report on Implementation 2024"@en ;
+    lomo:hasResultCategory <http://data.europa.eu/leg/result-category#report> ;
+    rdfs:comment "Annual report on the implementation of statistics of goods transport by inland waterways, as required by Art. 9 of Regulation (EU) 2018/974."@en .
+"""@en .
+
+:certificate rdf:type owl:NamedIndividual , skos:Concept ;
+    rdfs:label "certificate"@en ;
+    rdfs:comment "A result category representing an official document certifying a particular fact."@en ;
+    skos:prefLabel "certificate"@en ;
+    skos:inScheme :ResultCategoryScheme .
