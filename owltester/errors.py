@@ -59,6 +59,7 @@ W_CI_NO_SHACL = "W_CI_NO_SHACL"              # R10: shapes ship, CI never runs S
 W_CI_NO_REASONER = "W_CI_NO_REASONER"        # R10: CI never runs a reasoner
 W_CHANGELOG = "W_CHANGELOG"                  # R10: changelog names files that are absent
 W_IMPORT = "W_IMPORT"                        # R0: import could not be resolved locally
+W_CONFIG = "W_CONFIG"                        # R0: audit.yaml / audit.json could not be read
 W_LINT_NO_CHARACTERISTICS = "W_LINT_NO_CHARACTERISTICS"   # R2b
 W_LINT_INVERSE = "W_LINT_INVERSE"                         # R2b
 W_LINT_TRANSITIVE = "W_LINT_TRANSITIVE"                   # R2b
@@ -111,11 +112,12 @@ DESCRIPTIONS = {
     W_CI_NO_REASONER: "CI never runs a reasoner",
     W_CHANGELOG: "changelog names files that are not in the release",
     W_IMPORT: "import could not be resolved locally",
+    W_CONFIG: "audit configuration could not be read",
     W_LINT_NO_CHARACTERISTICS: "no property declares any characteristic",
     W_LINT_INVERSE: "name-paired properties not declared inverse",
     W_LINT_TRANSITIVE: "likely-transitive property not declared transitive",
     W_LINT_DISJOINT: "classes that look disjoint are not declared so",
-    W_LINT_FOREIGN_AXIOM: "domain or range placed on another vocabulary's class",
+    W_LINT_FOREIGN_AXIOM: "domain or range added to another vocabulary's property",
     W_LINT_ONEOF_UNA: "value list without distinctness axioms",
     I_PROFILE: "OWL 2 profile membership",
     I_SHAPES_LINT: "problems in the shapes themselves",

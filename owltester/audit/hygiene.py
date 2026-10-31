@@ -1,6 +1,7 @@
 """R10: release hygiene. Everything here is read as text and never executed."""
 
 import json
+import os
 import re
 
 from rdflib import OWL, RDF, URIRef
@@ -18,14 +19,14 @@ PEOPLE = [URIRef(DCT + x) for x in ("creator", "contributor", "publisher")] + \
      URIRef("http://purl.org/pav/authoredBy"), URIRef("http://purl.org/pav/createdBy")]
 MODIFIED = [URIRef(DCT + "modified"), URIRef(DCT + "date"), URIRef(DCT + "issued")]
 VERSION = re.compile(r"(?<![\w.])v?(\d+\.\d+(?:\.\d+)?(?:[-.]?(?:rc|alpha|beta)\d*)?)(?![\w.])", re.I)
-CI_FILES = re.compile(r"(^|/)(\.gitlab-ci\.ya?ml|\.github/workflows/[^/]+\.ya?ml|Makefile|tox\.ini|"
+CI_FILES = re.compile(r"(^|/)(\.gitlab-ci\.ya?ml|\.github/workflows/[^/]+\.ya?ml|tox\.ini|"
                       r"noxfile\.py|\.circleci/config\.ya?ml|Jenkinsfile|azure-pipelines\.ya?ml|"
                       r"\.travis\.ya?ml|bitbucket-pipelines\.ya?ml)$")
 CHECKS = {
     "syntax": re.compile(r"riot\s+--validate|rapper|rdflib|validate[_-]?(ttl|turtle|rdf|syntax)|"
                          r"turtle[_-]?(lint|validate)|ttl[_-]?lint", re.I),
     "shacl": re.compile(r"pyshacl|shacl\s+validate|jena\s+shacl|shaclvalidate|topbraid|\bshacl\b", re.I),
-    "reasoning": re.compile(r"robot\s+(reason|explain)|hermit|pellet|owlready|\belk\b|"
+    "reasoning": re.compile(r"robot(?:\.jar)?\s+(reason|explain)|hermit|pellet|owlready|\belk\b|"
                             r"konclude|openllet|sync_reasoner", re.I),
     "tests": re.compile(r"pytest|unittest|\bnox\b|\btox\b", re.I),
 }
@@ -92,6 +93,119 @@ def _versions(art, header_rows):
     return found
 
 
+MAKE_CALL = re.compile(r"(?<![\w$(-])make((?:[ \t]+(?:-C[ \t]*\S+|-f[ \t]*\S+|--?[\w-]+|\w+=\S*|[\w./%-]+))*)")
+WORKDIR = re.compile(r"working-directory:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.M)
+MAKE_ASSIGN = re.compile(r"^([A-Za-z_]\w*)[ \t]*(?:::=|:=|\?=|\+=|=)[ \t]*(.*)$", re.M)
+MAKE_RULE = re.compile(r"^([^\s:#=][^:#=]*?)[ \t]*::?(?!=)[ \t]*([^\n;]*)$")
+
+
+def _make_vars(text):
+    out = {}
+    for name, value in MAKE_ASSIGN.findall(text):
+        out.setdefault(name, value.strip())
+    return out
+
+
+def _expand(text, variables, depth=4):
+    for _ in range(depth):
+        new = re.sub(r"\$[({]([A-Za-z_]\w*)[)}]", lambda m: variables.get(m.group(1), ""), text)
+        if new == text:
+            break
+        text = new
+    return text
+
+
+def _make_rules(text):
+    """({target: (prerequisites, recipe)}, default target), variables expanded."""
+    variables = _make_vars(text)
+    lines = text.splitlines()
+    rules, default = {}, None
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = None
+        if line and not line.startswith(("\t", "#")) and not MAKE_ASSIGN.match(line):
+            m = MAKE_RULE.match(line)
+        if not m:
+            i += 1
+            continue
+        targets = _expand(m.group(1), variables).split()
+        prereqs = _expand(m.group(2), variables).replace("|", " ").split()
+        recipe = []
+        i += 1
+        while i < len(lines) and (lines[i].startswith("\t") or not lines[i].strip()):
+            if lines[i].startswith("\t"):
+                recipe.append(_expand(lines[i], variables))
+            i += 1
+        for t in targets:
+            old_pre, old_rec = rules.get(t, ([], ""))
+            rules[t] = (old_pre + prereqs, old_rec + "\n".join(recipe) + "\n")
+            if default is None and not t.startswith(".") and "%" not in t:
+                default = t
+    return rules, default
+
+
+def _make_reachable(text, goals):
+    """Recipes of the goals (or the default target) and everything they depend on."""
+    rules, default = _make_rules(text)
+    todo = list(goals) if goals else ([default] if default else [])
+    seen, out = set(), []
+    while todo:
+        t = todo.pop()
+        if t in seen or t not in rules:
+            continue
+        seen.add(t)
+        prereqs, recipe = rules[t]
+        out.append(recipe)
+        todo.extend(prereqs)
+    return "\n".join(out), sorted(seen)
+
+
+def _repo_root(path):
+    """The directory a CI file belongs to: the parent of .github/, or of .gitlab-ci.yml."""
+    if "/.github/" in "/" + path:
+        return ("/" + path).split("/.github/")[0].lstrip("/")
+    return os.path.dirname(path)
+
+
+def _make_texts(f, text, by_path):
+    """Follow each ``make`` call in a CI file into the Makefile it runs and
+    return [(where, recipe text)] for the targets it reaches. Targets that a
+    Makefile defines but CI never reaches earn no credit."""
+    out = []
+    root = _repo_root(f.path)
+    workdirs = [w.strip().rstrip("/") for w in WORKDIR.findall(text)] or [""]
+    for m in MAKE_CALL.finditer(text):
+        args = m.group(1).split()
+        mdir, mfile, goals = None, "Makefile", []
+        j = 0
+        while j < len(args):
+            a = args[j]
+            if a in ("-C", "-f") and j + 1 < len(args):
+                if a == "-C":
+                    mdir = args[j + 1]
+                else:
+                    mfile = args[j + 1]
+                j += 2
+                continue
+            if a.startswith("-C"):
+                mdir = a[2:]
+            elif not a.startswith("-") and "=" not in a:
+                goals.append(a)
+            j += 1
+        for d in ([mdir] if mdir else workdirs):
+            d = "" if d in (None, ".", "./") else d.strip("/")
+            if d.startswith("./"):
+                d = d[2:]
+            path = "/".join(p for p in (root, d, mfile) if p)
+            target = by_path.get(path)
+            if target is None or target.kind != "text":
+                continue
+            recipes, reached = _make_reachable(target.text(400_000), goals)
+            out.append((f"{target.path} (targets run by CI: {', '.join(reached) or 'none'})", recipes))
+    return out
+
+
 def _ci(art):
     configs = [f for f in art.files if CI_FILES.search(f.path) and f.kind != "binary"]
     by_path = {f.path: f for f in art.files}
@@ -103,6 +217,7 @@ def _ci(art):
             target = by_path.get(ref.lstrip("./"))
             if target is not None and target.kind == "text":
                 texts.append((target.path, target.text(400_000)))
+        texts += _make_texts(f, text, by_path)
         for where, t in texts:
             for kind, rx in CHECKS.items():
                 if rx.search(t):

@@ -438,21 +438,24 @@ def _lint_foreign(ctx, art, onto, ofiles):
                 continue
             if (c, RDF.type, RDFS.Datatype) in onto:
                 continue
-            foreign_class = not art.is_owned(c)
-            foreign_prop = isinstance(p, URIRef) and not art.is_owned(p)
-            if foreign_class or foreign_prop:
-                hits.append({"property": qname(onto, p), "axiom": local(pred),
-                             "class": qname(onto, c),
-                             "why": "the property belongs to another vocabulary" if foreign_prop
-                             else "the class belongs to another vocabulary"})
+            if not isinstance(p, URIRef) or art.is_owned(p):
+                # Your own property with another vocabulary's class (a BFO
+                # category, dcterms:Agent) is alignment, not a problem.
+                continue
+            if not art.is_owned(c) and split_iri(str(c))[0] == split_iri(str(p))[0]:
+                # The other vocabulary's own axiom, shipped in an import extract.
+                continue
+            hits.append({"property": qname(onto, p), "axiom": local(pred),
+                         "class": qname(onto, c),
+                         "why": "a domain or range added to another vocabulary's property"})
     if hits:
         ctx.add("R2b", errors.W_LINT_FOREIGN_AXIOM, "minor",
-                f"{len(hits)} domain or range axioms involve another vocabulary's terms",
-                "A domain or range retypes every subject or object that uses the property, "
-                "including data that never meant to use this ontology's model.",
+                f"{len(hits)} domain or range axioms added to another vocabulary's properties",
+                "A domain or range retypes every subject or object that uses the property, so "
+                "one added to a property you do not own retypes other people's data too.",
                 files=ofiles, count=len(hits), evidence={"axioms": hits[:40]},
-                fix="Use a local subclass or a SHACL shape instead of a domain or range on a "
-                    "class or property you do not own.")
+                fix="Use a local subproperty, or a SHACL shape, instead of a domain or range "
+                    "on a property you do not own.")
 
 
 def _lint_oneof(ctx, tbox, onto, ofiles):

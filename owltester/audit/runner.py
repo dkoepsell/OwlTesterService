@@ -61,6 +61,13 @@ def run_r0(ctx):
                 fix="Ship the imported ontologies with the release, or list them in a catalog.")
     for lim in art.limits:
         ctx.limits_hit.append(lim)
+    if art.config.get("_config_error"):
+        ctx.add("R0", errors.W_CONFIG, "major", "The audit configuration could not be read",
+                f"{art.config['_config_error']}. The audit ran with the roles it detected "
+                "from file contents, so any overrides in that file were not applied.",
+                files=[n for n in ("audit.yaml", "audit.yml", "audit.json")
+                       if art.config["_config_error"].startswith(n)],
+                fix="Correct the file, or write the same settings as audit.json.")
     unknown = art.config.get("_unknown_keys") or []
     m = art.manifest()
     ctx.finish("R0", "Ingest and role detection", status="pass",
@@ -69,6 +76,60 @@ def run_r0(ctx):
                         + f"; {len(art.data_sets)} data sets"
                         + (f"; audit.yaml keys not understood: {', '.join(unknown)}" if unknown else "")),
                notes={})
+
+
+def apply_expected(ctx):
+    """Mark findings the release declares expected (config ``expected``).
+
+    An entry matches a finding with the same code, in the given stage if one is
+    named, and touching a file that matches the entry's glob if one is named.
+    Matched findings stay in the report with the release's reason attached; they
+    do not count toward the verdict. Entries that match nothing are reported, so
+    a stale declaration cannot hide silently.
+    """
+    from .files import _glob_match
+    entries = ctx.artifact.config.get("expected") or []
+    unmatched = []
+    for e in entries:
+        hit = False
+        for f in ctx.findings:
+            if f.code != e["code"] or (e.get("stage") and f.stage != e["stage"]):
+                continue
+            if e.get("file") and not _glob_match_any(f, e["file"], _glob_match):
+                continue
+            f.expected = e["reason"]
+            hit = True
+        if not hit:
+            unmatched.append(e)
+    if unmatched:
+        ctx.add("R0", errors.W_CONFIG, "info",
+                f"{len(unmatched)} expected outcome(s) declared by the release did not occur",
+                "The audit configuration declares these findings expected, but the audit did "
+                "not report them. The declaration may be stale, or the outcome no longer happens.",
+                count=len(unmatched), evidence={"unmatched": unmatched},
+                fix="Remove the entries that no longer apply.")
+    if entries:
+        n = sum(1 for f in ctx.findings if f.expected)
+        st = ctx.stages.get("R0")
+        if st is not None and n:
+            st["summary"] += f"; {n} finding(s) marked expected by the release"
+    # A stage that failed only on expected findings reports what is left.
+    rank = {"fail": 2, "warn": 1, "pass": 0}
+    for code, st in ctx.stages.items():
+        mine = ctx.stage_findings(code)
+        exp = [f for f in mine if f.expected]
+        if not exp or st.get("status") not in rank:
+            continue
+        sev = {f.severity for f in mine if not f.expected}
+        new = "fail" if sev & {"critical", "major"} else "warn" if "minor" in sev else "pass"
+        if rank[new] < rank[st["status"]]:
+            st["status"] = new
+            st["summary"] = (st.get("summary") or "").rstrip(".") + f" ({len(exp)} expected by the release)."
+
+
+def _glob_match_any(finding, pattern, matcher):
+    files = list(finding.files) + [p for p in (finding.evidence or {}).get("files", ()) if isinstance(p, str)]
+    return any(matcher(p, [pattern]) for p in files)
 
 
 def run_audit(source, profile="general", config_path=None, budget=None, max_explanations=None,
@@ -112,6 +173,7 @@ def run_audit(source, profile="general", config_path=None, budget=None, max_expl
                                     "summary": f"The stage stopped with an error: "
                                                f"{type(e).__name__}: {str(e)[:300]}", "notes": {}}
         shacl_check.link(ctx)
+        apply_expected(ctx)
         lens_tables = lenses.run_lenses(ctx) if lenses_enabled else []
         report = AuditReport(
             artifact=art.name,

@@ -150,6 +150,7 @@ def run_r3(ctx):
                                    "can use.")
 
     inconsistent_files = []
+    set_files = []
     for name in sorted(art.data_sets):
         if ctx.budget.expired():
             ctx.limit("R3", "total", f"data set {name} not reasoned over")
@@ -164,6 +165,7 @@ def run_r3(ctx):
         if r["status"] in ("timeout", "error"):
             # the set as a whole could not be decided: fall back to file by file
             ctx.limit("R3", "reasoner", f"data set {name}: {r['detail']} Reasoned file by file instead.")
+        found = 0
         for f in files:
             if ctx.budget.expired():
                 ctx.limit("R3", "total", f"{f.path} not reasoned over")
@@ -172,10 +174,31 @@ def run_r3(ctx):
             notes["files"][f.path] = fr["status"]
             if fr["status"] == "inconsistent":
                 inconsistent_files.append(f)
+                found += 1
             elif fr["status"] in ("timeout", "error"):
                 ctx.limit("R3", "reasoner", f"{f.path}: {fr['detail']}")
+        if r["status"] == "inconsistent" and not found and not ctx.budget.expired():
+            # Every file is consistent alone, but not together: report the set,
+            # or the contradiction would vanish from the report.
+            set_files.append((name, files))
 
     explained = 0
+    for name, files in set_files:
+        legacy = _legacy(ctx, name)
+        evidence, message = {}, ""
+        if ctx.options.get("explain", True) and explained < ctx.budget["max_explanations"]:
+            ctx.progress("R3", f"explaining data set {name}")
+            explained += 1
+            evidence = explain(ctx, tbox, _SetAsFile(f"data set {name}", art.data_graph(name)))
+            message = " ".join(evidence.get("causes", []))
+        ctx.add("R3", errors.E_ABOX_INCONSISTENT, "major" if legacy else "critical",
+                f"Data set {name} contradicts the ontology when its files are combined",
+                "Each file is consistent with the ontology on its own; together they are not "
+                f"({LABEL}). " + message,
+                files=[f.path for f in files],
+                evidence=dict(evidence, data_set=name, combined=True),
+                fix=evidence.get("fix", "Correct the triples listed as the minimal cause; they "
+                                        "may come from more than one file."))
     by_set = {}
     for f in inconsistent_files:
         by_set.setdefault(f.data_set, []).append(f)
@@ -204,6 +227,7 @@ def run_r3(ctx):
     summary = (f"TBox consistent, {len(res['unsatisfiable'])} unsatisfiable classes"
                + (f", {inferred} inferred subsumptions" if inferred is not None else "")
                + f"; {len(inconsistent_files)} inconsistent data files"
+               + (f", {len(set_files)} data set(s) inconsistent only when combined" if set_files else "")
                + (f" ({LABEL})." if ctx.patches else "."))
     ctx.finish("R3", "Reasoning", summary=summary, notes=notes)
 
@@ -286,6 +310,13 @@ def _minimize(ctx, tbox, triples, deadline):
                 return current, True, checks
             n = min(len(current), n * 2)
     return current, True, checks
+
+
+class _SetAsFile:
+    """A data set's merged graph, shaped like an ArtifactFile for explain()."""
+
+    def __init__(self, path, graph):
+        self.path, self.graph = path, graph
 
 
 def explain(ctx, tbox, f):
