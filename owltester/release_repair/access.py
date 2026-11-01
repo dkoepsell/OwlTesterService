@@ -36,9 +36,23 @@ def current():
     return None, "", ""
 
 
+def matches(allow, username, email):
+    """Is the account named in ``allow``? An entry with "@" names an email and matches only
+    the account's email; any other entry matches only the username. So nobody can register
+    a username that equals someone's allowlisted email. Case-insensitive; registration
+    refuses case-variants of an existing username or email."""
+    username, email = (username or "").strip().lower(), (email or "").strip().lower()
+    for entry in allow:
+        if "@" in entry:
+            if email and entry == email:
+                return True
+        elif username and entry == username:
+            return True
+    return False
+
+
 def is_allowed(username, email):
-    allow = allowed_users()
-    return bool(allow) and bool({username.lower(), email.lower()} & allow - {""})
+    return matches(allowed_users(), username, email)
 
 
 def may_repair():
@@ -67,5 +81,6 @@ def describe():
     """One line for the startup log: who may audit and who may repair."""
     audit_allow = os.environ.get("AUDIT_ALLOWED_USERS", "").strip()
     repair = sorted(allowed_users())
-    return (f"full audits: {'only ' + audit_allow if audit_allow else 'nobody (AUDIT_ALLOWED_USERS is empty)'}; "
+    return (f"full audits: {('only ' + audit_allow) if audit_allow else 'no one named (AUDIT_ALLOWED_USERS is empty)'}"
+            " plus power users; "
             f"guided repair: {'only ' + ', '.join(repair) if repair else 'nobody (REPAIR_ALLOWED_USERS is empty)'}")

@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block title %}Power users{% endblock %}
+{% block content %}
+<div class="container mt-4" style="max-width: 820px">
+  <h1 class="h3">Power users</h1>
+  <p class="text-muted">Power users may run full audits, and will get future power-user features. Admins (ADMIN_USERS)
+    are power users already. A change takes effect on the user's next request.</p>
+  {% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+  {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+  <form method="post" class="row g-2 mb-4">
+    <input type="hidden" name="token" value="{{ token }}"><input type="hidden" name="action" value="add">
+    <div class="col-md-5"><input class="form-control" name="account" placeholder="Username or email of a registered account" required></div>
+    <div class="col-md-5"><input class="form-control" name="note" placeholder="Note (optional)" maxlength="200"></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100" type="submit">Add</button></div>
+  </form>
+  <table class="table table-sm">
+    <thead><tr><th>Account</th><th>Email</th><th>Granted</th><th>Note</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr><td>{{ r.user.username if r.user else r.user_id }}</td><td>{{ r.user.email if r.user else '' }}</td>
+        <td>{{ r.granted_at.strftime('%Y-%m-%d') }}</td><td>{{ r.note }}</td>
+        <td><form method="post" class="m-0"><input type="hidden" name="token" value="{{ token }}">
+          <input type="hidden" name="action" value="remove"><input type="hidden" name="user_id" value="{{ r.user_id }}">
+          <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button></form></td></tr>
+    {% else %}
+      <tr><td colspan="5" class="text-muted">No power users yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

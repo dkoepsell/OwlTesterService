@@ -114,12 +114,16 @@ try:
     app.register_blueprint(_owltester_bp)
     app.register_blueprint(_audit_pages_bp)
     app.register_blueprint(_release_service.release_pages_bp)
+    # Site admins (ADMIN_USERS) grant power users at /admin/power-users.
+    from owltester import power as _power
+    app.register_blueprint(_power.admin_bp)
     app.context_processor(lambda: {'may_start_audit': _may_start_audit,
-                                   'may_build_release': _release_service.may_build})
+                                   'may_build_release': _release_service.may_build,
+                                   'is_site_admin': _power.is_admin})
     logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
     # States who may audit and who may repair, so a misconfiguration shows in the logs.
-    logging.getLogger(__name__).warning("access: %s; %s", _repair_service.startup_line(),
-                                        _release_service.describe())
+    logging.getLogger(__name__).warning("access: %s; %s; %s", _repair_service.startup_line(),
+                                        _release_service.describe(), _power.describe())
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)
 
@@ -181,6 +185,7 @@ for _repair_endpoint in ('repair_decide', 'repair_comment', 'repair_add_member',
 # The release builder runs ROBOT, HermiT and the audit; publishing talks to GitHub.
 limit_endpoint(app, 'release_pages.release_create', UPLOAD_LIMIT, methods=['POST'])
 limit_endpoint(app, 'release_pages.release_step', ANALYSIS_LIMIT, methods=['POST'])
+limit_endpoint(app, 'admin.power_users_change', ANALYSIS_LIMIT)
 for _release_endpoint in ('release_repair', 'release_repaired', 'release_publish', 'release_github_token'):
     limit_endpoint(app, f'release_pages.{_release_endpoint}', ANALYSIS_LIMIT)
 limit_endpoint(app, 'kindwork.check', UPLOAD_LIMIT)
@@ -211,12 +216,17 @@ class RegistrationForm(FlaskForm):
     submit = SubmitField('Register')
     
     def validate_username(self, username):
-        user = User.query.filter_by(username=username.data).first()
+        from sqlalchemy import func
+        # No "@": access lists name accounts by email, and a username must never pass for one.
+        if '@' in (username.data or ''):
+            raise ValidationError('A username cannot contain "@".')
+        user = User.query.filter(func.lower(User.username) == (username.data or '').strip().lower()).first()
         if user is not None:
             raise ValidationError('Please use a different username.')
-            
+
     def validate_email(self, email):
-        user = User.query.filter_by(email=email.data).first()
+        from sqlalchemy import func
+        user = User.query.filter(func.lower(User.email) == (email.data or '').strip().lower()).first()
         if user is not None:
             raise ValidationError('Please use a different email address.')
 

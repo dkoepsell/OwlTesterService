@@ -637,3 +637,78 @@ def test_audit_http_flow(flask_app, monkeypatch, tmp_path):
     assert res.status_code == 200 and res.get_json()["status"] == "rejected"
     # another visitor cannot see the job
     assert flask_app.test_client().get(f"/owltester/audit/{job_id}").status_code == 404
+
+
+def test_only_the_named_account_may_audit(flask_app, monkeypatch):
+    """Allowlist entries with "@" match only the email; others only the username. A user
+    who registers a username equal to the owner's email, or a case-variant, is refused."""
+    from models import User, db
+    from owltester.release_repair.access import matches
+    allow = {"owner@example.test"}
+    assert matches(allow, "anything", "Owner@Example.test")
+    assert not matches(allow, "owner@example.test", "intruder@example.test")
+    assert not matches({"owner"}, "intruder", "owner@x.test")
+    assert not matches(set(), "owner", "owner@example.test")
+    monkeypatch.setenv("AUDIT_ALLOWED_USERS", "owner@example.test")
+    with flask_app.app_context():
+        if User.query.filter_by(username="owner@example.test").first() is None:
+            db.session.add(User(username="owner@example.test", email="intruder@example.test", password_hash="x"))
+            db.session.commit()
+    sneaky = flask_app.test_client()
+    with flask_app.app_context():
+        uid = User.query.filter_by(username="owner@example.test").first().id
+    with sneaky.session_transaction() as sess:
+        sess["_user_id"], sess["_fresh"] = str(uid), True
+    res = sneaky.post("/owltester/audit", data={}, headers={"Accept": "application/json"})
+    assert res.status_code == 403
+    owner = _signed_in_client(flask_app, "owner")
+    assert owner.post("/owltester/audit", data={}, headers={"Accept": "application/json"}).status_code == 400
+
+
+def test_registration_refuses_lookalike_accounts(flask_app):
+    from app import RegistrationForm
+    _signed_in_client(flask_app, "owner")                     # owner / owner@example.test
+    flask_app.config["WTF_CSRF_ENABLED"] = False
+    with flask_app.app_context():
+        from models import User, db
+        if User.query.filter_by(username="gmailowner").first() is None:
+            db.session.add(User(username="gmailowner", email="gmailowner@example.com", password_hash="x"))
+            db.session.commit()
+    cases = [("owner@example.com", "x@example.com"),          # username that looks like an email
+             ("OWNER", "y@example.com"),                      # case-variant username
+             ("newname", "GmailOwner@Example.COM")]           # case-variant email
+    for username, email in cases:
+        with flask_app.test_request_context(method="POST", data={
+                "username": username, "email": email, "password": "longpassword", "password2": "longpassword"}):
+            assert not RegistrationForm().validate(), (username, email)
+    with flask_app.test_request_context(method="POST", data={
+            "username": "fresh-user", "email": "fresh@example.com", "password": "longpassword",
+            "password2": "longpassword"}):
+        assert RegistrationForm().validate()
+
+
+def test_admin_grants_and_revokes_power_users(flask_app, monkeypatch):
+    import re
+    monkeypatch.setenv("ADMIN_USERS", "admin@example.test")
+    monkeypatch.delenv("AUDIT_ALLOWED_USERS", raising=False)
+    admin = _signed_in_client(flask_app, "admin")
+    user = _signed_in_client(flask_app, "poweruser")
+    start = lambda c: c.post("/owltester/audit", data={}, headers={"Accept": "application/json"}).status_code
+    assert start(user) == 403
+    assert user.get("/admin/power-users").status_code == 404           # not an admin
+    assert user.post("/admin/power-users", data={"action": "add", "account": "poweruser"}).status_code == 404
+    page = admin.get("/admin/power-users")
+    assert page.status_code == 200
+    token = re.search(rb'name="token" value="([^"]+)"', page.data).group(1).decode()
+    assert admin.post("/admin/power-users", data={"action": "add", "account": "poweruser"}).status_code == 400
+    res = admin.post("/admin/power-users", data={"token": token, "action": "add",
+                                                 "account": "poweruser@example.test", "note": "pilot"})
+    assert res.status_code == 302 and "now+a+power+user" in res.headers["Location"]
+    assert start(user) == 400                                          # allowed through; empty upload
+    assert start(admin) == 400                                         # admins are power users
+    from models import User
+    with flask_app.app_context():
+        uid = User.query.filter_by(username="poweruser").first().id
+    admin.post("/admin/power-users", data={"token": token, "action": "remove", "user_id": str(uid)})
+    assert start(user) == 403
+    assert start(_signed_in_client(flask_app, "someone")) == 403

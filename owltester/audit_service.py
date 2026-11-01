@@ -39,7 +39,8 @@ def audit_mode():
 
 def allowed_users():
     """AUDIT_ALLOWED_USERS: comma-separated usernames or emails who may start an
-    audit. Empty means nobody may."""
+    audit. Power users granted by an admin (owltester/power.py) may too. Neither
+    means nobody may."""
     raw = os.environ.get("AUDIT_ALLOWED_USERS", "")
     return {u.strip().lower() for u in raw.split(",") if u.strip()}
 
@@ -52,8 +53,10 @@ def may_start_audit():
         signed_in = current_user.is_authenticated
     except Exception:  # noqa: BLE001 - served without flask-login
         current_user, signed_in = None, False
-    return signed_in and bool({str(getattr(current_user, "username", "")).lower(),
-                               str(getattr(current_user, "email", "")).lower()} & allow)
+    from .power import is_power_user
+    from .release_repair.access import matches
+    return signed_in and (matches(allow, str(getattr(current_user, "username", "") or ""),
+                                  str(getattr(current_user, "email", "") or "")) or is_power_user())
 
 
 def _upload_dir():

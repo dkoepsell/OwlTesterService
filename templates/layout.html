@@ -45,6 +45,11 @@
                                 <li><a class="dropdown-item" href="/sandbox">
                                     <i class="fas fa-project-diagram me-2"></i> Build Ontology
                                 </a></li>
+                                {% if is_site_admin is defined and is_site_admin() %}
+                                <li><a class="dropdown-item" href="{{ url_for('admin.power_users') }}">
+                                    <i class="fas fa-user-shield me-2"></i> Power Users
+                                </a></li>
+                                {% endif %}
                                 {% if may_build_release is defined and may_build_release() %}
                                 <li><a class="dropdown-item" href="{{ url_for('release_pages.release_new') }}">
                                     <i class="fas fa-box-archive me-2"></i> Build a Release

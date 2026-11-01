@@ -97,7 +97,12 @@ repairs stay private (`SPEC-audit-repair.md`, section 1):
 AUDIT_ALLOWED_USERS=<owner account>
 REPAIR_ALLOWED_USERS=<owner account>
 BUILD_ALLOWED_USERS=<owner account>
+ADMIN_USERS=<owner account>
 ```
+
+An entry with `@` matches only the account's email, any other only its username. Admins
+grant and revoke **power users** at `/admin/power-users`; a power user may run full audits
+(and future power-user features) without being named in `AUDIT_ALLOWED_USERS`.
 
 All three fail closed: an empty list means nobody may audit, repair or build releases. Audits always need
 sign-in and only the account that ran one can see it; there is no public mode (`AUDIT_MODE`
