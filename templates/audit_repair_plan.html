@@ -228,7 +228,7 @@
     <div class="card-body">
       <h2 class="h5">People on this plan</h2>
       <p class="small text-muted">An approver may accept, apply and export; a reviewer may view, comment and
-        propose. Each must also be named in REPAIR_ALLOWED_USERS.</p>
+        propose. Each must also be named in REPAIR_ALLOWED_USERS or be a power user.</p>
       <ul id="members">
         {% for m in plan.members %}<li data-user="{{ m.user_id }}">{{ m.name }}: {{ m.role }}
           <button type="button" class="btn btn-sm btn-link member-remove">remove</button></li>{% endfor %}

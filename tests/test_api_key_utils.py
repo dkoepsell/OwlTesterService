@@ -10,7 +10,14 @@ def test_explicit_key_wins(monkeypatch):
 
 def test_falls_back_to_env(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-env")
+    monkeypatch.setenv("SERVER_AI_KEY_FOR", "all")
     assert api_key_utils.resolve_openai_key() == "sk-env"
+
+
+def test_server_key_withheld_outside_a_power_user_request(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-env")
+    monkeypatch.delenv("SERVER_AI_KEY_FOR", raising=False)
+    assert api_key_utils.resolve_openai_key() is None
 
 
 def test_none_when_nothing_configured(monkeypatch):

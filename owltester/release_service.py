@@ -13,7 +13,7 @@ JSON / downloads:
     POST /release/<id>/publish              GitHub: a dry run, then {confirm: true} pushes
     POST|DELETE /release/github-token       the owner's own token, stored encrypted
 
-Access: signed in and named in BUILD_ALLOWED_USERS (empty means nobody); a build
+Access: signed in, and named in BUILD_ALLOWED_USERS or a power user (owltester/power.py); a build
 belongs to the account that started it and only that account can see it (404
 otherwise). Publishing is owner only and confirmed each time.
 """
@@ -52,15 +52,20 @@ def allowed_users():
 
 
 def may_build():
-    """Signed in and named in BUILD_ALLOWED_USERS. Fails closed."""
+    """Signed in, and named in BUILD_ALLOWED_USERS or a power user. Fails closed."""
     uid, username, email = repair_access.current()
-    allow = allowed_users()
-    return uid is not None and repair_access.matches(allow, username, email)
+    if uid is None:
+        return False
+    if repair_access.matches(allowed_users(), username, email):
+        return True
+    from .power import is_power_user
+    return is_power_user()
 
 
 def describe():
     allow = sorted(allowed_users())
-    return f"release builder: {'only ' + ', '.join(allow) if allow else 'nobody (BUILD_ALLOWED_USERS is empty)'}"
+    named = 'only ' + ', '.join(allow) if allow else 'no one named (BUILD_ALLOWED_USERS is empty)'
+    return f"release builder: {named} plus power users"
 
 
 def _root():

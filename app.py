@@ -122,8 +122,13 @@ try:
                                    'is_site_admin': _power.is_admin})
     logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
     # States who may audit and who may repair, so a misconfiguration shows in the logs.
-    logging.getLogger(__name__).warning("access: %s; %s; %s", _repair_service.startup_line(),
-                                        _release_service.describe(), _power.describe())
+    from api_key_utils import server_key_policy as _server_key_policy
+    with app.app_context():
+        _power_line = _power.describe()
+    logging.getLogger(__name__).warning(
+        "access: %s; %s; %s; server AI key: %s", _repair_service.startup_line(),
+        _release_service.describe(), _power_line,
+        'everyone' if _server_key_policy() == 'all' else 'power users only')
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)
 
@@ -1674,12 +1679,13 @@ def analysis_probe(analysis_id):
 def inject_ai_key_status():
     """Expose AI key availability to all templates so the UI can prompt for a key."""
     try:
-        from api_key_utils import has_ai_key, ai_key_source, active_provider
+        from api_key_utils import has_ai_key, ai_key_source, active_provider, server_key_withheld
         return {'ai_key_available': has_ai_key(), 'ai_key_source': ai_key_source(),
-                'ai_provider': active_provider() or 'openai'}
+                'ai_provider': active_provider() or 'openai',
+                'ai_server_key_withheld': server_key_withheld()}
     except Exception:
         return {'ai_key_available': False, 'ai_key_source': 'none',
-                'ai_provider': 'openai'}
+                'ai_provider': 'openai', 'ai_server_key_withheld': False}
 
 
 @app.route('/api/settings/openai-key', methods=['GET', 'POST', 'DELETE'])

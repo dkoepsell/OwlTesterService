@@ -44,7 +44,7 @@
                                 AI is enabled
                                 ({% if ai_key_source == 'session' %}using your own {{ 'Anthropic (Claude)' if ai_provider == 'anthropic' else 'OpenAI' }} key{% else %}server key{% endif %}).
                             {% else %}
-                                AI is not configured. Add your own OpenAI or Anthropic (Claude) API key to enable implication generation. Your key is stored only in your session and never saved to our database.
+                                {% if ai_server_key_withheld %}The server's AI key is for power users. Add your own OpenAI or Anthropic (Claude) API key to enable implication generation.{% else %}AI is not configured. Add your own OpenAI or Anthropic (Claude) API key to enable implication generation.{% endif %} Your key is stored only in your session and never saved to our database.
                             {% endif %}
                         </span>
                         <button class="btn btn-sm btn-outline-dark" type="button" id="toggleAiKeyForm">
