@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<!-- A bfo-agent style output: an OWL file with no release around it. Two terms
+     lack definitions and one lacks a label, so the builder must list them, not
+     invent them. -->
+<rdf:RDF xmlns="https://w3id.org/clinic-demo/CLINIC_"
+     xml:base="https://w3id.org/clinic-demo/clinic.owl"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+     xmlns:obo="http://purl.obolibrary.org/obo/">
+    <owl:Ontology rdf:about="https://w3id.org/clinic-demo/clinic.owl"/>
+
+    <owl:Class rdf:about="https://w3id.org/clinic-demo/CLINIC_0000001">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000015"/>
+        <rdfs:label xml:lang="en">clinical visit</rdfs:label>
+        <skos:definition xml:lang="en">A process in which a patient is seen by a clinician at a clinic.</skos:definition>
+    </owl:Class>
+
+    <owl:Class rdf:about="https://w3id.org/clinic-demo/CLINIC_0000002">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000040"/>
+        <rdfs:label xml:lang="en">clinic building</rdfs:label>
+    </owl:Class>
+
+    <owl:Class rdf:about="https://w3id.org/clinic-demo/CLINIC_0000003">
+        <rdfs:subClassOf rdf:resource="http://purl.obolibrary.org/obo/BFO_0000023"/>
+        <skos:definition xml:lang="en">A role borne by a person in virtue of receiving care at a clinic.</skos:definition>
+    </owl:Class>
+
+    <owl:Class rdf:about="https://w3id.org/clinic-demo/CLINIC_0000004">
+        <rdfs:subClassOf rdf:resource="https://w3id.org/clinic-demo/CLINIC_0000001"/>
+        <rdfs:label xml:lang="en">follow-up visit</rdfs:label>
+    </owl:Class>
+
+    <owl:ObjectProperty rdf:about="https://w3id.org/clinic-demo/CLINIC_0000100">
+        <rdfs:label xml:lang="en">occurs at clinic</rdfs:label>
+        <skos:definition xml:lang="en">Relates a clinical visit to the clinic building where it occurs.</skos:definition>
+        <rdfs:domain rdf:resource="https://w3id.org/clinic-demo/CLINIC_0000001"/>
+        <rdfs:range rdf:resource="https://w3id.org/clinic-demo/CLINIC_0000002"/>
+    </owl:ObjectProperty>
+</rdf:RDF>

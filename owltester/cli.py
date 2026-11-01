@@ -4,8 +4,14 @@
     owltester repair <artifact> --kernel ... --out repaired.ttl --quarantine q.ttl
     owltester serve  --port 8080 --kernel ...
     owltester audit  <zip|dir|files...> [--profile general|bfo|sool] [--json f] [--html f] [--md f]
+                     [--fail-on critical|major|minor] [--summary-md f]
+    owltester record <release-dir> --report audit.json [--commit SHA] [--tag TAG] [--out VERIFICATION.json]
+    owltester verify <release.zip|dir> [--reaudit]
+    owltester build  <file.owl> --answers build.yaml --out dist/
 
-Exit 0 == pass, non-zero == fail (for audit: 0 on pass or warn, 1 on fail). The non-zero exit on a hollowed-out artifact is
+Exit 0 == pass, 1 == the gate rejected it, 2 == usage or environment error (missing Java,
+unreadable input), so CI can tell a bad release from a broken tool. For audit, the gate
+is --fail-on (default critical: exit 1 only on a ``fail`` verdict). The non-zero exit on a hollowed-out artifact is
 the whole point: CI and the corpus export pipeline abort before any FTP upload.
 """
 
@@ -85,6 +91,12 @@ def cmd_audit(args):
         if not args.quiet:
             print(f"  {stage} {note}".rstrip(), file=sys.stderr)
 
+    from .release import gate
+    from .release.tools import require_java
+    require_java()
+    missing = [a for a in args.artifact if not os.path.exists(a)]
+    if missing:
+        raise ToolInputError(f"No such file or directory: {missing[0]}")
     source = args.artifact if len(args.artifact) > 1 else args.artifact[0]
     report = run_audit(source, profile=args.profile, config_path=args.config, budget=args.budget,
                        max_explanations=args.max_explanations, explain=not args.no_explain,
@@ -106,7 +118,59 @@ def cmd_audit(args):
           f"{counts['minor']} minor, {counts['info']} info)", file=sys.stderr)
     for row in d["scorecard"]:
         print(f"  [{row['stage']}] {row['status']}: {row['summary']}", file=sys.stderr)
-    return errors.EXIT_FAIL if d["verdict"] == "fail" else errors.EXIT_PASS
+    if args.summary_md:
+        with open(args.summary_md, "w", encoding="utf-8") as fh:
+            fh.write(gate.summary_md(d, args.fail_on))
+    stop = gate.blocking(d, args.fail_on)
+    if stop:
+        print(f"gate --fail-on {args.fail_on}: rejected ({len(stop)} finding(s))", file=sys.stderr)
+    return errors.EXIT_FAIL if stop else errors.EXIT_PASS
+
+
+def cmd_record(args):
+    from .release import record as rec
+    if not os.path.isdir(args.release):
+        raise ToolInputError(f"{args.release} is not a directory")
+    with open(args.report, encoding="utf-8") as fh:
+        report = json.load(fh)
+    r = rec.make_record(args.release, report, name=args.name, version=args.version, tag=args.tag,
+                        commit=args.commit, repository=args.repository, fail_on=args.fail_on,
+                        attest=args.attest)
+    out_dir = os.path.dirname(os.path.abspath(args.out)) if args.out else os.path.abspath(args.release)
+    if out_dir != os.path.abspath(args.release):
+        raise ToolInputError("--out must name VERIFICATION.json at the root of the release")
+    rec.write_record(args.release, r)
+    print(rec.record_md(r).splitlines()[0], file=sys.stderr)
+    return errors.EXIT_PASS
+
+
+def cmd_verify(args):
+    from .release import record as rec
+    if not os.path.exists(args.release):
+        raise ToolInputError(f"No such file or directory: {args.release}")
+    if args.reaudit:
+        from .release.tools import require_java
+        require_java()
+    try:
+        res = rec.verify(args.release, reaudit=args.reaudit, allow=args.allow or ())
+    except rec.RecordError as e:
+        print(f"verify: FAILED: {e}", file=sys.stderr)
+        return errors.EXIT_FAIL
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as fh:
+            json.dump({k: v for k, v in res.items() if k != "record"}, fh, indent=2)
+    a = res["record"]["audit"]
+    for p in res["problems"]:
+        print(f"  {p}", file=sys.stderr)
+    state = "ok" if res["ok"] else "FAILED"
+    print(f"verify: {state}: {len(res['record']['files'])} file(s), recorded verdict {a['verdict']}"
+          + (f", re-audit verdict {res['reaudit']['verdict']}" if res["reaudit"] else ""), file=sys.stderr)
+    return errors.EXIT_PASS if res["ok"] else errors.EXIT_FAIL
+
+
+def cmd_build(args):
+    from .release.builder import build_cli
+    return build_cli(args)
 
 
 def cmd_repair_plan(args):
@@ -215,6 +279,11 @@ def build_parser():
                     help="skip minimal-cause search for inconsistent files")
     pa.add_argument("--config", help="audit.yaml or audit.json (default: the one at the archive root)")
     pa.add_argument("--quiet", action="store_true", help="no progress lines on stderr")
+    pa.add_argument("--fail-on", default="critical", choices=("critical", "major", "minor"),
+                    dest="fail_on", help="exit 1 when a finding not declared expected is at or "
+                                         "above this severity (default critical)")
+    pa.add_argument("--summary-md", dest="summary_md",
+                    help="write a short Markdown summary (for a CI job summary or PR comment)")
     pa.set_defaults(func=cmd_audit)
 
     rp = sub.add_parser("repair-plan", help="build a guided repair plan from an audit report")
@@ -232,6 +301,41 @@ def build_parser():
                     help="skip the second audit (the result is then unverified)")
     ra.set_defaults(func=cmd_repair_apply)
 
+    rc = sub.add_parser("record", help="write the verification record into a release directory")
+    rc.add_argument("release", help="the release directory (the files to ship)")
+    rc.add_argument("--report", required=True, help="the audit's JSON report (owltester audit --json)")
+    rc.add_argument("--out", help="VERIFICATION.json at the release root (the default)")
+    rc.add_argument("--commit")
+    rc.add_argument("--tag")
+    rc.add_argument("--repository", help="for example https://github.com/<owner>/<repo>")
+    rc.add_argument("--name")
+    rc.add_argument("--version")
+    rc.add_argument("--fail-on", default="critical", choices=("critical", "major", "minor"), dest="fail_on")
+    rc.add_argument("--attest", action="store_true",
+                    help="the CI signs the record with a GitHub artifact attestation")
+    rc.set_defaults(func=cmd_record)
+
+    rv = sub.add_parser("verify", help="check a release against its verification record")
+    rv.add_argument("release", help="the release zip or directory")
+    rv.add_argument("--reaudit", action="store_true", help="also audit again and compare")
+    rv.add_argument("--allow", action="append", help="glob of extra files to accept (repeatable)")
+    rv.add_argument("--json", help="write the result as JSON")
+    rv.set_defaults(func=cmd_verify)
+
+    pb = sub.add_parser("build", help="build an audited release from one OWL file")
+    pb.add_argument("input", help="the ontology file (any format OwlTester reads)")
+    pb.add_argument("--answers", required=True, help="build.yaml with the builder's answers")
+    pb.add_argument("--out", required=True, help="output directory (dist/)")
+    pb.add_argument("--import", action="append", dest="imports", default=[],
+                    help="a file to resolve an owl:imports with (repeatable)")
+    pb.add_argument("--shapes", action="append", default=[], help="SHACL shapes to include")
+    pb.add_argument("--vocab", action="append", default=[], help="controlled vocabularies to include")
+    pb.add_argument("--examples", action="append", default=[], help="example data to include")
+    pb.add_argument("--previous", help="the previous release zip (version suggestion, CHANGELOG)")
+    pb.add_argument("--no-audit", action="store_true", dest="no_audit")
+    pb.add_argument("--quiet", action="store_true")
+    pb.set_defaults(func=cmd_build)
+
     ps = sub.add_parser("serve", help="run the HTTP service")
     ps.add_argument("--host", default="0.0.0.0")
     ps.add_argument("--port", type=int, default=8080)
@@ -240,9 +344,24 @@ def build_parser():
     return p
 
 
+class ToolInputError(Exception):
+    """Unreadable or missing input: exit 2."""
+
+
+EXIT_TOOL = 2
+
+
 def main(argv=None):
-    args = build_parser().parse_args(argv)
-    return args.func(args)
+    args = build_parser().parse_args(argv)      # argparse itself exits 2 on usage errors
+    from .audit.files import ArtifactError
+    from .release.tools import ToolError
+    try:
+        return args.func(args)
+    except (ToolError, ToolInputError, ArtifactError, FileNotFoundError, IsADirectoryError,
+            PermissionError, UnicodeDecodeError, json.JSONDecodeError) as e:
+        print(f"owltester {args.cmd if hasattr(args, 'cmd') else ''}: error: {e}".replace("  ", " "),
+              file=sys.stderr)
+        return EXIT_TOOL
 
 
 if __name__ == "__main__":

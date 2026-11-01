@@ -1,0 +1,44 @@
+# The Action end to end on a fixture repository (SPEC-release.md, section 14):
+# build the CLI image from this commit, run ./action against
+# fixtures/release/gate-repo, check the record with `verify --reaudit`, and lint
+# the workflow templates the Action and the release builder ship.
+name: action-selftest
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the CLI image
+        run: docker build --target cli --build-arg OWLTESTER_VERSION="${GITHUB_SHA::7}" -t owltester-cli:selftest .
+      - name: Stage the fixture release
+        run: cp -R fixtures/release/gate-repo "$RUNNER_TEMP/dist"
+      - id: audit
+        uses: ./action
+        with:
+          path: ${{ runner.temp }}/dist
+          fail-on: major
+          record: true
+          image: owltester-cli:selftest
+      - name: The outputs are set
+        env:
+          VERDICT: ${{ steps.audit.outputs.verdict }}
+          RECORD: ${{ steps.audit.outputs.record }}
+        run: |
+          test "$VERDICT" = pass
+          test -f "$RECORD"
+      - name: Verify the recorded release
+        run: docker run --rm -v "$RUNNER_TEMP/dist:/w" -w /w owltester-cli:selftest verify . --reaudit
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        run: |
+          bash <(curl -sSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint -color .github/workflows/*.yml action/templates/*.yml

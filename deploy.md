@@ -96,12 +96,15 @@ repairs stay private (`SPEC-audit-repair.md`, section 1):
 ```
 AUDIT_ALLOWED_USERS=<owner account>
 REPAIR_ALLOWED_USERS=<owner account>
+BUILD_ALLOWED_USERS=<owner account>
 ```
 
-Both fail closed: an empty list means nobody may audit or repair. Audits always need
+All three fail closed: an empty list means nobody may audit, repair or build releases. Audits always need
 sign-in and only the account that ran one can see it; there is no public mode (`AUDIT_MODE`
 is ignored). After a restart, check the
-startup log line `access: full audits: ...; guided repair: ...` (`docker compose logs app | grep access:`).
+startup log line `access: full audits: ...; guided repair: ...; release builder: ...`
+(`docker compose logs app | grep access:`). The release builder runs ROBOT (in the image) and
+needs nothing else; `BUILD_BUDGET` (seconds, default 300) bounds its ROBOT steps.
 A host with its own edited `docker-compose.yml` must pass these variables to the `app` service too.
 
 ---

@@ -25,6 +25,37 @@ WORKDIR /kw
 COPY kindwork_core/package.json kindwork_core/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 
+# --- CLI image: the audit toolchain only (SPEC-release.md, section 3) ---------
+# For CI and the GitHub Action: Python, Java, ROBOT, owlready2 (HermiT), pyshacl,
+# rdflib, PyYAML, the vendored BFO and the owltester package. No Flask, gunicorn,
+# Node or Postgres client. Build it with --target cli; an untargeted build makes
+# the web image below (the last stage).
+#   docker build --target cli --build-arg OWLTESTER_VERSION=$(git rev-parse --short HEAD) \
+#     -t owltester-cli .
+#   docker run --rm -v "$PWD:/work" -w /work owltester-cli audit release.zip --fail-on major
+FROM python:3.11-slim AS cli
+RUN apt-get update && apt-get install -y --no-install-recommends default-jre-headless wget \
+    && rm -rf /var/lib/apt/lists/*
+ARG ROBOT_VERSION=1.9.6
+RUN wget -q "https://github.com/ontodev/robot/releases/download/v${ROBOT_VERSION}/robot.jar" \
+        -O /usr/local/bin/robot.jar && \
+    printf '#!/bin/sh\nexec java -jar /usr/local/bin/robot.jar "$@"\n' > /usr/local/bin/robot && \
+    chmod +x /usr/local/bin/robot && robot --version && apt-get purge -y wget
+WORKDIR /opt/owltester
+COPY requirements-cli.txt .
+RUN pip install --no-cache-dir -r requirements-cli.txt
+COPY owltester/ owltester/
+COPY bfo/ bfo/
+COPY kindwork/ kindwork/
+COPY shacl_tools.py bfo_lint.py ontology_bundle.py owl_format_detector.py ./
+COPY scripts/check_bundled_jar_java.py scripts/
+RUN python scripts/check_bundled_jar_java.py && \
+    python -c "from bfo.catalog import load_catalog; assert len(load_catalog().disjoint_pairs) > 7"
+ARG OWLTESTER_VERSION=
+ENV OWLTESTER_VERSION=${OWLTESTER_VERSION} PYTHONPATH=/opt/owltester HOME=/tmp
+RUN python -m owltester.cli --help >/dev/null && echo "owltester cli OK"
+ENTRYPOINT ["python", "-m", "owltester.cli"]
+
 # --- Final image --------------------------------------------------------------
 FROM python:3.11-slim
 

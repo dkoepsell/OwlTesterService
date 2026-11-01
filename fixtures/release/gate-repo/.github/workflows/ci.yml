@@ -1,0 +1,9 @@
+name: audit
+on: [push, pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dkoepsell/owltester-action@v1
+        with: {fail-on: major}

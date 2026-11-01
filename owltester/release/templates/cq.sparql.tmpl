@@ -1,0 +1,9 @@
+# Competency question {{n}}: {{question}}
+# Write the query that answers it, and the answers you expect, below.
+# Expected answers: (list them here)
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT ?x ?label WHERE {
+  ?x a owl:Class ;
+     rdfs:label ?label .
+}

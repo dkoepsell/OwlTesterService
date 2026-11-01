@@ -1,0 +1,27 @@
+# .github/workflows/badge.yml: keep a README badge current without a server.
+# Writes the shields.io endpoint JSON to the "badges" branch; the README shows
+#   ![OwlTester](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/badges/audit.json)
+name: badge
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dkoepsell/owltester-action@v1
+        continue-on-error: true
+        with:
+          fail-on: critical
+          badge: ${{ runner.temp }}/audit.json
+      - run: |
+          git fetch origin badges || true
+          git switch badges 2>/dev/null || git switch --orphan badges
+          cp "$RUNNER_TEMP/audit.json" audit.json
+          git add audit.json
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+            commit -m "badge: ${GITHUB_SHA::7}" || exit 0
+          git push origin badges

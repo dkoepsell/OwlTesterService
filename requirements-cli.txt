@@ -1,0 +1,9 @@
+# The audit toolchain only (the `cli` image target; SPEC-release.md, section 3).
+# Keep the pins in step with requirements.txt.
+owlready2==0.47
+rdflib>=7.1.4
+pyshacl>=0.26
+PyYAML>=6
+werkzeug>=3.1.3
+markupsafe>=2.1
+jinja2>=3.1

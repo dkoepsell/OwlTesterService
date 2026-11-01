@@ -1,0 +1,36 @@
+# {{title}}
+
+{{description}}
+
+| | |
+| --- | --- |
+| Ontology IRI | `{{ontology_iri}}` |
+| Version | {{version}} (`{{version_iri}}`) |
+| License | [{{license_name}}]({{license_url}}) |
+| Released | {{release_date}} |
+
+## Files
+
+{{files}}
+
+## Loading it
+
+Open `{{name}}.owl` in Protégé, or load it from its IRI once the persistent IRI resolves. The
+release is merged with its imports and reasoned with HermiT; `{{name}}-base.owl` holds this
+ontology's own axioms only, for reuse in other ontologies.
+
+```python
+from rdflib import Graph
+g = Graph().parse("{{name}}.ttl")
+```
+
+## Audit
+
+This release was audited with OwlTester. `VERIFICATION.md` states the result and lists the
+checksum of every file; check it with `owltester verify {{name}}-{{version}}.zip --reaudit`.
+
+## How to cite
+
+{{citation}}
+
+See `CITATION.cff`. Terms are listed in `docs/terms.md`.

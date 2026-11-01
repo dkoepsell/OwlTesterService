@@ -379,6 +379,12 @@ def resolve_imports(artifact):
 
 # -- entry point ---------------------------------------------------------------------------
 
+# The verification record and the report shipped with it describe the release; an
+# audit of a recorded release must not count them (SPEC-release.md, section 2).
+NOT_AUDITED = ("VERIFICATION.json", "VERIFICATION.md", "VERIFICATION.sigstore.json",
+               "audit/report.json", "audit/report.md", "audit-badge.json")
+
+
 def load_artifact(source, config_path=None, profile=None):
     """Load a zip, a directory or a list of files into an Artifact."""
     workdir = None
@@ -416,7 +422,10 @@ def load_artifact(source, config_path=None, profile=None):
     files, total, cap = [], 0, max_triples()
     limits = []
     for rel, ab in entries:
-        if _glob_match(rel, ignore) or rel.rsplit("/", 1)[-1] in ("audit.yaml", "audit.yml", "audit.json"):
+        # The release's own config (at the root, or the file passed in) is not audited;
+        # a workflow that happens to be called audit.yml is.
+        if _glob_match(rel, ignore) or rel in ("audit.yaml", "audit.yml", "audit.json") \
+                or (cfg_path and os.path.abspath(ab) == os.path.abspath(cfg_path)) or rel in NOT_AUDITED:
             continue
         kind, ext = _file_kind(rel)
         f = ArtifactFile(path=rel, abspath=ab, kind=kind)

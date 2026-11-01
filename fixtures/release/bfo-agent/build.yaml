@@ -1,0 +1,16 @@
+# Answers for the release builder (owltester build clinic-agent.owl --answers build.yaml).
+name: clinic-demo
+title: Clinic demo ontology
+description: A small demonstration ontology of clinical visits, built from a bfo-agent output.
+ontology_iri: https://w3id.org/clinic-demo/clinic.owl
+base: https://w3id.org/clinic-demo
+version: 0.1.0
+license: CC-BY-4.0
+creators:
+  - name: Ada Example
+    orcid: 0000-0002-1825-0097
+bfo: module
+formats: [ofn, jsonld]
+release_date: "2026-11-01"
+repository: https://github.com/example/clinic-demo
+keywords: [clinic, BFO]
