@@ -109,10 +109,69 @@ def cmd_audit(args):
     return errors.EXIT_FAIL if d["verdict"] == "fail" else errors.EXIT_PASS
 
 
+def cmd_repair_plan(args):
+    """Build a fix plan from an audit report (JSON) and the release it audited."""
+    from .release_repair.planner import build_plan
+    with open(args.report, encoding="utf-8") as fh:
+        report = json.load(fh)
+    release = args.release if len(args.release) > 1 else args.release[0]
+    plan = build_plan(report, release, user={"user_id": None, "name": os.environ.get("USER", "cli")})
+    with open(args.out, "w", encoding="utf-8") as fh:
+        json.dump(plan.to_dict(), fh, indent=1)
+    for r in plan.remedies:
+        print(f"{r.id}\t{r.severity}\t{r.kind}\t{r.title}", file=sys.stderr)
+    print(f"{len(plan.remedies)} remedies written to {args.out}. Record decisions in the file "
+          "(status 'accepted' and a decision naming the option), then run repair-apply.",
+          file=sys.stderr)
+    return 0
+
+
+def cmd_repair_apply(args):
+    """Apply the decisions recorded in a plan file. The CLI applies nothing the file
+    does not record as accepted; it does not check REPAIR_ALLOWED_USERS."""
+    import shutil
+    import tempfile
+    from .release_repair.apply import ApplyError, apply_plan
+    from .release_repair.model import Plan
+    from .release_repair.planner import DecisionError, fill_ops
+    with open(args.plan, encoding="utf-8") as fh:
+        plan = Plan.from_dict(json.load(fh))
+    for r in plan.remedies:
+        if r.status == "accepted" and r.decision and not r.decision.get("ops"):
+            opt = r.option(r.decision.get("option") or "")
+            if opt is None:
+                print(f"{r.id}: the decision names no option", file=sys.stderr)
+                return errors.EXIT_FAIL
+            try:
+                r.decision["ops"] = fill_ops(opt, r.decision.get("content"),
+                                             [tuple(x) for x in plan.prefixes])
+            except DecisionError as e:
+                print(f"{r.id}: {e}", file=sys.stderr)
+                return errors.EXIT_FAIL
+    release = args.release if len(args.release) > 1 else args.release[0]
+    work = tempfile.mkdtemp(prefix="owltester-repair-")
+    try:
+        result = apply_plan(plan, release, work, reaudit=not args.no_audit,
+                            progress=lambda s: print(s, file=sys.stderr))
+        out = os.path.join(work, "out")
+        shutil.copyfile(os.path.join(out, result["outputs"]["zip"]), args.out)
+        if args.outputs:
+            shutil.copytree(out, args.outputs, dirs_exist_ok=True)
+    except ApplyError as e:
+        print(f"apply failed ({e.code}): {e}", file=sys.stderr)
+        return errors.EXIT_FAIL
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    summary = {k: result.get(k) for k in ("applied", "verdict_before", "verdict_after", "fixed")}
+    print(json.dumps(summary, indent=1))
+    return errors.EXIT_PASS if result.get("fixed", True) else errors.EXIT_FAIL
+
+
 def cmd_serve(args):
     from flask import Flask
     from .service import bp, configure
     from .audit_service import audit_pages_bp
+    from . import repair_service  # noqa: F401 - adds the repair routes to both blueprints
     configure(kernel_path=args.kernel)
     app = Flask("owltester")
     app.secret_key = os.environ.get("SESSION_SECRET") or os.urandom(32)
@@ -157,6 +216,21 @@ def build_parser():
     pa.add_argument("--config", help="audit.yaml or audit.json (default: the one at the archive root)")
     pa.add_argument("--quiet", action="store_true", help="no progress lines on stderr")
     pa.set_defaults(func=cmd_audit)
+
+    rp = sub.add_parser("repair-plan", help="build a guided repair plan from an audit report")
+    rp.add_argument("report", help="the audit's JSON report (owltester audit --json)")
+    rp.add_argument("--release", nargs="+", required=True, help="the zip, directory or files audited")
+    rp.add_argument("--out", required=True, help="where to write plan.json")
+    rp.set_defaults(func=cmd_repair_plan)
+
+    ra = sub.add_parser("repair-apply", help="apply the accepted decisions in a plan file")
+    ra.add_argument("plan")
+    ra.add_argument("--release", nargs="+", required=True)
+    ra.add_argument("--out", required=True, help="where to write the repaired zip")
+    ra.add_argument("--outputs", help="directory for FIXLOG, repair.patch and the two audits")
+    ra.add_argument("--no-audit", action="store_true", dest="no_audit",
+                    help="skip the second audit (the result is then unverified)")
+    ra.set_defaults(func=cmd_repair_apply)
 
     ps = sub.add_parser("serve", help="run the HTTP service")
     ps.add_argument("--host", default="0.0.0.0")

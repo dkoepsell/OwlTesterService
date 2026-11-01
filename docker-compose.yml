@@ -48,6 +48,12 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       SESSION_SECRET: ${SESSION_SECRET}
       RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
+      # Full artifact audit and guided release repair (SPEC-audit.md, SPEC-audit-repair.md).
+      # Both lists empty mean nobody may audit or repair; set both to the owner's account.
+      AUDIT_ALLOWED_USERS: ${AUDIT_ALLOWED_USERS:-}
+      REPAIR_ALLOWED_USERS: ${REPAIR_ALLOWED_USERS:-}
+      REPAIR_RETENTION_DAYS: ${REPAIR_RETENTION_DAYS:-90}
+      REPAIR_MAX_REMOVED: ${REPAIR_MAX_REMOVED:-0.02}
     volumes:
       - uploads:/app/uploads
     expose:

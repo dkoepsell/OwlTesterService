@@ -9,15 +9,16 @@ Routes on the ``owltester`` blueprint:
     POST /owltester/audit/<job_id>/lens/<lens>/draft   AI draft with the visitor's own key
 
 and the page ``GET /audit/<job_id>`` (``audit_pages_bp``), which polls and then
-renders the report. Who may run an audit is set by AUDIT_MODE (signed-in by
-default), narrowed to named accounts by AUDIT_ALLOWED_USERS when it is set. A job belongs to the user who started it, or, for an anonymous
-visitor, to their session, the way uploads do.
+renders the report. Audits are private: only a signed-in account named in
+AUDIT_ALLOWED_USERS may run one, and an empty list means nobody may (it fails
+closed). A job belongs to the account that started it and only that account
+can see it; there are no anonymous or public audits.
 """
 
 import os
 
 from flask import (Blueprint, Response, abort, current_app, jsonify, redirect, render_template,
-                   request, session, url_for)
+                   request, url_for)
 from werkzeug.utils import secure_filename
 
 from .audit import jobs
@@ -29,16 +30,16 @@ audit_pages_bp = Blueprint("audit_pages", __name__)
 
 ALLOWED = {"zip", "ttl", "owl", "rdf", "xml", "n3", "nt", "nq", "trig", "jsonld", "ofn", "owx",
            "yaml", "yml", "json"}
-SESSION_KEY = "audit_job_ids"
 
 
 def audit_mode():
-    return "public" if os.environ.get("AUDIT_MODE", "signed-in").lower() == "public" else "signed-in"
+    """Always "signed-in": public audits were removed (AUDIT_MODE is ignored)."""
+    return "signed-in"
 
 
 def allowed_users():
     """AUDIT_ALLOWED_USERS: comma-separated usernames or emails who may start an
-    audit. Empty means anyone AUDIT_MODE lets in."""
+    audit. Empty means nobody may."""
     raw = os.environ.get("AUDIT_ALLOWED_USERS", "")
     return {u.strip().lower() for u in raw.split(",") if u.strip()}
 
@@ -51,10 +52,8 @@ def may_start_audit():
         signed_in = current_user.is_authenticated
     except Exception:  # noqa: BLE001 - served without flask-login
         current_user, signed_in = None, False
-    if allow:
-        return signed_in and bool({str(getattr(current_user, "username", "")).lower(),
-                                   str(getattr(current_user, "email", "")).lower()} & allow)
-    return signed_in or audit_mode() == "public"
+    return signed_in and bool({str(getattr(current_user, "username", "")).lower(),
+                               str(getattr(current_user, "email", "")).lower()} & allow)
 
 
 def _upload_dir():
@@ -79,11 +78,8 @@ def _job_or_404(job_id):
     data = jobs.read(_upload_dir(), job_id) if jobs.JOB_ID.match(job_id or "") else None
     if data is None:
         abort(404)
-    owner = data.get("owner") or {}
-    if owner.get("user_id") is not None:
-        if owner["user_id"] != _user_id():
-            abort(404)
-    elif job_id not in session.get(SESSION_KEY, []):
+    owner = (data.get("owner") or {}).get("user_id")
+    if owner is None or owner != _user_id():
         abort(404)
     return data
 
@@ -96,11 +92,11 @@ def _report_or_409(data):
 
 @bp.route("/audit", methods=["POST"])
 def audit_start():
-    if audit_mode() == "signed-in" and _user_id() is None:
+    if _user_id() is None:
         if _wants_html():
             return redirect(url_for("login", next=request.path)) if "login" in current_app.view_functions \
                 else abort(401)
-        return jsonify({"error": "Sign in to run an audit (AUDIT_MODE is signed-in)."}), 401
+        return jsonify({"error": "Sign in to run an audit."}), 401
     if not may_start_audit():
         return jsonify({"error": "Full audits are not open to this account yet."}), 403
     uploads = [f for f in request.files.getlist("files") or request.files.getlist("file")
@@ -123,11 +119,16 @@ def audit_start():
         path = os.path.join(d, "input", name)
         f.save(path)
         paths.append(path)
-    if uid is None:
-        session[SESSION_KEY] = (session.get(SESSION_KEY, []) + [job_id])[-50:]
     source = paths[0] if len(paths) == 1 and names[0].lower().endswith(".zip") else paths
+    # Guided release repair needs the release the audit saw; keep it only for
+    # an owner who may repair (REPAIR_ALLOWED_USERS, closed by default).
+    from .release_repair.access import may_repair
+    from .release_repair.storage import sha256_of
+    keep = may_repair()
+    jobs.update(_upload_dir(), job_id, release_files=names, release_sha256=sha256_of(paths))
     jobs.start(_upload_dir(), job_id, source, profile,
-               {"artifact_name": artifact, "explain": request.form.get("explain", "1") != "0"})
+               {"artifact_name": artifact, "explain": request.form.get("explain", "1") != "0"},
+               keep_release=keep)
     if _wants_html():
         return redirect(url_for("audit_pages.audit_page", job_id=job_id))
     return jsonify({"job_id": job_id, "status": "queued",
@@ -145,11 +146,20 @@ def audit_status(job_id):
     return jsonify(out)
 
 
+def _may_fix(data):
+    """Show "Fix this release" only to an allowed owner. The repair routes check again."""
+    from .release_repair.access import may_repair
+    uid = _user_id()
+    return uid is not None and may_repair() and (data.get("owner") or {}).get("user_id") == uid
+
+
 @bp.route("/audit/<job_id>/report.html", methods=["GET"])
 def audit_report_html(job_id):
     from .audit.render import html_context
-    report = _report_or_409(_job_or_404(job_id))
-    return render_template("audit_report.html", job_id=job_id, **html_context(report))
+    data = _job_or_404(job_id)
+    report = _report_or_409(data)
+    return render_template("audit_report.html", job_id=job_id, may_fix=_may_fix(data),
+                           **html_context(report))
 
 
 @bp.route("/audit/<job_id>/report.md", methods=["GET"])
@@ -209,7 +219,7 @@ def audit_page(job_id):
     data = _job_or_404(job_id)
     if data.get("status") == "done":
         from .audit.render import html_context
-        return render_template("audit_report.html", job_id=job_id,
+        return render_template("audit_report.html", job_id=job_id, may_fix=_may_fix(data),
                                **html_context(AuditReport.from_dict(data["report"])))
     return render_template("audit_job.html", job=data, job_id=job_id)
 

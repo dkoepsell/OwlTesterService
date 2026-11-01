@@ -135,8 +135,13 @@ def _slug(text):
     return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")[:60].lower()
 
 
-def issues_zip(report: AuditReport, include=("critical", "major", "minor")):
-    """A zip of one Markdown file per finding, ready to file on a tracker."""
+def issues_zip(report: AuditReport, include=("critical", "major", "minor"), fixes=None):
+    """A zip of one Markdown file per finding, ready to file on a tracker.
+
+    ``fixes`` (from guided release repair) maps a finding id to
+    ``{"summary": text, "patch": unified diff}``; each issue then carries its
+    proposed fix, with the patch attached next to it."""
+    fixes = fixes or {}
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         index = [f"# Issues from the audit of {report.artifact}", ""]
@@ -146,6 +151,13 @@ def issues_zip(report: AuditReport, include=("critical", "major", "minor")):
             name = f"{f.id}-{_slug(f.code + ' ' + f.title)}.md"
             body = (f"{finding_md(f, '#')}\n---\nFound by the OwlTester full artifact audit "
                     f"({report.profile} profile, {report.audited_at}, tool {report.tool_version}).\n")
+            fix = fixes.get(f.id)
+            if fix:
+                body += f"\n## Proposed fix\n\n{fix.get('summary', '')}\n"
+                if fix.get("patch"):
+                    patch_name = name[:-3] + ".patch"
+                    zf.writestr(patch_name, fix["patch"])
+                    body += f"\nThe change is attached as `{patch_name}` (apply with `git apply`).\n"
             zf.writestr(name, body)
             index.append(f"- [{f.severity}] [{f.id} {f.title}]({name})")
         zf.writestr("README.md", "\n".join(index) + "\n")

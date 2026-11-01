@@ -3,7 +3,7 @@
 **Target repo:** `OwlTesterService` (dkoepsell)
 **Builds on:** `SPEC-audit.md` (the full artifact audit), `owltester/repair.py`, `ontology_fixer.py`
 **Role of this feature:** turn an audit report into a **fix plan**, walk the user through it finding by finding, apply only the changes the user accepts to a *copy* of the release, and prove the result with a second audit.
-**Status:** plan only. No code in this change.
+**Status:** implemented in `owltester/release_repair/` and `owltester/repair_service.py` (phases 1 to 4), except opening pull requests (section 6), which is not built yet: export `repair.patch` instead.
 **Who may use it:** the owner of the service only, until the owner names others (section 1).
 
 Do not introduce em-dashes into any user-facing copy, docstrings, or report templates in this project.

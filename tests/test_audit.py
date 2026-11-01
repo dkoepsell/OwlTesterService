@@ -592,10 +592,28 @@ def test_allowlist_limits_who_may_start_an_audit(flask_app, monkeypatch, tmp_pat
     assert b"Start the audit" in owner.get("/upload").data
 
 
+def test_audits_are_never_public(flask_app, monkeypatch, tmp_path):
+    monkeypatch.setenv("AUDIT_MODE", "public")          # ignored: there is no public mode
+    monkeypatch.setenv("AUDIT_ALLOWED_USERS", "owner@example.test")
+    res = flask_app.test_client().post("/owltester/audit", data={},
+                                       headers={"Accept": "application/json"})
+    assert res.status_code == 401
+    monkeypatch.delenv("AUDIT_ALLOWED_USERS")           # empty allowlist: nobody
+    res = _signed_in_client(flask_app, "owner").post("/owltester/audit", data={},
+                                                     headers={"Accept": "application/json"})
+    assert res.status_code == 403
+    # a job with no owning account (an old anonymous one) is visible to nobody
+    job_id, _ = jobs.create(flask_app.config["UPLOADED_OWLS_DEST"], {"user_id": None}, "x", "general")
+    with flask_app.test_client() as anon:
+        with anon.session_transaction() as sess:
+            sess["audit_job_ids"] = [job_id]
+        assert anon.get(f"/owltester/audit/{job_id}").status_code == 404
+
+
 @pytest.mark.java
 def test_audit_http_flow(flask_app, monkeypatch, tmp_path):
-    monkeypatch.setenv("AUDIT_MODE", "public")
-    client = flask_app.test_client()
+    monkeypatch.setenv("AUDIT_ALLOWED_USERS", "owner@example.test")
+    client = _signed_in_client(flask_app, "owner")
     z = zip_dir(materialize("ci-no-shacl", tmp_path), str(tmp_path / "r.zip"))
     with open(z, "rb") as fh:
         res = client.post("/owltester/audit", data={"files": (fh, "r.zip"), "profile": "general"},

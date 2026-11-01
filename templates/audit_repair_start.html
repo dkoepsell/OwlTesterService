@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+
+{% block title %}Fix this release: {{ job.artifact }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 860px">
+  <p class="small mb-1"><a href="{{ url_for('audit_pages.audit_page', job_id=job_id) }}">Back to the audit report</a></p>
+  <h1 class="h3">Fix this release: {{ job.artifact }}</h1>
+  <p class="text-muted">
+    Guided repair turns the audit into a fix plan. You decide each change; nothing is applied
+    until you accept a specific option. Changes are made to a copy of the release, every change
+    is logged, and the copy is audited again to prove the result.
+  </p>
+
+  {% if has_release %}
+  <form method="post" action="{{ url_for('audit_pages.repair_start', job_id=job_id) }}">
+    <button class="btn btn-primary" type="submit">Build a fix plan</button>
+  </form>
+  {% else %}
+  <div class="alert alert-warning">
+    This audit did not keep a copy of the release, so there is nothing to repair yet.
+    Upload the same zip or files the audit ran on; they are checked against the audit's record.
+  </div>
+  <form method="post" enctype="multipart/form-data"
+        action="{{ url_for('owltester.repair_upload_release', job_id=job_id) }}" class="d-flex gap-2">
+    <input class="form-control" type="file" name="files" multiple required>
+    <button class="btn btn-primary" type="submit">Upload the release</button>
+  </form>
+  {% endif %}
+
+  {% if plans %}
+  <h2 class="h5 mt-4">Earlier plans</h2>
+  <ul>
+    {% for p in plans %}
+    <li><a href="{{ url_for('audit_pages.repair_plan_page', job_id=job_id, plan_id=p.plan_id) }}">Plan {{ p.plan_id[:8] }}</a>,
+      started {{ p.created_at }}: {{ p.progress().decided }} of {{ p.progress().total }} decided</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endblock %}

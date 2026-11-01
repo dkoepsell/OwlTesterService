@@ -1,0 +1,231 @@
+{% extends "layout.html" %}
+
+{% block title %}Fix plan: {{ plan.artifact }}{% endblock %}
+
+{% set sev_class = {'critical': 'danger', 'major': 'warning', 'minor': 'info', 'info': 'secondary'} %}
+{% set status_class = {'open': 'secondary', 'accepted': 'primary', 'skipped': 'light text-dark',
+                       'declared': 'info', 'applied': 'success', 'reverted': 'warning'} %}
+
+{% block content %}
+<div class="container mt-4" id="repair"
+     data-plan-url="{{ url_for('owltester.repair_plan_json', job_id=job_id, plan_id=plan.plan_id) }}"
+     data-base="{{ url_for('owltester.repair_plan_json', job_id=job_id, plan_id=plan.plan_id) }}"
+     data-status="{{ plan.status }}">
+  <p class="small mb-1">
+    <a href="{{ url_for('audit_pages.audit_page', job_id=job_id) }}">Back to the audit report</a>
+    {% if role == 'owner' %} &middot; <a href="{{ url_for('audit_pages.repair_home', job_id=job_id, new=1) }}">Start another plan</a>{% endif %}
+  </p>
+  <div class="d-flex flex-wrap justify-content-between align-items-baseline">
+    <h1 class="h3 mb-1">Fix plan: {{ plan.artifact }}</h1>
+    <span class="small text-muted">Plan {{ plan.plan_id[:8] }}, your role: <strong>{{ role }}</strong></span>
+  </div>
+  <p class="text-muted small mb-2">
+    Built from the audit of {{ plan.audit_before.audited_at if plan.audit_before else '' }}
+    ({{ plan.profile }} profile). Decisions save as you make them. Nothing changes until the plan is
+    applied, and the original release is never touched.
+  </p>
+
+  {% if plan.status == 'building' %}
+  <div class="alert alert-info">Building the plan from the release. This page updates by itself.</div>
+  {% elif plan.status == 'error' %}
+  <div class="alert alert-danger">The plan could not be built: {{ plan.error }}</div>
+  {% else %}
+  {% set prog = plan.progress() %}
+  <div class="progress mb-3" role="progressbar" aria-label="Decided" aria-valuenow="{{ prog.decided }}"
+       aria-valuemin="0" aria-valuemax="{{ prog.total }}">
+    <div class="progress-bar" id="progress-bar" style="width: {{ (100 * prog.decided / prog.total) if prog.total else 100 }}%">
+      {{ prog.decided }} of {{ prog.total }} decided</div>
+  </div>
+
+  {% if not plan.remedies %}
+  <div class="alert alert-success">The audit found nothing this tool can propose a change for.</div>
+  {% endif %}
+
+  {% for r in plan.remedies %}
+  <div class="card mb-3 remedy" id="{{ r.id }}" data-rid="{{ r.id }}">
+    <div class="card-header d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge bg-{{ sev_class.get(r.severity, 'secondary') }}">{{ r.severity }}</span>
+      <strong>{{ r.title }}</strong>
+      <span class="small text-muted"><code>{{ r.code }}</code> finding {{ r.finding_id }} &middot; {{ r.kind }}</span>
+      <span class="ms-auto badge bg-{{ status_class.get(r.status, 'secondary') }} remedy-status">{{ r.status }}</span>
+    </div>
+    <div class="card-body">
+      <p class="mb-2">{{ r.rationale }}</p>
+      {% if r.files %}<p class="small text-muted mb-2">Files: {{ r.files[:6]|join(', ') }}{% if r.files|length > 6 %} and {{ r.files|length - 6 }} more{% endif %}</p>{% endif %}
+      {% if r.depends_on %}<p class="small mb-2">Decide first: {% for d in r.depends_on %}<a href="#{{ d }}">{{ d }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+      {% if r.explanation %}<pre class="small bg-body-tertiary p-2 mb-2" style="white-space: pre-wrap">{{ r.explanation }}</pre>{% endif %}
+      {% if r.decision %}
+      <p class="small mb-2 decision">
+        {% if r.status in ('accepted', 'applied') %}Chose option ({{ r.decision.option }}){% elif r.status == 'declared' %}Declared expected: {{ r.decision.reason }}{% elif r.status == 'skipped' %}Skipped{% elif r.status == 'reverted' %}Reverted{% endif %}
+        by {{ r.decision.by.name if r.decision.by else 'unknown' }} on {{ r.decision.at }}{% if r.decision.note and r.status != 'declared' %}: {{ r.decision.note }}{% endif %}{% if r.decision.ai_assisted %} (AI assisted){% endif %}.
+      </p>
+      {% endif %}
+
+      {% for o in r.options %}
+      <div class="border rounded p-2 mb-2 option" data-option="{{ o.id }}">
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="opt-{{ r.id }}" id="opt-{{ r.id }}-{{ o.id }}" value="{{ o.id }}"
+                 {% if (r.decision and r.decision.option == o.id) or (not r.decision and o.recommended) %}checked{% endif %}
+                 {% if not can.decide %}disabled{% endif %}>
+          <label class="form-check-label" for="opt-{{ r.id }}-{{ o.id }}">
+            <strong>({{ o.id }}) {{ o.label }}</strong>{% if o.recommended %} <span class="badge bg-success">recommended</span>{% endif %}
+          </label>
+        </div>
+        <p class="small mb-1">{{ o.consequence }}</p>
+        {% if o.preview %}
+        <details class="small"><summary>Preview</summary>
+          {% if o.preview.counts %}
+          <table class="table table-sm mb-1"><thead><tr><th>File</th><th>Changes</th></tr></thead><tbody>
+            {% for f, n in o.preview.counts.items() %}<tr><td><code>{{ f }}</code></td><td>{{ n }}</td></tr>{% endfor %}
+          </tbody></table>
+          {% endif %}
+          {% if o.preview.before %}<div>Before:</div><pre class="mb-1">{{ o.preview.before|join('\n') }}</pre>{% endif %}
+          {% if o.preview.after %}<div>After:</div><pre class="mb-1">{{ o.preview.after|join('\n') }}</pre>{% endif %}
+          {% if o.preview.remove %}<div>Removed:</div><pre class="mb-1">{% if o.preview.remove[0] is string %}{{ o.preview.remove|join(' ') }}{% else %}{% for t in o.preview.remove %}{{ t|join(' ') }}
+{% endfor %}{% endif %}</pre>{% endif %}
+          {% if o.preview.turtle %}<div>Added:</div><pre class="mb-1">{{ o.preview.turtle }}</pre>{% endif %}
+          {% if o.preview.lines %}<div>Added to <code>{{ o.preview.file }}</code>:</div><pre class="mb-1">{{ o.preview.lines|join('\n') }}</pre>{% endif %}
+          {% if o.preview.entries %}<pre class="mb-1">{{ o.preview.entries|tojson(indent=1) }}</pre>{% endif %}
+        </details>
+        {% endif %}
+        {% if o.input and o.input.kind %}
+        <div class="mt-2 input-slot" data-kind="{{ o.input.kind }}">
+          {% if o.input.kind in ('iri', 'text') %}
+          <label class="form-label small mb-0">{{ o.input.label }}</label>
+          <input class="form-control form-control-sm slot-value" value="{{ o.input.default or '' }}" {% if not can.decide %}disabled{% endif %}>
+          {% elif o.input.kind == 'fields' %}
+          {% for fld in o.input.fields %}
+          <label class="form-label small mb-0">{{ fld.label }}</label>
+          <input class="form-control form-control-sm mb-1 slot-field" data-slot="{{ fld.slot }}" value="{{ fld.default or '' }}" {% if not can.decide %}disabled{% endif %}>
+          {% endfor %}
+          {% elif o.input.kind in ('turtle', 'example') %}
+          <label class="form-label small mb-0">{{ o.input.label }}</label>
+          <textarea class="form-control form-control-sm font-monospace slot-value" rows="8" {% if not can.decide %}disabled{% endif %}>{{ o.input.default or '' }}</textarea>
+          {% elif o.input.kind == 'table' %}
+          <div class="d-flex gap-2 small mb-1 align-items-center">
+            <span>{{ o.input.rows|length }} rows.</span>
+            {% if o.input.choices %}
+            <label>Fill rows in file
+              <select class="form-select form-select-sm d-inline-block w-auto rule-file">
+                {% for f in o.input.rows|map(attribute='file')|unique %}<option>{{ f }}</option>{% endfor %}
+              </select></label>
+            <label>with
+              <select class="form-select form-select-sm d-inline-block w-auto rule-value">
+                {% for c in o.input.choices %}<option value="{{ c.iri }}">{{ c.label }}</option>{% endfor %}
+              </select></label>
+            <button type="button" class="btn btn-sm btn-outline-secondary rule-apply">Fill</button>
+            {% endif %}
+          </div>
+          <div style="max-height: 320px; overflow: auto">
+          <table class="table table-sm small"><tbody>
+            {% for row in o.input.rows %}
+            <tr data-row="{{ loop.index0 }}"><td><code>{{ row.subject }}</code>{% if row.label %}<br><span class="text-muted">{{ row.label }}</span>{% endif %}</td>
+              <td style="min-width: 220px">
+              {% if o.input.choices %}
+                <select class="form-select form-select-sm table-value" data-file="{{ row.file }}" {% if not can.decide %}disabled{% endif %}>
+                  <option value="">keep as is</option>
+                  {% for c in o.input.choices %}<option value="{{ c.iri }}">{{ c.label }}</option>{% endfor %}
+                </select>
+              {% else %}
+                <input class="form-control form-control-sm table-value" placeholder="{{ '<iri> or \"value\"' if o.input.column == 'value' else 'target IRI' }}" {% if not can.decide %}disabled{% endif %}>
+              {% endif %}
+              </td></tr>
+            {% endfor %}
+          </tbody></table>
+          </div>
+          {% endif %}
+          {% if can.decide and o.input.kind in ('table', 'turtle', 'example') and (o.input.kind != 'table' or o.input.choices) %}
+          <button type="button" class="btn btn-sm btn-outline-secondary mt-1 ai-suggest" data-option="{{ o.id }}">Suggest with AI (your own key)</button>
+          <span class="small text-warning ai-label d-none">AI suggestion, check it before you accept.</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      {% if can.decide %}
+      <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+        <input class="form-control form-control-sm note" style="max-width: 420px" placeholder="Note (required to declare expected)">
+        {% if r.options %}<button type="button" class="btn btn-sm btn-primary act" data-action="accept">Accept</button>{% endif %}
+        <button type="button" class="btn btn-sm btn-outline-secondary act" data-action="skip">Skip</button>
+        <button type="button" class="btn btn-sm btn-outline-info act" data-action="declare">Declare expected</button>
+        {% if r.status in ('accepted', 'skipped', 'declared', 'reverted') %}<button type="button" class="btn btn-sm btn-link act" data-action="reopen">Reopen</button>{% endif %}
+        {% if r.status == 'applied' %}<button type="button" class="btn btn-sm btn-outline-warning act" data-action="revert">Revert</button>{% endif %}
+        <span class="small text-danger error"></span>
+      </div>
+      {% endif %}
+
+      <details class="mt-2 small"><summary>Comments ({{ r.comments|length }})</summary>
+        {% for c in r.comments %}
+        <div class="border-start ps-2 my-1"><strong>{{ c.by.name }}</strong> ({{ c.role }}, {{ c.at }}){% if c.propose_option %} proposes option ({{ c.propose_option }}){% endif %}: {{ c.text }}</div>
+        {% endfor %}
+        {% if can.comment %}
+        <div class="d-flex gap-2 mt-1">
+          <input class="form-control form-control-sm comment-text" placeholder="Comment">
+          {% if r.options and not can.decide %}
+          <select class="form-select form-select-sm w-auto comment-propose"><option value="">no proposal</option>
+            {% for o in r.options %}<option value="{{ o.id }}">propose ({{ o.id }})</option>{% endfor %}</select>
+          {% endif %}
+          <button type="button" class="btn btn-sm btn-outline-secondary comment-send">Send</button>
+        </div>
+        {% endif %}
+      </details>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="card mb-4" id="apply-card">
+    <div class="card-body">
+      <h2 class="h5">Apply and verify</h2>
+      <p class="small text-muted">Applying copies the release, makes the accepted changes in plan order,
+        checks every guard and the removal bound, and audits the copy again. A revert applies the plan again
+        without the reverted card.</p>
+      {% if can.apply %}<button type="button" class="btn btn-success" id="apply-btn">Apply the accepted changes</button>{% endif %}
+      <div id="apply-status" class="mt-3" data-state="{{ apply|tojson|forceescape }}"></div>
+      {% if can.pull_request %}
+      <details class="mt-3" id="pr-box"><summary>Open a pull request on the source repository</summary>
+        <p class="small text-muted mt-2">Uses your own GitHub token (stored encrypted, never shown again;
+          the service has no token of its own). You see the list of files before anything is pushed.</p>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <input class="form-control form-control-sm" id="pr-token" type="password" placeholder="GitHub token (repo scope)" style="max-width: 320px">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="pr-token-save">Store token</button>
+          <button type="button" class="btn btn-sm btn-link" id="pr-token-delete">Forget my token</button>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <input class="form-control form-control-sm" id="pr-repo" placeholder="owner/repository" style="max-width: 240px">
+          <input class="form-control form-control-sm" id="pr-base" value="main" style="max-width: 140px">
+          <input class="form-control form-control-sm" id="pr-prefix" placeholder="folder of the release in the repo (optional)" style="max-width: 320px">
+          <button type="button" class="btn btn-sm btn-outline-primary" id="pr-open">Open pull request</button>
+        </div>
+        <div class="small mt-2" id="pr-result"></div>
+      </details>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if can.share %}
+  <div class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">People on this plan</h2>
+      <p class="small text-muted">An approver may accept, apply and export; a reviewer may view, comment and
+        propose. Each must also be named in REPAIR_ALLOWED_USERS.</p>
+      <ul id="members">
+        {% for m in plan.members %}<li data-user="{{ m.user_id }}">{{ m.name }}: {{ m.role }}
+          <button type="button" class="btn btn-sm btn-link member-remove">remove</button></li>{% endfor %}
+      </ul>
+      <div class="d-flex gap-2">
+        <input class="form-control form-control-sm" id="member-account" placeholder="Username or email" style="max-width: 280px">
+        <select class="form-select form-select-sm w-auto" id="member-role"><option>reviewer</option><option>approver</option></select>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="member-add">Add</button>
+        <span class="small text-danger" id="member-error"></span>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/audit-repair.js') }}"></script>
+{% endblock %}

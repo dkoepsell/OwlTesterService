@@ -90,7 +90,7 @@ def update(upload_dir, job_id, **changes):
     return data
 
 
-def _run(upload_dir, job_id, source, profile, options):
+def _run(upload_dir, job_id, source, profile, options, keep_release=False):
     from .runner import run_audit
     d = job_dir(upload_dir, job_id)
     done_stages = []
@@ -113,11 +113,20 @@ def _run(upload_dir, job_id, source, profile, options):
         update(upload_dir, job_id, status="error", finished_at=_now(),
                error=f"{type(e).__name__}: {str(e)[:500]}")
     finally:
+        # Guided release repair works on the release the audit saw, so an owner
+        # who may repair keeps it (as release/, deleted with the job).
+        if keep_release and os.path.isdir(os.path.join(d, "input")):
+            try:
+                shutil.rmtree(os.path.join(d, "release"), ignore_errors=True)
+                os.replace(os.path.join(d, "input"), os.path.join(d, "release"))
+            except OSError as e:
+                logger.warning("audit %s: could not keep the release: %s", job_id, e)
         shutil.rmtree(os.path.join(d, "input"), ignore_errors=True)
 
 
-def start(upload_dir, job_id, source, profile="general", options=None):
-    t = threading.Thread(target=_run, args=(upload_dir, job_id, source, profile, options or {}),
+def start(upload_dir, job_id, source, profile="general", options=None, keep_release=False):
+    t = threading.Thread(target=_run, args=(upload_dir, job_id, source, profile, options or {},
+                                            keep_release),
                          name=f"audit-{job_id[:8]}", daemon=True)
     t.start()
     return t

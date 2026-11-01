@@ -6,10 +6,17 @@
   <div class="d-flex flex-wrap align-items-baseline justify-content-between mb-2">
     <h1 class="h3 mb-0">Audit report: {{ report.artifact }}</h1>
     {% if job_id %}
+    <div class="d-flex gap-2">
+    {% if may_fix %}
+    <form method="get" action="{{ url_for('audit_pages.repair_home', job_id=job_id) }}">
+      <button class="btn btn-sm btn-primary" type="submit">Fix this release</button>
+    </form>
+    {% endif %}
     <div class="btn-group btn-group-sm">
       <a class="btn btn-outline-secondary" href="{{ url_for('owltester.audit_report_md', job_id=job_id) }}">Markdown</a>
       <a class="btn btn-outline-secondary" href="{{ url_for('owltester.audit_issues_zip', job_id=job_id) }}">Issues (.zip)</a>
       <a class="btn btn-outline-secondary" href="{{ url_for('owltester.audit_status', job_id=job_id) }}">JSON</a>
+    </div>
     </div>
     {% endif %}
   </div>
