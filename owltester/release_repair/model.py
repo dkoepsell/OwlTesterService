@@ -85,6 +85,7 @@ class Plan:
     status: str = "ready"         # building | ready | error
     error: str = ""
     owned: list = field(default_factory=list)     # the release's own namespaces
+    build: dict = field(default_factory=dict)     # while building: {stage, done, total, updated_at}
 
     def remedy(self, rid):
         return next((r for r in self.remedies if r.id == rid), None)

@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import threading
+import time
 
 from flask import Response, abort, current_app, jsonify, redirect, render_template, request, \
     send_from_directory, url_for
@@ -88,13 +89,23 @@ def _save(plan):
 # -- plans ---------------------------------------------------------------------------------
 
 def _build_in_background(app, upload_dir, job, plan, release):
+    last = [0.0]
+
+    def progress(stage, done, total):
+        # The stub plan.json carries the progress; written at most once a second.
+        if time.monotonic() - last[0] < 1 and done not in (0, total):
+            return
+        last[0] = time.monotonic()
+        plan.build = {"stage": stage, "done": done, "total": total, "updated_at": now()}
+        storage.save(upload_dir, plan)
+
     def go():
         with app.app_context():
             try:
                 built = build_plan(job["report"], release, job_id=job["job_id"],
-                                   user=plan.created_by, plan_id=plan.plan_id)
+                                   user=plan.created_by, plan_id=plan.plan_id, progress=progress)
                 built.created_at, built.release_sha256 = plan.created_at, plan.release_sha256
-                built.status = "ready"
+                built.status, built.build = "ready", {}
                 storage.save(upload_dir, built)
             except Exception as e:  # noqa: BLE001 - shown on the plan page
                 logger.error("repair plan %s failed: %s", plan.plan_id, e)
@@ -103,6 +114,26 @@ def _build_in_background(app, upload_dir, job, plan, release):
     t = threading.Thread(target=go, name=f"repair-plan-{plan.plan_id[:8]}", daemon=True)
     t.start()
     return t
+
+
+BUILD_STALE_SECONDS = 15 * 60
+
+
+def _build_state(plan):
+    """What the page shows while a plan builds; "stale" when the build stopped
+    reporting (the worker restarted or the thread died)."""
+    if plan.status != "building":
+        return {"status": plan.status}
+    b = dict(plan.build or {})
+    import datetime
+    last = b.get("updated_at") or plan.created_at
+    try:
+        age = (datetime.datetime.now(datetime.timezone.utc)
+               - datetime.datetime.fromisoformat(last).replace(tzinfo=datetime.timezone.utc)).total_seconds()
+    except ValueError:
+        age = 0
+    b.update(status="stale" if age > BUILD_STALE_SECONDS else "building", started_at=plan.created_at)
+    return b
 
 
 @audit_pages_bp.route("/audit/<job_id>/repair", methods=["GET"])
@@ -142,7 +173,7 @@ def repair_start(job_id):
 def repair_plan_page(job_id, plan_id):
     data, plan, role = _plan_for(job_id, plan_id)
     return render_template("audit_repair_plan.html", job=data, job_id=job_id, plan=plan, role=role,
-                           me=_me(), apply=storage.read_apply(_upload_dir(), job_id, plan_id),
+                           me=_me(), build=_build_state(plan), apply=storage.read_apply(_upload_dir(), job_id, plan_id),
                            can={k: access.can(role, k) for k in access.CAN})
 
 
@@ -185,7 +216,7 @@ def repair_plan_json(job_id, plan_id):
     data, plan, role = _plan_for(job_id, plan_id)
     out = plan.to_dict()
     out.pop("audit_before", None)
-    out.update(role=role, progress=plan.progress(),
+    out.update(role=role, progress=plan.progress(), build=_build_state(plan),
                apply=storage.read_apply(_upload_dir(), job_id, plan_id))
     return jsonify(out)
 
