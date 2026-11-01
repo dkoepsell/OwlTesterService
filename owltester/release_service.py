@@ -55,7 +55,7 @@ def may_build():
     """Signed in and named in BUILD_ALLOWED_USERS. Fails closed."""
     uid, username, email = repair_access.current()
     allow = allowed_users()
-    return uid is not None and bool(allow) and bool({username.lower(), email.lower()} & allow - {""})
+    return uid is not None and repair_access.matches(allow, username, email)
 
 
 def describe():

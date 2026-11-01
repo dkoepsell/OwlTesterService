@@ -56,6 +56,8 @@ services:
       REPAIR_MAX_REMOVED: ${REPAIR_MAX_REMOVED:-0.02}
       # Release builder (SPEC-release.md, Part B): empty means nobody may build.
       BUILD_ALLOWED_USERS: ${BUILD_ALLOWED_USERS:-}
+      # Site admins (grant power users at /admin/power-users); empty means none.
+      ADMIN_USERS: ${ADMIN_USERS:-}
       BUILD_BUDGET: ${BUILD_BUDGET:-300}
     volumes:
       - uploads:/app/uploads

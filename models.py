@@ -286,3 +286,16 @@ class ShaclShapeSet(db.Model):
 
     def __repr__(self):
         return f"<ShaclShapeSet {self.id}: {self.name}>"
+
+
+class PowerUser(db.Model):
+    """An account a site admin has granted power-user features (full audits, and later
+    others). Admins are named in ADMIN_USERS; see owltester/power.py."""
+    __tablename__ = 'power_user'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), unique=True,
+                        nullable=False, index=True)
+    granted_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    granted_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, nullable=False)
+    note = db.Column(db.String(200), default='')
+    user = db.relationship('User', foreign_keys=[user_id])
