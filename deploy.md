@@ -253,8 +253,13 @@ docker-compose up -d
 ### Update the app
 ```bash
 git pull
-docker compose up -d --build app
+docker compose build --build-arg OWLTESTER_VERSION=$(git rev-parse --short HEAD) app
+docker compose up -d app
 ```
+
+The build argument stamps the commit on audit reports ("Tool version"). Without it
+they show `src-<hash>`, a hash of the audit code. On the production host (compose v1),
+use `docker-compose` and `docker rm -f` the old app container before `up -d`.
 
 ### Run a database migration
 ```bash

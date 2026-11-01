@@ -146,9 +146,14 @@ def _make_rules(text):
 
 
 def _make_reachable(text, goals):
-    """Recipes of the goals (or the default target) and everything they depend on."""
+    """Recipes of the goals (or the default target) and everything they depend
+    on, and the names of the targets reached: the goals and any .PHONY targets
+    (or, without .PHONY, targets that are not file paths). File targets such as
+    tmp/merged.owl are followed but not named."""
     rules, default = _make_rules(text)
+    phony = set(rules.get(".PHONY", ([], ""))[0])
     todo = list(goals) if goals else ([default] if default else [])
+    start = set(todo)
     seen, out = set(), []
     while todo:
         t = todo.pop()
@@ -158,7 +163,11 @@ def _make_reachable(text, goals):
         prereqs, recipe = rules[t]
         out.append(recipe)
         todo.extend(prereqs)
-    return "\n".join(out), sorted(seen)
+    if phony:
+        named = {t for t in seen if t in start or t in phony}
+    else:
+        named = {t for t in seen if t in start or not re.search(r"[/.]", t)}
+    return "\n".join(out), sorted(named)
 
 
 def _repo_root(path):
