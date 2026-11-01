@@ -1,0 +1,36 @@
+# .github/workflows/release.yml: on a version tag.
+# The release job stops before anything is published if the audit fails. The
+# GitHub Release body is the verification summary.
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C src/ontology release VERSION=${GITHUB_REF_NAME#v}
+      - run: ./scripts/stage-release.sh dist/
+      - id: audit
+        uses: dkoepsell/owltester-action@v1
+        with:
+          path: dist
+          profile: {{profile}}
+          fail-on: {{fail_on}}
+          record: true
+          attest: true
+      - id: attest
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: dist/VERIFICATION.json
+      - run: cp "${{ steps.attest.outputs.bundle-path }}" dist/VERIFICATION.sigstore.json
+      - run: cd dist && zip -X -r "../${{ github.event.repository.name }}-${GITHUB_REF_NAME}.zip" .
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: '*.zip'
+          body_path: dist/VERIFICATION.md

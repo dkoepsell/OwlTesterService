@@ -1,0 +1,116 @@
+name: OwlTester audit
+description: >-
+  Audit an ontology release (ontology, vocabularies, SHACL shapes, data) with OwlTester as a
+  release gate, and optionally write its verification record.
+author: dkoepsell
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  path:
+    description: Directory or zip to audit
+    default: "."
+  profile:
+    description: "general, bfo or sool"
+    default: general
+  config:
+    description: Audit configuration (default audit.yaml at the root of path, if present)
+    default: ""
+  fail-on:
+    description: "Gate threshold: critical, major or minor"
+    default: major
+  budget:
+    description: Seconds for the whole audit
+    default: "900"
+  record:
+    description: Also write VERIFICATION.json / .md into path (path must be a directory)
+    default: "false"
+  attest:
+    description: The workflow signs VERIFICATION.json with actions/attest-build-provenance
+    default: "false"
+  comment:
+    description: Post the summary as a pull-request comment (needs pull-requests write)
+    default: "false"
+  badge:
+    description: Write shields.io endpoint JSON to this path (for example badges/audit.json)
+    default: ""
+  image:
+    description: >-
+      The OwlTester CLI image. Empty uses the digest pinned in this action's IMAGE file,
+      so a given action version always runs the same toolchain.
+    default: ""
+  github-token:
+    description: Token for the pull-request comment
+    default: ${{ github.token }}
+
+outputs:
+  verdict:
+    description: pass, warn or fail
+    value: ${{ steps.audit.outputs.verdict }}
+  report-json:
+    description: Path of the JSON report
+    value: ${{ steps.audit.outputs.report-json }}
+  report-md:
+    description: Path of the Markdown report
+    value: ${{ steps.audit.outputs.report-md }}
+  record:
+    description: Path of VERIFICATION.json, when record is true
+    value: ${{ steps.audit.outputs.record }}
+  counts:
+    description: Severity counts as JSON
+    value: ${{ steps.audit.outputs.counts }}
+
+runs:
+  using: composite
+  steps:
+    - id: audit
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_BUDGET: ${{ inputs.budget }}
+        INPUT_RECORD: ${{ inputs.record }}
+        INPUT_ATTEST: ${{ inputs.attest }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+        INPUT_BADGE: ${{ inputs.badge }}
+        INPUT_IMAGE: ${{ inputs.image }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -u
+        image="${INPUT_IMAGE:-$(tr -d '[:space:]' < "$GITHUB_ACTION_PATH/IMAGE")}"
+        out="$RUNNER_TEMP/owltester-report"
+        mkdir -p "$out"
+        echo "OwlTester image: $image"
+        status=0
+        docker run --rm --user "$(id -u):$(id -g)" \
+          -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -v "$out:$out" \
+          -v "$GITHUB_EVENT_PATH:$GITHUB_EVENT_PATH:ro" -w "$GITHUB_WORKSPACE" \
+          -e INPUT_PATH -e INPUT_PROFILE -e INPUT_CONFIG -e INPUT_FAIL_ON -e INPUT_BUDGET \
+          -e INPUT_RECORD -e INPUT_ATTEST -e INPUT_COMMENT -e INPUT_BADGE -e GITHUB_TOKEN \
+          -e GITHUB_EVENT_PATH -e GITHUB_REPOSITORY -e GITHUB_SHA -e GITHUB_REF_NAME \
+          -e GITHUB_REF_TYPE -e GITHUB_SERVER_URL -e OWLTESTER_OUT="$out" \
+          -e OWLTESTER_IMAGE="$image" \
+          --entrypoint python "$image" -m owltester.release.action || status=$?
+        if [ -f "$out/outputs.env" ]; then cat "$out/outputs.env" >> "$GITHUB_OUTPUT"; fi
+        if [ -f "$out/summary.md" ]; then cat "$out/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+        echo "status=$status" >> "$GITHUB_OUTPUT"
+        echo "out=$out" >> "$GITHUB_OUTPUT"
+    - if: always() && steps.audit.outputs.out != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: owltester-report-${{ github.job }}-${{ github.run_attempt }}
+        path: ${{ steps.audit.outputs.out }}
+        if-no-files-found: ignore
+    - if: always()
+      shell: bash
+      env:
+        STATUS: ${{ steps.audit.outputs.status }}
+      run: |
+        case "$STATUS" in
+          0) echo "OwlTester gate passed." ;;
+          1) echo "OwlTester gate rejected the release (see the job summary)."; exit 1 ;;
+          *) echo "OwlTester could not run (exit ${STATUS:-unknown})."; exit "${STATUS:-2}" ;;
+        esac

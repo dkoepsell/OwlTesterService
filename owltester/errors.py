@@ -70,6 +70,8 @@ I_PROFILE = "I_PROFILE"                      # R2: OWL 2 profile membership
 I_SHAPES_LINT = "I_SHAPES_LINT"              # R4: problems in the shapes themselves
 I_EXTERNAL_REFS = "I_EXTERNAL_REFS"          # R5: references to other namespaces
 I_FEATURE_USE = "I_FEATURE_USE"              # R8: feature use matrix
+I_VERIFIED = "I_VERIFIED"                    # R10: a verification record whose checksums verify
+W_RECORD_MISMATCH = "W_RECORD_MISMATCH"      # R10: a verification record that does not match the files
 
 DESCRIPTIONS = {
     E_NO_AXIOMS: "artifact has no logical axioms",
@@ -123,6 +125,8 @@ DESCRIPTIONS = {
     I_SHAPES_LINT: "problems in the shapes themselves",
     I_EXTERNAL_REFS: "references to other namespaces",
     I_FEATURE_USE: "how the data uses the ontology",
+    I_VERIFIED: "verification record matches the files",
+    W_RECORD_MISMATCH: "verification record does not match the files",
 }
 
 # Which stage each code belongs to (for the report's stage grouping).

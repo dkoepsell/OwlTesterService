@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+{% block title %}Release builder: {{ b.answers.name }}{% endblock %}
+{% block content %}
+{% set a = b.answers %}
+<div class="container mt-4" style="max-width: 900px">
+  <h1 class="h3">Release builder: {{ a.title or a.name }}</h1>
+  <ol class="breadcrumb small">
+    {% for s in steps %}
+    <li class="breadcrumb-item {% if s == step %}active{% endif %}">
+      {% if s == step %}{{ loop.index }}. {{ s|capitalize }}{% else %}
+      <a href="{{ url_for('release_pages.release_step', build_id=b.build_id, step=s) }}">{{ loop.index }}. {{ s|capitalize }}</a>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+  {% if problems %}<div class="alert alert-warning"><strong>Fix these before building:</strong>
+    <ul class="mb-0">{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul></div>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="card card-body">
+  {% if step == 'identity' %}
+    <p class="small text-muted">Read from the file where it says so. Each answer is saved when you continue.</p>
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label">Short name</label>
+        <input class="form-control" name="name" value="{{ a.name }}" pattern="[a-z][a-z0-9-]{1,62}[a-z0-9]" required>
+        <div class="form-text">Lowercase, for file names: {{ a.name }}.owl</div></div>
+      <div class="col-md-6"><label class="form-label">Version</label>
+        <input class="form-control" name="version" value="{{ a.version }}" required>
+        <div class="form-text">Semantic version. With a previous release, the build compares the two and warns if the change calls for another number.</div></div>
+      <div class="col-12"><label class="form-label">Title</label><input class="form-control" name="title" value="{{ a.title }}" required></div>
+      <div class="col-12"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="3" required>{{ a.description }}</textarea></div>
+      <div class="col-md-7"><label class="form-label">Ontology IRI</label><input class="form-control" name="ontology_iri" value="{{ a.ontology_iri }}" required>
+        <div class="form-text">For persistent IRIs use https://w3id.org/&lt;project&gt;/...; the builder writes the w3id .htaccess.</div></div>
+      <div class="col-md-5"><label class="form-label">Base (optional)</label><input class="form-control" name="base" value="{{ a.base or '' }}">
+        <div class="form-text">Version IRIs are &lt;base&gt;/releases/&lt;version&gt;/{{ a.name }}.owl</div></div>
+      {% if b.detected %}<div class="col-12 small text-muted">Terms found: {{ b.detected.external_namespaces|length }} foreign namespace(s), {{ b.detected.bfo_terms }} BFO term(s).</div>{% endif %}
+      <div class="col-md-6"><label class="form-label">License</label>
+        <select class="form-select" name="license">{% for k, v in licenses.items() %}
+          <option value="{{ k }}" {% if a.license == k %}selected{% endif %}>{{ v[0] }}</option>{% endfor %}</select></div>
+      <div class="col-md-6"><label class="form-label">Release date</label><input class="form-control" name="release_date" value="{{ a.release_date }}"></div>
+      <div class="col-md-6"><label class="form-label">Creators</label>
+        <textarea class="form-control" name="creators" rows="3" placeholder="Name, ORCID (one per line)">{% for p in a.creators %}{{ p.name }}{% if p.orcid %}, {{ p.orcid }}{% endif %}
+{% endfor %}</textarea></div>
+      <div class="col-md-6"><label class="form-label">Contributors</label>
+        <textarea class="form-control" name="contributors" rows="3" placeholder="Name, ORCID (one per line)">{% for p in a.contributors %}{{ p.name }}{% if p.orcid %}, {{ p.orcid }}{% endif %}
+{% endfor %}</textarea></div>
+      <div class="col-md-6"><label class="form-label">Prior version IRI (optional)</label><input class="form-control" name="prior_version" value="{{ a.prior_version or '' }}"></div>
+      <div class="col-md-6"><label class="form-label">GitHub repository (optional)</label><input class="form-control" name="repository" value="{{ a.repository or '' }}" placeholder="https://github.com/owner/name"></div>
+      <div class="col-md-6"><label class="form-label">w3id project (optional)</label><input class="form-control" name="w3id_project" value="{{ a.w3id_project or '' }}"></div>
+    </div>
+  {% elif step == 'imports' %}
+    <p>Imports declared by the file:</p>
+    <ul>{% for i in b.header.imports %}<li><code>{{ i }}</code></li>{% else %}<li class="text-muted">none</li>{% endfor %}</ul>
+    <p class="small">Supplied files: {{ b.inputs.imports|join(', ') or 'none' }}. Each import must be supplied or removed
+      before building (BFO can come from the vendored BFO 2020).</p>
+    <div class="mb-3"><label class="form-label">Add files for imports</label>
+      <input class="form-control" type="file" name="imports" multiple></div>
+    <label class="form-label">BFO</label>
+    {% for v, label in [('module', 'A module of BFO 2020 for the terms used (robot extract --method BOT), as LOF does'),
+                        ('full', 'BFO 2020 whole'), ('none', 'No BFO import')] %}
+    <div class="form-check"><input class="form-check-input" type="radio" name="bfo" id="bfo-{{ v }}" value="{{ v }}" {% if a.bfo == v %}checked{% endif %}>
+      <label class="form-check-label" for="bfo-{{ v }}">{{ label }}</label></div>{% endfor %}
+  {% elif step == 'build' %}
+    <p class="small">ROBOT writes {{ a.name }}-base.owl (own axioms), {{ a.name }}.owl (merged and reasoned with HermiT) and {{ a.name }}.ttl.</p>
+    <label class="form-label">Also write</label>
+    {% for f, label in [('ofn', 'OWL functional syntax (.ofn)'), ('jsonld', 'JSON-LD (.jsonld)')] %}
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="formats" value="{{ f }}" id="f-{{ f }}" {% if f in (a.formats or []) %}checked{% endif %}>
+      <label class="form-check-label" for="f-{{ f }}">{{ label }}</label></div>{% endfor %}
+    <div class="row g-3 mt-1">
+      <div class="col-md-6"><label class="form-label">Audit profile</label>
+        <select class="form-select" name="profile">{% for p in ['', 'general', 'bfo', 'sool'] %}
+          <option value="{{ p }}" {% if (a.profile or '') == p %}selected{% endif %}>{{ p or 'automatic (bfo when BFO is imported)' }}</option>{% endfor %}</select></div>
+      <div class="col-md-6"><label class="form-label">Gate</label>
+        <select class="form-select" name="fail_on">{% for p in ['major', 'critical', 'minor'] %}
+          <option value="{{ p }}" {% if a.fail_on == p %}selected{% endif %}>reject at {{ p }} or worse</option>{% endfor %}</select></div>
+    </div>
+  {% elif step == 'quality' %}
+    <p class="small">The release always gets QC queries (missing label, missing definition, duplicate label, IRI pattern,
+      no BFO ancestor) and two competency-question starters to edit.</p>
+    <label class="form-label">SHACL scaffold from the axioms</label>
+    {% for v, label in [('draft', 'Generate it for me to review (not shipped)'), ('include', 'Ship it in the release'), ('off', 'Do not generate')] %}
+    <div class="form-check"><input class="form-check-input" type="radio" name="shapes_scaffold" id="s-{{ v }}" value="{{ v }}" {% if a.shapes_scaffold == v %}checked{% endif %}>
+      <label class="form-check-label" for="s-{{ v }}">{{ label }}</label></div>{% endfor %}
+    <div class="mt-3"><label class="form-label">Expected outcomes (optional)</label>
+      <textarea class="form-control font-monospace" name="expected" rows="3" placeholder="E_ABOX_INCONSISTENT: why this outcome is by design">{% for e in a.expected or [] %}{{ e.finding }}: {{ e.reason }}
+{% endfor %}</textarea>
+      <div class="form-text">Written to audit.yaml; they do not count against the release and are listed in its record.</div></div>
+  {% elif step == 'review' %}
+    <dl class="row small mb-0">
+      {% for k in ['name', 'title', 'ontology_iri', 'version', 'license', 'bfo', 'profile', 'fail_on', 'formats', 'shapes_scaffold', 'release_date', 'repository'] %}
+      <dt class="col-sm-3">{{ k|replace('_', ' ') }}</dt><dd class="col-sm-9">{{ a[k] if a[k] is not none else '' }}</dd>{% endfor %}
+    </dl>
+    <p class="small text-muted mt-2">Building takes a few minutes: ROBOT, HermiT and the full audit run on the server, offline.</p>
+  {% endif %}
+    <div class="mt-3"><button class="btn btn-primary" type="submit">{% if step == 'review' %}Build the release{% else %}Save and continue{% endif %}</button></div>
+  </form>
+</div>
+{% endblock %}

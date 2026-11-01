@@ -1,0 +1,20 @@
+@prefix d:    <https://data.audit-mini.test/id/> .
+@prefix onto: <https://w3id.org/audit-mini/onto#> .
+@prefix mod:  <https://w3id.org/audit-mini/modality/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+d:r1 a onto:Obligation ;
+    onto:requires d:a1 ;
+    onto:hasModality mod:Must ;
+    onto:title "Pay the annual fee" .
+
+d:a1 a onto:Action ;
+    rdfs:label "pay the fee" .
+
+d:r2 a onto:Permission ;
+    onto:requires d:a2 ;
+    onto:hasModality mod:May ;
+    onto:title "Appeal a decision" .
+
+d:a2 a onto:Action ;
+    rdfs:label "appeal" .

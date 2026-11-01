@@ -22,12 +22,15 @@ VERSION = re.compile(r"(?<![\w.])v?(\d+\.\d+(?:\.\d+)?(?:[-.]?(?:rc|alpha|beta)\
 CI_FILES = re.compile(r"(^|/)(\.gitlab-ci\.ya?ml|\.github/workflows/[^/]+\.ya?ml|tox\.ini|"
                       r"noxfile\.py|\.circleci/config\.ya?ml|Jenkinsfile|azure-pipelines\.ya?ml|"
                       r"\.travis\.ya?ml|bitbucket-pipelines\.ya?ml)$")
+# The OwlTester Action and CLI audit run both SHACL and a reasoner (SPEC-release.md, section 5).
+OWLTESTER_GATE = r"dkoepsell/owltester-action|owltester\.cli\s+audit|\bowltester\s+audit"
 CHECKS = {
     "syntax": re.compile(r"riot\s+--validate|rapper|rdflib|validate[_-]?(ttl|turtle|rdf|syntax)|"
                          r"turtle[_-]?(lint|validate)|ttl[_-]?lint", re.I),
-    "shacl": re.compile(r"pyshacl|shacl\s+validate|jena\s+shacl|shaclvalidate|topbraid|\bshacl\b", re.I),
+    "shacl": re.compile(r"pyshacl|shacl\s+validate|jena\s+shacl|shaclvalidate|topbraid|\bshacl\b|"
+                        + OWLTESTER_GATE, re.I),
     "reasoning": re.compile(r"robot(?:\.jar)?\s+(reason|explain)|hermit|pellet|owlready|\belk\b|"
-                            r"konclude|openllet|sync_reasoner", re.I),
+                            r"konclude|openllet|sync_reasoner|" + OWLTESTER_GATE, re.I),
     "tests": re.compile(r"pytest|unittest|\bnox\b|\btox\b", re.I),
 }
 SCRIPT_REF = re.compile(r"(?:python3?|bash|sh)\s+([\w./-]+\.(?:py|sh))")
@@ -262,6 +265,28 @@ def _changelog_claims(art):
     return log.path, sorted(set(missing))
 
 
+def _record(ctx, art):
+    """A shipped VERIFICATION.json: I_VERIFIED when its checksums verify (no re-audit here)."""
+    from ..release import record as rec
+    if not os.path.isfile(os.path.join(art.root, rec.RECORD_JSON)):
+        return
+    try:
+        problems = rec.check_files(art.root, rec.load_record(art.root))
+    except (rec.RecordError, OSError, ValueError, KeyError) as e:
+        problems = [str(e)]
+    if problems:
+        ctx.add("R10", errors.W_RECORD_MISMATCH, "minor",
+                f"The verification record does not match the release ({len(problems)} problem(s))",
+                files=[rec.RECORD_JSON], count=len(problems), evidence={"problems": problems[:20]},
+                fix="Re-run the audit and write the record again (owltester record), or ship the "
+                    "files the record names.")
+    else:
+        ctx.add("R10", errors.I_VERIFIED, "info",
+                "The release carries a verification record whose checksums verify",
+                files=[rec.RECORD_JSON],
+                fix="Nothing to do. Anyone can check it with: owltester verify <release> --reaudit.")
+
+
 def run_r10(ctx):
     art = ctx.artifact
     header = _header(art)
@@ -303,6 +328,7 @@ def run_r10(ctx):
                 evidence={"ci_checks": sorted(kinds), "sources": sources},
                 fix="Add a CI step such as: robot reason --reasoner HermiT --input ontology.ttl.")
 
+    _record(ctx, art)
     log, missing = _changelog_claims(art)
     if missing:
         ctx.add("R10", errors.W_CHANGELOG, "info",

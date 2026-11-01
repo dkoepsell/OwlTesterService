@@ -1,0 +1,19 @@
+# .github/workflows/audit.yml: every push and pull request.
+# The repository's own build runs unchanged; OwlTester adds SHACL, reasoning and
+# the rest of the release audit as a gate.
+name: audit
+on: [push, pull_request]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make -C src/ontology test
+      - uses: dkoepsell/owltester-action@v1
+        with:
+          profile: {{profile}}
+          fail-on: critical
+          comment: ${{ github.event_name == 'pull_request' }}

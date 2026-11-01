@@ -45,6 +45,11 @@
                                 <li><a class="dropdown-item" href="/sandbox">
                                     <i class="fas fa-project-diagram me-2"></i> Build Ontology
                                 </a></li>
+                                {% if may_build_release is defined and may_build_release() %}
+                                <li><a class="dropdown-item" href="{{ url_for('release_pages.release_new') }}">
+                                    <i class="fas fa-box-archive me-2"></i> Build a Release
+                                </a></li>
+                                {% endif %}
                                 <li><a class="dropdown-item" href="/sandbox/guide">
                                     <i class="fas fa-compass me-2"></i> Ontology Building Guide
                                 </a></li>

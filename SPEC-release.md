@@ -2,7 +2,7 @@
 
 **Target repo:** `OwlTesterService` (dkoepsell)
 **Builds on:** `SPEC-audit.md` (the full artifact audit), `SPEC-audit-repair.md` (guided repair)
-**Status:** plan only. No code in this change.
+**Status:** implemented (Parts A and B); see "Implementation notes" at the end.
 
 This spec covers two features for two audiences:
 
@@ -289,3 +289,14 @@ As for the audit: a background job with a sidecar (`jobs.py` pattern), budgets (
 4. **B1:** builder core: metadata, imports, build, audit, package (CLI `build` first, then the pages).
 5. **B2:** documentation generation, quality-layer starters, guided repair hook.
 6. **B3:** repository scaffold, w3id files, publish to GitHub.
+
+---
+
+## Implementation notes
+
+- **Action home (decision 1):** the Action's source is `action/` in OwlTesterService; publishing it as `dkoepsell/owltester-action` is a copy of that directory (see `action/README.md`). The Action is a composite action that runs the CLI image, so it can also upload the report as a workflow artifact. It pins the image through `action/IMAGE`, which holds a tag until the first image is published and should then hold the digest the `cli-image` workflow prints.
+- **Diagram:** `docs/diagram.svg` comes from an offline SVG renderer of the class hierarchy (`release/docs.py`); the existing UML generator calls plantuml.com, which section 5 rules out.
+- **Release CI outcomes:** a release zip has no CI of its own, so the builder's `audit.yaml` declares `W_CI_NO_REASONER` and `W_CI_NO_SHACL` expected, with the reason (the builder reasoned and validated it; the repository scaffold runs the Action). The repository scaffold's own `audit.yaml` does not.
+- **Reproducible timestamps:** inside a built release, `audited_at` is the release date and wall-clock timings are dropped from the shipped report, so two builds give the same bytes. `build-report.json` (not shipped) keeps the real times.
+- **Version suggestion:** the bump is computed by comparing the term sets and each shared term's statements (rdflib); `robot diff` output goes into the CHANGELOG draft.
+- **Not done here:** LOF adoption (section 7) needs pull requests to the LOF repositories reviewed by the coordinators, and the image and Action must be published first.

@@ -1,0 +1,140 @@
+{% extends "layout.html" %}
+{% block title %}Release: {{ b.answers.name }} {{ b.answers.version }}{% endblock %}
+{% block content %}
+{% set a = b.answers %}
+<div class="container mt-4" style="max-width: 900px" id="release" data-status="{{ b.status }}"
+     data-status-url="{{ url_for('release_pages.release_status', build_id=b.build_id) }}"
+     data-publish-url="{{ url_for('release_pages.release_publish', build_id=b.build_id) }}"
+     data-token-url="{{ url_for('release_pages.release_github_token') }}">
+  <h1 class="h3">{{ a.title or a.name }} {{ a.version }}</h1>
+  <p class="small"><a href="{{ url_for('release_pages.release_step', build_id=b.build_id, step='identity') }}">Change the answers</a>
+    &middot; <a href="{{ url_for('release_pages.release_new') }}">Build another release</a></p>
+
+  {% if b.status == 'running' %}
+  <div class="card mb-3"><div class="card-body d-flex align-items-center gap-3">
+    <div class="spinner-border spinner-border-sm text-info" role="status" aria-hidden="true"></div>
+    <strong id="stage">{{ b.stage or 'Starting' }}</strong>
+    <span class="small text-muted ms-auto">This page updates by itself. You can leave it; the build keeps running.</span>
+  </div></div>
+  {% elif b.status == 'error' %}
+  <div class="alert alert-danger">The build failed: {{ b.error }}</div>
+  {% elif b.status == 'draft' %}
+  <div class="alert alert-info">Not built yet. <a href="{{ url_for('release_pages.release_step', build_id=b.build_id, step='review') }}">Review and build</a>.</div>
+  {% endif %}
+
+  {% if report and b.status in ('done', 'rejected') %}
+  {% set au = report.audit %}
+  {% if au %}
+  <div class="alert alert-{{ 'success' if au.gate == 'passed' else 'warning' }}">
+    <strong>Audit: {{ au.verdict }}</strong> ({{ au.counts.critical }} critical, {{ au.counts.major }} major,
+    {{ au.counts.minor }} minor, {{ au.counts.info }} info{% if au.counts.expected %}; {{ au.counts.expected }} expected{% endif %}).
+    Gate <code>--fail-on {{ au.fail_on }}</code>: {{ au.gate }}.{% if report.repaired %} Audited again after guided repair.{% endif %}
+  </div>
+  {% if au.blocking %}
+  <p>What stops the release:</p>
+  <ul>{% for f in au.blocking %}<li><span class="badge bg-secondary">{{ f.severity }}</span> <code>{{ f.code }}</code> {{ f.title }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% endif %}
+  {% if report.warnings %}<div class="alert alert-secondary small"><ul class="mb-0">{% for w in report.warnings %}<li>{{ w }}</li>{% endfor %}</ul></div>{% endif %}
+
+  <h2 class="h5 mt-4">Downloads</h2>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm btn-primary" href="{{ url_for('release_pages.release_out', build_id=b.build_id, name='zip') }}">{{ report.outputs.zip }}</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('release_pages.release_out', build_id=b.build_id, name='repo') }}">Repository ({{ report.outputs.repo_zip }})</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('release_pages.release_out', build_id=b.build_id, name='report') }}">Build report</a>
+    {% if '.htaccess' in report.outputs.w3id %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('release_pages.release_out', build_id=b.build_id, name='htaccess') }}">w3id .htaccess</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('release_pages.release_out', build_id=b.build_id, name='w3id-pr') }}">w3id pull request text</a>
+    {% endif %}
+  </div>
+  <p class="small text-muted mt-2">The repository holds the edit file, imports, catalog, Makefile, workflows that run the
+    OwlTester Action, and the release files: push it, and make the next release with a tag. Persistent IRIs: open a pull
+    request to perma-id/w3id.org with the .htaccess (the builder does not submit it). Zenodo: link the repository
+    once on Zenodo (GitHub integration) and each GitHub Release gets a DOI.</p>
+
+  {% if report.gaps and (report.gaps.label or report.gaps.definition) %}
+  <h2 class="h5 mt-4">To complete</h2>
+  <p class="small">These terms need text from you; the builder did not invent it (also in <code>docs/terms.md</code>).</p>
+  <ul class="small">{% for t in report.gaps.label %}<li>no label: <code>{{ t }}</code></li>{% endfor %}
+    {% for t in report.gaps.definition %}<li>no definition: <code>{{ t }}</code></li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if au and au.gate == 'rejected' and may_repair %}
+  <h2 class="h5 mt-4">Fix it</h2>
+  <form method="post" action="{{ url_for('release_pages.release_repair', build_id=b.build_id) }}" class="d-inline">
+    <button class="btn btn-outline-primary btn-sm" type="submit">Open guided repair on this release</button></form>
+  {% if b.repair_job %}
+  <form method="post" action="{{ url_for('release_pages.release_repaired', build_id=b.build_id) }}" class="d-flex gap-2 mt-2">
+    <input class="form-control form-control-sm" style="max-width: 22rem" name="plan_id" placeholder="Applied repair plan id" required>
+    <button class="btn btn-sm btn-primary" type="submit">Use the repaired release</button></form>
+  <p class="small text-muted">After applying a plan, the repaired release is audited again and recorded here.</p>
+  {% endif %}
+  {% endif %}
+
+  {% if b.status == 'done' %}
+  <h2 class="h5 mt-4">Publish to GitHub (optional)</h2>
+  <p class="small">With your own GitHub token (stored encrypted, used only for this). You see exactly what will be
+    pushed and confirm it each time.</p>
+  <div class="row g-2 small">
+    <div class="col-md-6"><input class="form-control form-control-sm" type="password" id="gh-token" placeholder="GitHub token (repo scope)" autocomplete="off"></div>
+    <div class="col-md-6"><button class="btn btn-sm btn-outline-secondary" id="gh-token-save" type="button">Store token</button>
+      <button class="btn btn-sm btn-outline-secondary" id="gh-token-delete" type="button">Forget token</button></div>
+    <div class="col-md-6"><input class="form-control form-control-sm" id="gh-repo" placeholder="owner/name" value="{{ (a.repository or '')|replace('https://github.com/', '') }}"></div>
+    <div class="col-md-6 form-check pt-1"><input class="form-check-input" type="checkbox" id="gh-create">
+      <label class="form-check-label" for="gh-create">Create it (private, under my account)</label></div>
+    <div class="col-12"><button class="btn btn-sm btn-primary" id="gh-publish" type="button">Publish</button>
+      <span id="gh-result" class="ms-2"></span></div>
+  </div>
+  {% for p in b.published or [] %}<p class="small mt-2">Published {{ p.at }}: <a href="{{ p.url }}" rel="noopener">{{ p.url }}</a></p>{% endfor %}
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const root = document.getElementById('release');
+  if (root.dataset.status === 'running') {
+    const poll = async () => {
+      try {
+        const s = await (await fetch(root.dataset.statusUrl, {headers: {'Accept': 'application/json'}})).json();
+        if (s.status !== 'running') { window.location.reload(); return; }
+        document.getElementById('stage').textContent = s.stage || 'Working';
+      } catch (e) { /* retried */ }
+      setTimeout(poll, 2000);
+    };
+    setTimeout(poll, 2000);
+  }
+  const out = document.getElementById('gh-result');
+  const send = async (url, body, method) => {
+    const res = await fetch(url, {method: method || 'POST', headers: {'Content-Type': 'application/json'},
+                                  body: body === undefined ? undefined : JSON.stringify(body)});
+    let data = {}; try { data = await res.json(); } catch (e) { data = {error: 'No answer from the server.'}; }
+    return {ok: res.ok, data: data};
+  };
+  const save = document.getElementById('gh-token-save');
+  if (!save) { return; }
+  save.addEventListener('click', async () => {
+    const el = document.getElementById('gh-token');
+    const r = await send(root.dataset.tokenUrl, {token: el.value}); el.value = '';
+    out.textContent = r.ok ? 'Token stored.' : (r.data.error || 'Could not store the token.');
+  });
+  document.getElementById('gh-token-delete').addEventListener('click', async () => {
+    const r = await send(root.dataset.tokenUrl, undefined, 'DELETE');
+    out.textContent = r.ok && r.data.deleted ? 'Token forgotten.' : 'No token was stored.';
+  });
+  document.getElementById('gh-publish').addEventListener('click', async () => {
+    const body = {repo: document.getElementById('gh-repo').value.trim(), create: document.getElementById('gh-create').checked};
+    const dry = await send(root.dataset.publishUrl, body);
+    if (!dry.ok) { out.textContent = dry.data.error || 'Could not prepare.'; return; }
+    if (!window.confirm('This will:\n- ' + dry.data.steps.join('\n- ') + '\n\nContinue?')) { return; }
+    out.textContent = 'Publishing...';
+    const r = await send(root.dataset.publishUrl, Object.assign(body, {confirm: true}));
+    if (!r.ok) { out.textContent = r.data.error || 'Publishing failed.'; return; }
+    out.innerHTML = '';
+    const link = document.createElement('a'); link.href = r.data.url; link.rel = 'noopener'; link.textContent = r.data.url;
+    out.append('Published: ', link);
+  });
+})();
+</script>
+{% endblock %}

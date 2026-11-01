@@ -108,13 +108,18 @@ try:
     # Guided release repair adds its routes to both blueprints, so it is
     # imported before they are registered (SPEC-audit-repair.md).
     from owltester import repair_service as _repair_service
+    # The release builder (SPEC-release.md, Part B): /release/new and /release/<id>.
+    from owltester import release_service as _release_service
     _owltester_configure()
     app.register_blueprint(_owltester_bp)
     app.register_blueprint(_audit_pages_bp)
-    app.context_processor(lambda: {'may_start_audit': _may_start_audit})
+    app.register_blueprint(_release_service.release_pages_bp)
+    app.context_processor(lambda: {'may_start_audit': _may_start_audit,
+                                   'may_build_release': _release_service.may_build})
     logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
     # States who may audit and who may repair, so a misconfiguration shows in the logs.
-    logging.getLogger(__name__).warning("access: %s", _repair_service.startup_line())
+    logging.getLogger(__name__).warning("access: %s; %s", _repair_service.startup_line(),
+                                        _release_service.describe())
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)
 
@@ -173,6 +178,11 @@ limit_endpoint(app, 'owltester.repair_ai', AI_LIMIT)
 for _repair_endpoint in ('repair_decide', 'repair_comment', 'repair_add_member', 'repair_remove_member',
                          'repair_github_token', 'repair_pull_request'):
     limit_endpoint(app, f'owltester.{_repair_endpoint}', ANALYSIS_LIMIT)
+# The release builder runs ROBOT, HermiT and the audit; publishing talks to GitHub.
+limit_endpoint(app, 'release_pages.release_create', UPLOAD_LIMIT, methods=['POST'])
+limit_endpoint(app, 'release_pages.release_step', ANALYSIS_LIMIT, methods=['POST'])
+for _release_endpoint in ('release_repair', 'release_repaired', 'release_publish', 'release_github_token'):
+    limit_endpoint(app, f'release_pages.{_release_endpoint}', ANALYSIS_LIMIT)
 limit_endpoint(app, 'kindwork.check', UPLOAD_LIMIT)
 for _kw_endpoint in ('build', 'import_model', 'lint', 'ingest', 'mcp'):
     limit_endpoint(app, f'kindwork_module.{_kw_endpoint}', ANALYSIS_LIMIT)

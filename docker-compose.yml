@@ -54,6 +54,9 @@ services:
       REPAIR_ALLOWED_USERS: ${REPAIR_ALLOWED_USERS:-}
       REPAIR_RETENTION_DAYS: ${REPAIR_RETENTION_DAYS:-90}
       REPAIR_MAX_REMOVED: ${REPAIR_MAX_REMOVED:-0.02}
+      # Release builder (SPEC-release.md, Part B): empty means nobody may build.
+      BUILD_ALLOWED_USERS: ${BUILD_ALLOWED_USERS:-}
+      BUILD_BUDGET: ${BUILD_BUDGET:-300}
     volumes:
       - uploads:/app/uploads
     expose:
