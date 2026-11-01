@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: make -C src/ontology release VERSION=${GITHUB_REF_NAME#v}
+      - run: make -C src/ontology release VERSION="${GITHUB_REF_NAME#v}"
       - run: ./scripts/stage-release.sh dist/
       - id: audit
         uses: dkoepsell/owltester-action@v1
