@@ -20,13 +20,33 @@
     <span class="small text-muted">Plan {{ plan.plan_id[:8] }}, your role: <strong>{{ role }}</strong></span>
   </div>
   <p class="text-muted small mb-2">
-    Built from the audit of {{ plan.audit_before.audited_at if plan.audit_before else '' }}
+    Built from the audit of {{ ((plan.audit_before or (job.report or {})).audited_at or 'this release')|replace('T', ' ') }}
     ({{ plan.profile }} profile). Decisions save as you make them. Nothing changes until the plan is
     applied, and the original release is never touched.
   </p>
 
-  {% if plan.status == 'building' %}
-  <div class="alert alert-info">Building the plan from the release. This page updates by itself.</div>
+  {% if plan.status == 'building' and build.status == 'stale' %}
+  <div class="alert alert-danger">The plan stopped building: it has not reported progress for 15 minutes,
+    most likely because the server restarted.
+    {% if role == 'owner' %}<a href="{{ url_for('audit_pages.repair_home', job_id=job_id, new=1) }}">Start another plan</a>.{% endif %}</div>
+  {% elif plan.status == 'building' %}
+  <div class="card mb-3" id="build-status" data-started="{{ plan.created_at }}">
+    <div class="card-body">
+      <div class="d-flex align-items-center gap-3 mb-2">
+        <div class="spinner-border spinner-border-sm text-info" role="status" aria-hidden="true"></div>
+        <strong id="build-stage">{{ build.stage or 'Starting' }}</strong>
+        <span class="small text-muted ms-auto" id="build-elapsed"></span>
+      </div>
+      <div class="progress mb-2" role="progressbar" aria-label="Plan build progress">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" id="build-bar"
+             style="width: {{ (100 * build.done / build.total) if build.total else 5 }}%">
+          <span id="build-count">{% if build.total %}{{ build.done }} of {{ build.total }} findings{% endif %}</span></div>
+      </div>
+      <p class="small text-muted mb-0">The server reads the release and works out a fix for each finding.
+        A large release takes a few minutes. You can leave this page; the plan keeps building and
+        is here when you come back.</p>
+    </div>
+  </div>
   {% elif plan.status == 'error' %}
   <div class="alert alert-danger">The plan could not be built: {{ plan.error }}</div>
   {% else %}

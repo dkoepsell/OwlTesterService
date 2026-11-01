@@ -470,3 +470,25 @@ def test_only_the_owner_may_open_a_pull_request(flask_app, monkeypatch, tmp_path
     assert dwayne.post(base + "/pull-request", json={}).status_code == 403
     assert dwayne.post(base + "/github-token", json={"token": "x" * 40}).status_code == 403
     assert owner.post(base + "/pull-request", json={"repo": "a/b"}).status_code == 409   # not applied yet
+
+
+def test_plan_build_reports_progress_and_goes_stale(flask_app, monkeypatch, tmp_path):
+    from owltester import repair_service
+    from owltester.release_repair.model import Plan
+    monkeypatch.setenv("REPAIR_ALLOWED_USERS", "owner")
+    c, uid = _client(flask_app, "owner")
+    j, p, _ = _done_job(flask_app, uid, tmp_path)
+    up = flask_app.config["UPLOADED_OWLS_DEST"]
+    stub = Plan(plan_id="b" * 32, job_id=j, artifact="mini", profile="general",
+                created_at="2026-01-01T00:00:00", created_by={"user_id": uid}, status="building",
+                build={"stage": "Proposing fixes (W_HEADER)", "done": 3, "total": 9,
+                       "updated_at": "2026-01-01T00:00:00"})
+    storage.save(up, stub)
+    assert c.get(f"/owltester/audit/{j}/repair/{stub.plan_id}").get_json()["build"]["status"] == "stale"
+    assert b"stopped building" in c.get(f"/audit/{j}/repair/{stub.plan_id}").data
+    stub.build["updated_at"] = repair_service.now()
+    storage.save(up, stub)
+    b = c.get(f"/owltester/audit/{j}/repair/{stub.plan_id}").get_json()["build"]
+    assert (b["status"], b["done"], b["total"]) == ("building", 3, 9)
+    page = c.get(f"/audit/{j}/repair/{stub.plan_id}").data
+    assert b"Proposing fixes (W_HEADER)" in page and b"3 of 9 findings" in page

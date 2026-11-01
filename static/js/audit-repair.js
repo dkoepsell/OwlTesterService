@@ -7,7 +7,32 @@
     const aiUsed = new Set();
 
     if (root.dataset.status === 'building') {
-        setTimeout(() => window.location.reload(), 4000);
+        const box = document.getElementById('build-status');
+        if (!box) { return; }   // stale: nothing to poll
+        const started = Date.parse(box.dataset.started + 'Z');
+        const elapsed = document.getElementById('build-elapsed');
+        const tick = () => {
+            const s = Math.max(0, Math.round((Date.now() - started) / 1000));
+            elapsed.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} elapsed`;
+        };
+        tick();
+        setInterval(tick, 1000);
+        const poll = async () => {
+            try {
+                const res = await fetch(base, {headers: {'Accept': 'application/json'}});
+                if (res.ok) {
+                    const b = (await res.json()).build || {};
+                    if (b.status !== 'building') { window.location.reload(); return; }
+                    if (b.stage) { document.getElementById('build-stage').textContent = b.stage; }
+                    if (b.total) {
+                        document.getElementById('build-bar').style.width = `${Math.max(5, Math.round(100 * b.done / b.total))}%`;
+                        document.getElementById('build-count').textContent = `${b.done} of ${b.total} findings`;
+                    }
+                }
+            } catch (e) { /* a missed poll is retried */ }
+            setTimeout(poll, 2000);
+        };
+        setTimeout(poll, 2000);
         return;
     }
 

@@ -26,16 +26,22 @@ def now():
 
 # -- building ----------------------------------------------------------------------------
 
-def build_plan(report, release, *, job_id="", user=None, plan_id=None):
-    """A Plan for ``report`` (an AuditReport dict) over ``release`` (zip, dir or files)."""
+def build_plan(report, release, *, job_id="", user=None, plan_id=None, progress=None):
+    """A Plan for ``report`` (an AuditReport dict) over ``release`` (zip, dir or files).
+
+    ``progress(stage, done, total)``, when given, is called as the build moves on.
+    """
     from ..audit.artifact import load_artifact
+    step = progress or (lambda *a: None)
+    step("Reading the release", 0, 0)
     art = load_artifact(release)
     try:
+        step("Preparing the release's graphs", 0, 0)
         ctx = Ctx(art, report)
         remedies = []
-        for f in report.get("findings", []):
-            if f.get("expected"):
-                continue
+        todo = [f for f in report.get("findings", []) if not f.get("expected")]
+        for i, f in enumerate(todo):
+            step(f"Proposing fixes ({f.get('code', '')})", i, len(todo))
             try:
                 r = build(ctx, f)
             except Exception as e:  # noqa: BLE001 - one bad builder must not cost the plan
@@ -44,6 +50,7 @@ def build_plan(report, release, *, job_id="", user=None, plan_id=None):
                 logging.getLogger(__name__).warning("remedy for %s failed: %s", f.get("id"), e)
             if r is not None:
                 remedies.append(r)
+        step("Checking the lens gaps", len(todo), len(todo))
         remedies += lens_gaps(ctx, report.get("lenses"))
         _link(remedies, report)
         remedies = order(remedies)
