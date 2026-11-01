@@ -46,6 +46,7 @@ services:
       KINDWORK_CTA_LABEL: ${KINDWORK_CTA_LABEL:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-owltester}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-owl_tester}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       SESSION_SECRET: ${SESSION_SECRET}
       RATELIMIT_STORAGE_URI: ${RATELIMIT_STORAGE_URI:-redis://redis:6379/0}
       # Full artifact audit and guided release repair (SPEC-audit.md, SPEC-audit-repair.md).
