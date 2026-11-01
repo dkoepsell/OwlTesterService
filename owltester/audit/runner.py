@@ -32,16 +32,43 @@ STAGES = (
 
 
 def tool_version():
-    v = os.environ.get("OWLTESTER_VERSION")
-    if v:
+    """The commit the audit code came from, in order of preference:
+    ``OWLTESTER_VERSION`` (set at image build, see the Dockerfile), the git
+    checkout, or, where neither exists (the Docker image has no .git), a hash
+    of the audit source itself, ``src-<hash>``, so two reports can still be
+    told apart by the code that produced them."""
+    v = os.environ.get("OWLTESTER_VERSION", "").strip()
+    if v and v != "unknown":
         return v
+    here = os.path.dirname(os.path.abspath(__file__))
     try:
-        here = os.path.dirname(os.path.abspath(__file__))
         out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=here,
                              capture_output=True, text=True, timeout=5, check=False)
-        return out.stdout.strip() or "unknown"
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
-        return "unknown"
+        pass
+    return source_hash()
+
+
+def source_hash():
+    """Short hash of the owltester package's Python source and lens files."""
+    import hashlib
+    pkg = os.path.dirname(here_dir())
+    h = hashlib.sha256()
+    for dirpath, dirnames, files in os.walk(pkg):
+        dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+        for fn in sorted(files):
+            if fn.endswith((".py", ".yaml", ".yml", ".json", ".ttl")):
+                path = os.path.join(dirpath, fn)
+                h.update(os.path.relpath(path, pkg).replace(os.sep, "/").encode())
+                with open(path, "rb") as fh:
+                    h.update(fh.read())
+    return "src-" + h.hexdigest()[:10]
+
+
+def here_dir():
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def run_r0(ctx):

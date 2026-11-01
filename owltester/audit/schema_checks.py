@@ -31,6 +31,26 @@ NEUTRAL_CLASSES = {OWL.Thing, RDFS.Resource, RDFS.Literal, RDF.langString,
 
 
 _GENERATED_PREFIX = re.compile(r"^(default|ns)\d+:")
+_LOCAL_OK = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+
+def _shortest_prefix(g, iri):
+    """prefix:local using the shortest bound namespace that leaves a clean local
+    name. The union of several files carries every file's prefixes, and rdflib
+    would pick the longest match, so a term's name depended on which file
+    bound which prefix first (odp1:0001000 beside lof:ODP002_0001000)."""
+    best = None
+    for prefix, ns in g.namespaces():
+        ns = str(ns)
+        if not prefix or _GENERATED_PREFIX.match(prefix + ":") or not iri.startswith(ns):
+            continue
+        rest = iri[len(ns):]
+        if not rest or not _LOCAL_OK.match(rest):
+            continue
+        key = (len(ns), prefix)
+        if best is None or key < best[0]:
+            best = (key, f"{prefix}:{rest}")
+    return best[1] if best else None
 
 
 def qname(g, iri):
@@ -38,6 +58,9 @@ def qname(g, iri):
     the graph has no prefix for it (rdflib would invent 'default3:')."""
     if g is None:
         return str(iri)
+    best = _shortest_prefix(g, str(iri))
+    if best:
+        return best
     try:
         name = g.namespace_manager.normalizeUri(URIRef(iri))
     except Exception:  # noqa: BLE001

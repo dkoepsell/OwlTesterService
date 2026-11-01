@@ -67,6 +67,13 @@ RUN python -c "import nltk; nltk.download('wordnet'); nltk.download('omw-1.4')"
 # Copy application code (vendors bfo/bfo-2020.owl into the image; no runtime fetch)
 COPY . .
 
+# The commit this image was built from, shown as "Tool version" on audit reports.
+# .git is not in the build context, so pass it in:
+#   docker-compose build --build-arg OWLTESTER_VERSION=$(git rev-parse --short HEAD) app
+# Without it, reports show src-<hash> of the audit code instead.
+ARG OWLTESTER_VERSION=
+ENV OWLTESTER_VERSION=${OWLTESTER_VERSION}
+
 # Node runtime + deps for the kindwork-core sidecar; fail the build if it can't
 # load the vendored Kindwork page.
 COPY --from=kwnode /usr/local/bin/node /usr/local/bin/node

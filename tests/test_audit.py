@@ -280,6 +280,44 @@ def test_bfo_profile_without_kernel_and_alignment_lint(tmp_path):
     assert flagged == {"dcterms:subject"}
 
 
+def test_qname_is_independent_of_which_file_bound_a_prefix_first():
+    import rdflib
+    from owltester.audit.schema_checks import qname
+    for order in (("odp1", "lof"), ("lof", "odp1")):
+        g = rdflib.Graph()
+        for prefix in order:
+            g.bind(prefix, {"odp1": "https://w3id.org/lof/ODP001_", "lof": "https://w3id.org/lof/"}[prefix])
+        assert qname(g, "https://w3id.org/lof/ODP001_0001000") == "lof:ODP001_0001000"
+    g = rdflib.Graph()
+    g.bind("ex", "http://example.org/")
+    g.bind("onto", "http://example.org/onto#")
+    assert qname(g, "http://example.org/onto#Rule") == "onto:Rule"   # no "ex:onto#Rule"
+
+
+def test_make_targets_named_without_file_paths():
+    from owltester.audit.hygiene import _make_reachable
+    mk = ("ROBOT := java -jar ../../bin/robot.jar\nTMP := tmp\n.PHONY: test verify\n"
+          "test: verify\n\n$(TMP):\n\tmkdir -p $(TMP)\n\n"
+          "$(TMP)/r.owl: in.owl | ../../bin/robot.jar $(TMP)\n\t$(ROBOT) reason --input $< --output $@\n\n"
+          "verify: $(TMP)/r.owl\n\t$(ROBOT) verify --input $<\n")
+    recipes, named = _make_reachable(mk, ["test"])
+    assert named == ["test", "verify"]
+    assert "reason" in recipes                     # file targets are still followed
+    _, named = _make_reachable("all: out/x.ttl build\nbuild:\n\techo\nout/x.ttl:\n\ttouch $@\n", [])
+    assert named == ["all", "build"]               # no .PHONY: file paths left out
+
+
+def test_tool_version_without_git_or_env(monkeypatch):
+    import subprocess as sp
+    from owltester.audit import runner
+    monkeypatch.setenv("OWLTESTER_VERSION", "")
+    monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: sp.CompletedProcess(a, 128, "", "no git"))
+    v = runner.tool_version()
+    assert v.startswith("src-") and len(v) == 14 and v == runner.source_hash()
+    monkeypatch.setenv("OWLTESTER_VERSION", "abc1234")
+    assert runner.tool_version() == "abc1234"
+
+
 # -- one test per mini fixture --------------------------------------------------------
 
 @pytest.mark.java
