@@ -90,6 +90,20 @@ DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGR
 
 > `DATABASE_URL` uses the variable substitution above — Docker Compose resolves it from the other vars in `.env`.
 
+**Full audits and guided repair.** Set both to the owner's username or email, so audits and
+repairs stay private (`SPEC-audit-repair.md`, section 1):
+
+```
+AUDIT_ALLOWED_USERS=<owner account>
+REPAIR_ALLOWED_USERS=<owner account>
+```
+
+Both fail closed: an empty list means nobody may audit or repair. Audits always need
+sign-in and only the account that ran one can see it; there is no public mode (`AUDIT_MODE`
+is ignored). After a restart, check the
+startup log line `access: full audits: ...; guided repair: ...` (`docker compose logs app | grep access:`).
+A host with its own edited `docker-compose.yml` must pass these variables to the `app` service too.
+
 ---
 
 ## Topology A — self-contained (bundled nginx)

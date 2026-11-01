@@ -105,11 +105,16 @@ try:
     # /owltester/audit, GET /owltester/audit/<job_id>...) plus the /audit/<job_id> page.
     from owltester.audit_service import audit_pages_bp as _audit_pages_bp
     from owltester.audit_service import may_start_audit as _may_start_audit
+    # Guided release repair adds its routes to both blueprints, so it is
+    # imported before they are registered (SPEC-audit-repair.md).
+    from owltester import repair_service as _repair_service
     _owltester_configure()
     app.register_blueprint(_owltester_bp)
     app.register_blueprint(_audit_pages_bp)
     app.context_processor(lambda: {'may_start_audit': _may_start_audit})
     logging.getLogger(__name__).info("owltesterservice gate mounted at /owltester")
+    # States who may audit and who may repair, so a misconfiguration shows in the logs.
+    logging.getLogger(__name__).warning("access: %s", _repair_service.startup_line())
 except Exception as _e:  # noqa: BLE001
     logging.getLogger(__name__).warning("owltesterservice gate not mounted: %s", _e)
 
@@ -160,6 +165,14 @@ limit_endpoint(app, 'owltester.http_check', UPLOAD_LIMIT)
 limit_endpoint(app, 'owltester.http_repair', UPLOAD_LIMIT)
 limit_endpoint(app, 'owltester.audit_start', UPLOAD_LIMIT)
 limit_endpoint(app, 'owltester.audit_lens_draft', AI_LIMIT)
+# Guided release repair: apply and plan building run the reasoner; suggestions use AI.
+limit_endpoint(app, 'audit_pages.repair_start', UPLOAD_LIMIT, methods=['POST'])
+limit_endpoint(app, 'owltester.repair_apply', UPLOAD_LIMIT)
+limit_endpoint(app, 'owltester.repair_upload_release', UPLOAD_LIMIT)
+limit_endpoint(app, 'owltester.repair_ai', AI_LIMIT)
+for _repair_endpoint in ('repair_decide', 'repair_comment', 'repair_add_member', 'repair_remove_member',
+                         'repair_github_token', 'repair_pull_request'):
+    limit_endpoint(app, f'owltester.{_repair_endpoint}', ANALYSIS_LIMIT)
 limit_endpoint(app, 'kindwork.check', UPLOAD_LIMIT)
 for _kw_endpoint in ('build', 'import_model', 'lint', 'ingest', 'mcp'):
     limit_endpoint(app, f'kindwork_module.{_kw_endpoint}', ANALYSIS_LIMIT)
