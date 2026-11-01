@@ -16,12 +16,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the CLI image
         run: docker build --target cli --build-arg OWLTESTER_VERSION="${GITHUB_SHA::7}" -t owltester-cli:selftest .
+      # Inside the workspace: the Action's container mounts only $GITHUB_WORKSPACE.
       - name: Stage the fixture release
-        run: cp -R fixtures/release/gate-repo "$RUNNER_TEMP/dist"
+        run: mkdir -p _selftest && cp -R fixtures/release/gate-repo _selftest/dist
       - id: audit
         uses: ./action
         with:
-          path: ${{ runner.temp }}/dist
+          path: _selftest/dist
           fail-on: major
           record: true
           image: owltester-cli:selftest
@@ -33,7 +34,7 @@ jobs:
           test "$VERDICT" = pass
           test -f "$RECORD"
       - name: Verify the recorded release
-        run: docker run --rm -v "$RUNNER_TEMP/dist:/w" -w /w owltester-cli:selftest verify . --reaudit
+        run: docker run --rm -v "$GITHUB_WORKSPACE/_selftest/dist:/w" -w /w owltester-cli:selftest verify . --reaudit
   actionlint:
     runs-on: ubuntu-latest
     steps:
