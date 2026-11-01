@@ -13,9 +13,15 @@ memcached:// for exact, shared counting.
 
 Set RATELIMIT_ENABLED=0 to turn limiting off (the test suite does). The flag is
 read per request, so a test can flip ``app.config['RATELIMIT_ENABLED']``.
+
+Power users (owltester/power.py) get POWER_FACTOR times the upload, analysis and
+AI limits, and POWER_CAP_FACTOR times the per-account sandbox caps. Override with
+POWER_UPLOAD_LIMIT / POWER_ANALYSIS_LIMIT / POWER_AI_LIMIT (limit strings) and
+POWER_<cap name> (integers), in the app config or the environment.
 """
 
 import os
+import re
 
 from flask import current_app, jsonify, render_template, request
 from flask_limiter import Limiter
@@ -26,9 +32,9 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 # -- rate limits (per key: signed-in user id, else client IP) -----------------
 SANDBOX_CREATE_LIMIT = "10 per hour;30 per day"     # /sandbox/new, import_to_sandbox
 SANDBOX_WRITE_LIMIT = "120 per minute"              # class / property create
-UPLOAD_LIMIT = "30 per hour"                        # /upload, gate check/repair, export
-ANALYSIS_LIMIT = "60 per hour"                      # reanalyze, fix-and-reanalyze, prover
-AI_LIMIT = "20 per hour;100 per day"                # anything that calls OpenAI/Anthropic
+UPLOAD_LIMIT_FREE = "30 per hour"                   # /upload, gate check/repair, export
+ANALYSIS_LIMIT_FREE = "60 per hour"                 # reanalyze, fix-and-reanalyze, prover
+AI_LIMIT_FREE = "20 per hour;100 per day"           # anything that calls OpenAI/Anthropic
 FOL_TEST_LIMIT = "30 per minute"                    # /api/test-expression
 LOGIN_LIMIT = "10 per minute;50 per hour"           # POST /login
 REGISTER_LIMIT = "5 per hour"                       # POST /register
@@ -40,6 +46,45 @@ DEFAULT_CAPS = {
     "MAX_CLASSES_PER_SANDBOX": 2000,
     "MAX_PROPERTIES_PER_SANDBOX": 1000,
 }
+POWER_FACTOR = 5          # rate limits
+POWER_CAP_FACTOR = 4      # per-account sandbox caps
+POWER_CAPS = ("MAX_SANDBOXES_PER_USER", "MAX_CLASSES_PER_SANDBOX", "MAX_PROPERTIES_PER_SANDBOX")
+
+
+def _is_power_user():
+    """Fails closed: any error (no request, no table) means not a power user."""
+    try:
+        from owltester.power import is_power_user
+        return bool(is_power_user())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def scale_limit(limit, factor):
+    """"20 per hour;100 per day" * 5 -> "100 per hour;500 per day"."""
+    return ";".join(re.sub(r"^\s*(\d+)", lambda m: str(int(m.group(1)) * factor), part)
+                    for part in limit.split(";"))
+
+
+def tiered(free, power_name):
+    """A limit flask-limiter evaluates per request: ``free`` for most accounts, the
+    power value (``power_name`` in config/env, else ``free`` * POWER_FACTOR) for
+    power users. Counters are kept separately per limit value."""
+    def limit():
+        if not _is_power_user():
+            return free
+        try:
+            override = current_app.config.get(power_name)
+        except RuntimeError:  # no app context
+            override = None
+        return override or os.environ.get(power_name) or scale_limit(free, POWER_FACTOR)
+    limit.free = free
+    return limit
+
+
+UPLOAD_LIMIT = tiered(UPLOAD_LIMIT_FREE, "POWER_UPLOAD_LIMIT")
+ANALYSIS_LIMIT = tiered(ANALYSIS_LIMIT_FREE, "POWER_ANALYSIS_LIMIT")
+AI_LIMIT = tiered(AI_LIMIT_FREE, "POWER_AI_LIMIT")
 
 
 def _env_flag(name, default=True):
@@ -88,7 +133,10 @@ class SandboxCapError(ValueError):
 
 
 def cap(name):
-    return int(current_app.config.get(name, DEFAULT_CAPS[name]))
+    base = int(current_app.config.get(name, DEFAULT_CAPS[name]))
+    if name in POWER_CAPS and _is_power_user():
+        return int(current_app.config.get("POWER_" + name) or base * POWER_CAP_FACTOR)
+    return base
 
 
 def check_sandbox_count_cap():
@@ -155,6 +203,9 @@ def init_abuse_controls(app):
 
     for name, default in DEFAULT_CAPS.items():
         app.config.setdefault(name, int(os.environ.get(name, default)))
+    for name in POWER_CAPS:
+        if os.environ.get("POWER_" + name):
+            app.config.setdefault("POWER_" + name, int(os.environ["POWER_" + name]))
 
     app.register_error_handler(429, _too_many_requests)
 

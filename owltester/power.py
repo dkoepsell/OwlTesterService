@@ -2,8 +2,8 @@
 
 Admins are the accounts named in ADMIN_USERS (comma-separated; an entry with "@"
 is an email, any other a username; empty means no admins). They grant and revoke
-power users at /admin/power-users. A power user may run full audits, and future
-power-user features check ``is_power_user()``.
+power users at /admin/power-users. A power user gets ``PERKS``; every power-user
+feature checks ``is_power_user()`` (signed-in account) or ``is_power_account(user)``.
 
 Everything fails closed: not signed in, or any error reading the table, means no.
 """
@@ -49,6 +49,26 @@ def is_power_user(user_id=None):
         return False
 
 
+def is_power_account(user):
+    """Same rule for a given account (not the signed-in one): an admin, or granted."""
+    if user is None or getattr(user, "id", None) is None:
+        return False
+    if matches(admin_users(), str(getattr(user, "username", "") or ""),
+               str(getattr(user, "email", "") or "")):
+        return True
+    return is_power_user(user.id)
+
+
+PERKS = (
+    "full artifact audits",
+    "guided repair of their own audited releases",
+    "the release builder, and publishing to GitHub with their own token",
+    "5x the hourly limits on uploads, analysis and AI calls",
+    "4x the sandbox caps (sandboxes, classes and properties per sandbox)",
+    "the server's AI key (other users must bring their own)",
+)
+
+
 def describe():
     admins = sorted(admin_users())
     try:
@@ -77,7 +97,7 @@ def power_users():
         abort(404)
     from models import PowerUser
     rows = PowerUser.query.order_by(PowerUser.granted_at).all()
-    return render_template("admin/power_users.html", rows=rows, token=_token(),
+    return render_template("admin/power_users.html", rows=rows, token=_token(), perks=PERKS,
                            message=request.args.get("m"), error=request.args.get("e"))
 
 

@@ -101,8 +101,12 @@ ADMIN_USERS=<owner account>
 ```
 
 An entry with `@` matches only the account's email, any other only its username. Admins
-grant and revoke **power users** at `/admin/power-users`; a power user may run full audits
-(and future power-user features) without being named in `AUDIT_ALLOWED_USERS`.
+grant and revoke **power users** at `/admin/power-users`. Without being named in any list, a
+power user gets full audits, guided repair, the release builder, 5x the upload, analysis and
+AI rate limits (`POWER_UPLOAD_LIMIT`, `POWER_ANALYSIS_LIMIT`, `POWER_AI_LIMIT` override), 4x
+the per-account sandbox caps (`POWER_MAX_SANDBOXES_PER_USER` etc.), and the server's AI key.
+Everyone else must bring their own AI key; `SERVER_AI_KEY_FOR=all` restores the old
+behaviour (anyone may use the server's key) with a restart, no code change.
 
 All three fail closed: an empty list means nobody may audit, repair or build releases. Audits always need
 sign-in and only the account that ran one can see it; there is no public mode (`AUDIT_MODE`

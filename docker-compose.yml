@@ -58,6 +58,10 @@ services:
       BUILD_ALLOWED_USERS: ${BUILD_ALLOWED_USERS:-}
       # Site admins (grant power users at /admin/power-users); empty means none.
       ADMIN_USERS: ${ADMIN_USERS:-}
+      SERVER_AI_KEY_FOR: ${SERVER_AI_KEY_FOR:-power}
+      POWER_UPLOAD_LIMIT: ${POWER_UPLOAD_LIMIT:-}
+      POWER_ANALYSIS_LIMIT: ${POWER_ANALYSIS_LIMIT:-}
+      POWER_AI_LIMIT: ${POWER_AI_LIMIT:-}
       BUILD_BUDGET: ${BUILD_BUDGET:-300}
     volumes:
       - uploads:/app/uploads

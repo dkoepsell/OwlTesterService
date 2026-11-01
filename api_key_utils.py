@@ -9,7 +9,10 @@ this priority order:
      which lives only in their session cookie's server-side store and is never
      written to the database. Each provider has its own session slot, and the
      user's selected provider is recorded so resolution is unambiguous.
-  3. The server's OPENAI_API_KEY / ANTHROPIC_API_KEY environment variables.
+  3. The server's OPENAI_API_KEY / ANTHROPIC_API_KEY environment variables,
+     only for power users (owltester/power.py) unless SERVER_AI_KEY_FOR=all.
+     Everyone else brings their own key. Outside a request (scripts, threads)
+     the server key is not used: it fails closed.
 
 Keeping this in one place means openai_utils, improved_openai_utils, and the web
 layer all make the same decision. Implication generation is provider-aware via
@@ -23,6 +26,32 @@ ANTHROPIC_SESSION_KEY = "anthropic_api_key"
 PROVIDER_SESSION_KEY = "ai_provider"      # "openai" | "anthropic"
 
 VALID_PROVIDERS = ("openai", "anthropic")
+
+
+def server_key_policy():
+    """'power' (default): only power users may use the server's key; 'all': anyone."""
+    v = os.environ.get("SERVER_AI_KEY_FOR", "power").strip().lower()
+    return "all" if v == "all" else "power"
+
+
+def server_key_allowed():
+    """May the current request fall back to the server's AI key? Fails closed."""
+    if server_key_policy() == "all":
+        return True
+    try:
+        from flask import has_request_context
+        if not has_request_context():
+            return False
+        from owltester.power import is_power_user
+        return bool(is_power_user())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _server_env(name):
+    """The server's key ``name`` if this request may use it, else None."""
+    value = os.environ.get(name)
+    return value if value and server_key_allowed() else None
 
 
 def _session():
@@ -48,7 +77,7 @@ def resolve_openai_key(explicit=None):
         # it turns every OpenAI call into a 401.
         if not key.startswith("sk-ant-"):
             return key
-    return os.environ.get("OPENAI_API_KEY")
+    return _server_env("OPENAI_API_KEY")
 
 
 def resolve_anthropic_key(explicit=None):
@@ -58,7 +87,7 @@ def resolve_anthropic_key(explicit=None):
     s = _session()
     if s and s.get(ANTHROPIC_SESSION_KEY):
         return s.get(ANTHROPIC_SESSION_KEY)
-    return os.environ.get("ANTHROPIC_API_KEY")
+    return _server_env("ANTHROPIC_API_KEY")
 
 
 def resolve_ai(explicit_key=None, explicit_provider=None):
@@ -69,8 +98,9 @@ def resolve_ai(explicit_key=None, explicit_provider=None):
       2. A BYO session key, honoring the provider the user selected; if no
          provider was selected (or its key is missing), whichever session key
          is present.
-      3. The server env keys: OPENAI_API_KEY first (to preserve the prior
-         default behavior), then ANTHROPIC_API_KEY.
+      3. The server env keys (power users only, see server_key_allowed):
+         OPENAI_API_KEY first (to preserve the prior default behavior), then
+         ANTHROPIC_API_KEY.
     """
     if explicit_key:
         return (explicit_provider or "openai", explicit_key)
@@ -93,6 +123,8 @@ def resolve_ai(explicit_key=None, explicit_provider=None):
             return ("anthropic", anthropic_key)
         if openai_key:
             return ("openai", openai_key)
+    if not server_key_allowed():
+        return (None, None)
     if os.environ.get("OPENAI_API_KEY"):
         return ("openai", os.environ["OPENAI_API_KEY"])
     if os.environ.get("ANTHROPIC_API_KEY"):
@@ -110,7 +142,7 @@ def key_source():
     s = _session()
     if s and s.get(SESSION_KEY):
         return "session"
-    return "server" if os.environ.get("OPENAI_API_KEY") else "none"
+    return "server" if _server_env("OPENAI_API_KEY") else "none"
 
 
 def has_ai_key():
@@ -123,9 +155,16 @@ def ai_key_source():
     s = _session()
     if s and (s.get(SESSION_KEY) or s.get(ANTHROPIC_SESSION_KEY)):
         return "session"
-    if os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
+    if _server_env("OPENAI_API_KEY") or _server_env("ANTHROPIC_API_KEY"):
         return "server"
     return "none"
+
+
+def server_key_withheld():
+    """True when the server has a key but this visitor may not use it (so the UI
+    can say "bring your own key; power users can use the server's")."""
+    has = bool(os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"))
+    return has and not server_key_allowed()
 
 
 def active_provider():

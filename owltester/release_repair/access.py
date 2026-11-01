@@ -55,10 +55,26 @@ def is_allowed(username, email):
     return matches(allowed_users(), username, email)
 
 
+def account_may_repair(user):
+    """May this account (e.g. one being added to a plan) repair? Named in
+    REPAIR_ALLOWED_USERS, or a power user. Fails closed."""
+    if user is None:
+        return False
+    if is_allowed(str(getattr(user, "username", "") or ""), str(getattr(user, "email", "") or "")):
+        return True
+    from ..power import is_power_account
+    return is_power_account(user)
+
+
 def may_repair():
-    """Signed in, and named in REPAIR_ALLOWED_USERS. Fails closed."""
+    """Signed in, and named in REPAIR_ALLOWED_USERS or a power user. Fails closed."""
     uid, username, email = current()
-    return uid is not None and is_allowed(username, email)
+    if uid is None:
+        return False
+    if is_allowed(username, email):
+        return True
+    from ..power import is_power_user
+    return is_power_user()
 
 
 def role(plan, job, user_id):
@@ -83,4 +99,5 @@ def describe():
     repair = sorted(allowed_users())
     return (f"full audits: {('only ' + audit_allow) if audit_allow else 'no one named (AUDIT_ALLOWED_USERS is empty)'}"
             " plus power users; "
-            f"guided repair: {'only ' + ', '.join(repair) if repair else 'nobody (REPAIR_ALLOWED_USERS is empty)'}")
+            f"guided repair: {'only ' + ', '.join(repair) if repair else 'no one named (REPAIR_ALLOWED_USERS is empty)'}"
+            " plus power users")

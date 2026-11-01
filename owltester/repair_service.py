@@ -15,7 +15,7 @@ JSON (``owltester`` blueprint), under /owltester/audit/<job_id>/repair/:
     GET  <plan_id>/out/<name>                   outputs; <plan_id>/issues.zip
     POST <plan_id>/members  DELETE <plan_id>/members/<user_id>   share and unshare
 
-Every route checks, in order: signed in; named in REPAIR_ALLOWED_USERS; owner of
+Every route checks, in order: signed in; named in REPAIR_ALLOWED_USERS or a power user; owner of
 the audit job (or, for a plan, a member of it). A failure returns 404 for plans
 and jobs, so their existence is not revealed, and 403 for the start route.
 """
@@ -399,8 +399,9 @@ def repair_add_member(job_id, plan_id):
         user = None
     if user is None:
         return jsonify({"error": "No account with that username or email."}), 400
-    if not access.is_allowed(str(user.username or ""), str(user.email or "")):
-        return jsonify({"error": "That account is not in REPAIR_ALLOWED_USERS."}), 400
+    if not access.account_may_repair(user):
+        return jsonify({"error": "That account may not use guided repair (not in "
+                                 "REPAIR_ALLOWED_USERS and not a power user)."}), 400
     if user.id == (data.get("owner") or {}).get("user_id"):
         return jsonify({"error": "The owner already has every right."}), 400
     with storage.lock(storage.plan_dir(_upload_dir(), job_id, plan_id)):
